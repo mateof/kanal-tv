@@ -78,6 +78,12 @@ class LiveViewModel @Inject constructor(
     private var previewJob: Job? = null
     private var player: ExoPlayer? = null
 
+    /** Same container fallback the full player does, so a preview that fails
+     *  does not mislabel a channel that plays fine once opened. */
+    private var previewCandidates: List<String> = emptyList()
+    private var previewIndex = 0
+    private var previewTitle = ""
+
     val source: StateFlow<Source?> =
         activeSource.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), null)
 
@@ -163,6 +169,10 @@ class LiveViewModel @Inject constructor(
             if (_focused.value?.streamId != channel.streamId) return@launch
 
             val playable = playback.forChannel(current, channel)
+            previewCandidates = listOf(playable.url) + playable.fallbackUrls
+            previewIndex = 0
+            previewTitle = playable.title
+
             val exo = ensurePlayer(playable.userAgent, config)
             exo.setMediaItem(playerFactory.mediaItem(playable.url, playable.title))
             exo.prepare()
@@ -177,12 +187,24 @@ class LiveViewModel @Inject constructor(
         created.addListener(object : Player.Listener {
             override fun onPlayerError(error: PlaybackException) {
                 logger.w("Preview", "Vista previa fallida: ${error.errorCodeName}")
+                if (advancePreview()) return
                 _previewError.value = "No se pudo cargar la vista previa"
                 _previewActive.value = false
             }
         })
         player = created
         return created
+    }
+
+    /** @return true when another container variant was queued. */
+    private fun advancePreview(): Boolean {
+        if (previewIndex + 1 >= previewCandidates.size) return false
+        val exo = player ?: return false
+        previewIndex++
+        exo.setMediaItem(playerFactory.mediaItem(previewCandidates[previewIndex], previewTitle))
+        exo.prepare()
+        exo.playWhenReady = true
+        return true
     }
 
     fun previewPlayer(): ExoPlayer? = player

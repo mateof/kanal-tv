@@ -46,6 +46,14 @@ object XtreamUrls {
     fun live(source: Source, streamId: String, extension: String): String =
         "${normalizeBase(source.url)}/live/${encPath(source.username)}/${encPath(source.password)}/$streamId.$extension"
 
+    /**
+     * The pre-`/live/` form some panels (and a few Dispatcharr setups) still
+     * serve, with no path prefix and no extension. Kept as a last resort when
+     * both container variants fail.
+     */
+    fun legacyLive(source: Source, streamId: String): String =
+        "${normalizeBase(source.url)}/${encPath(source.username)}/${encPath(source.password)}/$streamId"
+
     fun movie(source: Source, streamId: String, extension: String): String =
         "${normalizeBase(source.url)}/movie/${encPath(source.username)}/${encPath(source.password)}/$streamId.${extension.ifBlank { "mp4" }}"
 

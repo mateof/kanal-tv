@@ -10,6 +10,7 @@ import com.mateof.kanal.data.model.Source
 import com.mateof.kanal.data.model.SourceType
 import com.mateof.kanal.data.prefs.AppPreferences
 import com.mateof.kanal.data.prefs.DEFAULT_USER_AGENT
+import com.mateof.kanal.data.prefs.StreamFormat
 import com.mateof.kanal.data.xtream.XtreamUrls
 import kotlinx.coroutines.flow.first
 import java.text.SimpleDateFormat
@@ -33,7 +34,14 @@ data class Playable(
     val seriesId: String = "",
     val startPositionMs: Long = 0L,
     /** Xtream channel id used to look the guide up while playing. */
-    val epgChannelId: String = ""
+    val epgChannelId: String = "",
+    /**
+     * Other urls for the same content, tried in order when the first one fails
+     * to parse. Panels are not consistent: within one account some channels
+     * only answer in MPEG-TS, others only in HLS, and a few still use the old
+     * prefix-less path.
+     */
+    val fallbackUrls: List<String> = emptyList()
 )
 
 @Singleton
@@ -42,9 +50,23 @@ class PlaybackRepository @Inject constructor(
 ) {
     suspend fun forChannel(source: Source, channel: ChannelEntity): Playable {
         val settings = prefs.settings.first()
-        val url = when (source.type) {
-            SourceType.M3U -> channel.url
-            SourceType.XTREAM -> XtreamUrls.live(source, channel.streamId, settings.streamFormat.extension)
+        val url: String
+        val fallbacks: List<String>
+        when (source.type) {
+            SourceType.M3U -> {
+                url = channel.url
+                fallbacks = emptyList()
+            }
+
+            SourceType.XTREAM -> {
+                val preferred = settings.streamFormat
+                val other = if (preferred == StreamFormat.TS) StreamFormat.HLS else StreamFormat.TS
+                url = XtreamUrls.live(source, channel.streamId, preferred.extension)
+                fallbacks = listOf(
+                    XtreamUrls.live(source, channel.streamId, other.extension),
+                    XtreamUrls.legacyLive(source, channel.streamId)
+                )
+            }
         }
         return Playable(
             kind = ContentKind.LIVE,
@@ -56,7 +78,8 @@ class PlaybackRepository @Inject constructor(
             url = url,
             userAgent = userAgentFor(source),
             isLive = true,
-            epgChannelId = channel.epgChannelId
+            epgChannelId = channel.epgChannelId,
+            fallbackUrls = fallbacks
         )
     }
 

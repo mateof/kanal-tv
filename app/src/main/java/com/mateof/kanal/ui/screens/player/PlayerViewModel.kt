@@ -11,6 +11,7 @@ import androidx.media3.exoplayer.ExoPlayer
 import com.mateof.kanal.core.log.FileLogger
 import com.mateof.kanal.data.db.EpgEntity
 import com.mateof.kanal.data.model.Source
+import com.mateof.kanal.data.net.redactUrl
 import com.mateof.kanal.data.prefs.AppPreferences
 import com.mateof.kanal.data.repo.ContentRepository
 import com.mateof.kanal.data.repo.EpgRepository
@@ -71,6 +72,10 @@ class PlayerViewModel @Inject constructor(
     private var channelIds: List<String> = emptyList()
     private var ticker: Job? = null
     private var loadedKey = ""
+
+    /** Urls still to try for the current item, in order. */
+    private var candidates: List<String> = emptyList()
+    private var candidateIndex = 0
 
     fun load(kind: String, itemId: String, startMillis: Long) {
         val key = "$kind/$itemId/$startMillis"
@@ -138,6 +143,9 @@ class PlayerViewModel @Inject constructor(
             player = it
         }
 
+        candidates = listOf(playable.url) + playable.fallbackUrls
+        candidateIndex = 0
+
         exo.setMediaItem(playerFactory.mediaItem(playable.url, playable.title))
         exo.prepare()
         if (playable.startPositionMs > 0) exo.seekTo(playable.startPositionMs)
@@ -189,7 +197,9 @@ class PlayerViewModel @Inject constructor(
 
     private val listener = object : Player.Listener {
         override fun onPlayerError(error: PlaybackException) {
-            logger.e("Player", "Error de reproducción: ${error.errorCodeName}", error)
+            logger.w("Player", "Error de reproducción: ${error.errorCodeName}")
+            if (tryNextCandidate(error)) return
+            logger.e("Player", "Sin más formatos que probar", error)
             _state.value = _state.value.copy(
                 error = friendlyError(error),
                 buffering = false,
@@ -208,6 +218,43 @@ class PlayerViewModel @Inject constructor(
             _state.value = _state.value.copy(playing = isPlaying)
             if (!isPlaying) recordProgress()
         }
+    }
+
+    /**
+     * Panels are inconsistent channel by channel: some only answer in MPEG-TS,
+     * some only in HLS, and a few still use the prefix-less path. When the
+     * failure looks like "this is not what I asked for", walk the alternatives
+     * instead of showing the user an error they cannot act on.
+     *
+     * @return true when another url was queued.
+     */
+    private fun tryNextCandidate(error: PlaybackException): Boolean {
+        if (!isWorthRetrying(error)) return false
+        if (candidateIndex + 1 >= candidates.size) return false
+        val exo = player ?: return false
+
+        candidateIndex++
+        val url = candidates[candidateIndex]
+        val title = _state.value.playable?.title.orEmpty()
+        logger.i("Player", "Reintentando '$title' con ${redactUrl(url)}")
+
+        _state.value = _state.value.copy(error = "", buffering = true)
+        exo.setMediaItem(playerFactory.mediaItem(url, title))
+        exo.prepare()
+        exo.playWhenReady = true
+        return true
+    }
+
+    private fun isWorthRetrying(error: PlaybackException): Boolean = when (error.errorCode) {
+        PlaybackException.ERROR_CODE_PARSING_CONTAINER_UNSUPPORTED,
+        PlaybackException.ERROR_CODE_PARSING_CONTAINER_MALFORMED,
+        PlaybackException.ERROR_CODE_PARSING_MANIFEST_UNSUPPORTED,
+        PlaybackException.ERROR_CODE_PARSING_MANIFEST_MALFORMED,
+        PlaybackException.ERROR_CODE_IO_BAD_HTTP_STATUS,
+        PlaybackException.ERROR_CODE_IO_FILE_NOT_FOUND,
+        PlaybackException.ERROR_CODE_IO_UNSPECIFIED -> true
+
+        else -> false
     }
 
     private fun optionsFor(tracks: Tracks, type: Int): List<TrackOption> {
@@ -281,7 +328,12 @@ class PlayerViewModel @Inject constructor(
 
     fun retry() {
         val exo = player ?: return
-        _state.value = _state.value.copy(error = "")
+        _state.value = _state.value.copy(error = "", buffering = true)
+        // Start the candidate walk over: the channel may simply have been down.
+        candidateIndex = 0
+        candidates.firstOrNull()?.let { url ->
+            exo.setMediaItem(playerFactory.mediaItem(url, _state.value.playable?.title.orEmpty()))
+        }
         exo.prepare()
         exo.playWhenReady = true
     }
@@ -304,6 +356,13 @@ class PlayerViewModel @Inject constructor(
 
         PlaybackException.ERROR_CODE_IO_FILE_NOT_FOUND ->
             "La emisión ya no existe en el servidor."
+
+        PlaybackException.ERROR_CODE_PARSING_CONTAINER_UNSUPPORTED,
+        PlaybackException.ERROR_CODE_PARSING_CONTAINER_MALFORMED,
+        PlaybackException.ERROR_CODE_PARSING_MANIFEST_UNSUPPORTED,
+        PlaybackException.ERROR_CODE_PARSING_MANIFEST_MALFORMED ->
+            "El servidor no envía vídeo en ningún formato reconocible. Suele ser un " +
+                "canal caído o el límite de conexiones alcanzado."
 
         PlaybackException.ERROR_CODE_DECODING_FAILED,
         PlaybackException.ERROR_CODE_DECODER_INIT_FAILED ->
