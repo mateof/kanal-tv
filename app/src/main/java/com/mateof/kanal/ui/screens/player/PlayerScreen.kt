@@ -22,7 +22,13 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.outlined.AspectRatio
 import androidx.compose.material.icons.outlined.ClosedCaption
+import androidx.compose.material.icons.outlined.Forward10
+import androidx.compose.material.icons.outlined.Pause
+import androidx.compose.material.icons.outlined.PlayArrow
+import androidx.compose.material.icons.outlined.Replay10
+import androidx.compose.material.icons.outlined.Tune
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
@@ -37,6 +43,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.foundation.focusGroup
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
@@ -63,7 +70,18 @@ import com.mateof.kanal.ui.components.ThinProgress
 import com.mateof.kanal.ui.theme.KanalColors
 import kotlinx.coroutines.delay
 
-private const val OSD_TIMEOUT_MS = 5_000L
+private const val OSD_TIMEOUT_MS = 6_000L
+
+/**
+ * Who owns the D-pad at any moment.
+ *
+ * The player has to serve two jobs with the same four arrow keys: driving
+ * playback (zapping, seeking) and operating the on-screen controls. Mixing them
+ * makes the buttons unreachable — the root box swallows every arrow, focus
+ * never moves and, on a remote with no MENU key, there is no way in at all.
+ * So the modes are explicit and only [Mode.Watching] consumes the arrows.
+ */
+private enum class Mode { Watching, Controls, Tracks }
 
 @Composable
 fun PlayerScreen(
@@ -75,61 +93,99 @@ fun PlayerScreen(
     val vm: PlayerViewModel = hiltViewModel()
     val state by vm.state.collectAsStateWithLifecycle()
 
+    var mode by remember { mutableStateOf(Mode.Watching) }
     var osdVisible by remember { mutableStateOf(true) }
     var osdTick by remember { mutableIntStateOf(0) }
-    var tracksVisible by remember { mutableStateOf(false) }
     var resizeMode by remember { mutableIntStateOf(AspectRatioFrameLayout.RESIZE_MODE_FIT) }
-    val focusRequester = remember { FocusRequester() }
+
+    val stageFocus = remember { FocusRequester() }
+    val controlsFocus = remember { FocusRequester() }
+    val tracksFocus = remember { FocusRequester() }
+
+    val isLive = state.playable?.isLive == true
 
     fun poke() {
         osdVisible = true
         osdTick++
     }
 
+    fun openControls() {
+        osdVisible = true
+        osdTick++
+        mode = Mode.Controls
+    }
+
     LaunchedEffect(kind, itemId, startMillis) { vm.load(kind, itemId, startMillis) }
-    LaunchedEffect(Unit) { runCatching { focusRequester.requestFocus() } }
-    LaunchedEffect(osdTick, tracksVisible) {
-        if (tracksVisible) return@LaunchedEffect
+
+    // Focus follows the mode, so the arrows always land where the user expects.
+    // The control bar and the track panel appear with the same frame that
+    // changes the mode, so their target may not be attached yet: keep trying
+    // for a moment instead of silently leaving focus on the video.
+    LaunchedEffect(mode) {
+        val target = when (mode) {
+            Mode.Watching -> stageFocus
+            Mode.Controls -> controlsFocus
+            Mode.Tracks -> tracksFocus
+        }
+        repeat(12) {
+            if (runCatching { target.requestFocus() }.isSuccess) return@LaunchedEffect
+            delay(40)
+        }
+    }
+
+    // The bar only fades out while watching; it must stay while it is being used.
+    LaunchedEffect(osdTick, mode) {
+        if (mode != Mode.Watching) return@LaunchedEffect
         delay(OSD_TIMEOUT_MS)
         osdVisible = false
     }
 
     BackHandler {
-        if (tracksVisible) tracksVisible = false else onBack()
+        when (mode) {
+            Mode.Tracks -> mode = Mode.Controls
+            Mode.Controls -> mode = Mode.Watching
+            Mode.Watching -> onBack()
+        }
     }
 
     Box(
         Modifier
             .fillMaxSize()
             .background(Color.Black)
-            .focusRequester(focusRequester)
+            .focusRequester(stageFocus)
             .focusable()
             .onKeyEvent { event ->
+                // Outside Watching the arrows belong to Compose's focus system.
+                if (mode != Mode.Watching) return@onKeyEvent false
                 if (event.type != KeyEventType.KeyDown) return@onKeyEvent false
                 when (event.key) {
                     Key.DirectionUp -> {
                         poke()
-                        if (state.playable?.isLive == true) vm.zap(-1)
+                        if (isLive) vm.zap(-1)
                         true
                     }
 
                     Key.DirectionDown -> {
                         poke()
-                        if (state.playable?.isLive == true) vm.zap(1)
+                        if (isLive) vm.zap(1)
                         true
                     }
 
                     Key.DirectionLeft -> {
-                        poke(); vm.seekBy(-10_000); true
+                        poke()
+                        if (!isLive) vm.seekBy(-10_000)
+                        true
                     }
 
                     Key.DirectionRight -> {
-                        poke(); vm.seekBy(10_000); true
+                        poke()
+                        if (!isLive) vm.seekBy(10_000)
+                        true
                     }
 
+                    // The only way into the controls on a remote without MENU.
                     Key.DirectionCenter, Key.Enter -> {
-                        if (osdVisible && state.playable?.isLive != true) vm.togglePlayPause()
-                        poke()
+                        openControls()
                         true
                     }
 
@@ -138,7 +194,7 @@ fun PlayerScreen(
                     }
 
                     Key.Menu, Key.Info -> {
-                        tracksVisible = !tracksVisible; poke(); true
+                        openControls(); true
                     }
 
                     else -> false
@@ -178,7 +234,8 @@ fun PlayerScreen(
             Column(
                 modifier = Modifier
                     .align(Alignment.Center)
-                    .padding(40.dp),
+                    .padding(40.dp)
+                    .focusGroup(),
                 horizontalAlignment = Alignment.CenterHorizontally
             ) {
                 Text(
@@ -202,21 +259,27 @@ fun PlayerScreen(
         ) {
             Osd(
                 state = state,
+                controlsActive = mode == Mode.Controls,
+                controlsFocus = controlsFocus,
                 resizeLabel = resizeLabel(resizeMode),
                 onCycleResize = {
                     resizeMode = nextResizeMode(resizeMode)
                     poke()
                 },
-                onToggleTracks = { tracksVisible = !tracksVisible; poke() }
+                onTogglePlay = { vm.togglePlayPause(); poke() },
+                onSeekBack = { vm.seekBy(-10_000); poke() },
+                onSeekForward = { vm.seekBy(10_000); poke() },
+                onOpenTracks = { mode = Mode.Tracks; poke() }
             )
         }
 
-        if (tracksVisible) {
+        if (mode == Mode.Tracks) {
             TrackPanel(
                 state = state,
+                focusRequester = tracksFocus,
                 onSelect = { option -> vm.selectTrack(option); poke() },
                 onDisableSubtitles = { vm.disableSubtitles(); poke() },
-                onClose = { tracksVisible = false },
+                onClose = { mode = Mode.Controls },
                 modifier = Modifier.align(Alignment.CenterEnd)
             )
         }
@@ -226,9 +289,14 @@ fun PlayerScreen(
 @Composable
 private fun Osd(
     state: PlayerUiState,
+    controlsActive: Boolean,
+    controlsFocus: FocusRequester,
     resizeLabel: String,
     onCycleResize: () -> Unit,
-    onToggleTracks: () -> Unit
+    onTogglePlay: () -> Unit,
+    onSeekBack: () -> Unit,
+    onSeekForward: () -> Unit,
+    onOpenTracks: () -> Unit
 ) {
     val playable = state.playable ?: return
     Column(
@@ -279,13 +347,9 @@ private fun Osd(
                     overflow = TextOverflow.Ellipsis
                 )
             }
-            Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                KanalButton(resizeLabel, onCycleResize)
-                KanalButton("Pistas", onToggleTracks)
-            }
         }
 
-        Spacer(Modifier.height(20.dp))
+        Spacer(Modifier.height(18.dp))
 
         val now = state.now
         if (playable.isLive && now != null) {
@@ -324,12 +388,40 @@ private fun Osd(
             )
         }
 
+        Spacer(Modifier.height(18.dp))
+
+        Row(
+            modifier = Modifier
+                .focusRequester(controlsFocus)
+                .focusGroup(),
+            horizontalArrangement = Arrangement.spacedBy(12.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            if (!playable.isLive) {
+                KanalButton(
+                    text = if (state.playing) "Pausa" else "Reproducir",
+                    onClick = onTogglePlay,
+                    icon = if (state.playing) Icons.Outlined.Pause else Icons.Outlined.PlayArrow,
+                    tone = ButtonTone.Primary
+                )
+                KanalButton("10 s", onSeekBack, icon = Icons.Outlined.Replay10)
+                KanalButton("10 s", onSeekForward, icon = Icons.Outlined.Forward10)
+            }
+            KanalButton(resizeLabel, onCycleResize, icon = Icons.Outlined.AspectRatio)
+            KanalButton(
+                text = "Audio y subtítulos",
+                onClick = onOpenTracks,
+                icon = Icons.Outlined.Tune,
+                tone = if (playable.isLive) ButtonTone.Primary else ButtonTone.Neutral
+            )
+        }
+
         Spacer(Modifier.height(14.dp))
         Text(
-            if (playable.isLive) {
-                "Arriba/abajo para cambiar de canal · OK para el panel · MENÚ para las pistas"
-            } else {
-                "Izquierda/derecha ±10 s · OK reproduce o pausa · MENÚ para las pistas"
+            text = when {
+                controlsActive -> "Izquierda y derecha para moverte por los botones · ATRÁS vuelve al vídeo"
+                playable.isLive -> "Arriba y abajo cambian de canal · OK abre los controles · ATRÁS sale"
+                else -> "Izquierda y derecha ±10 s · OK abre los controles · ATRÁS sale"
             },
             style = MaterialTheme.typography.labelSmall,
             color = KanalColors.OnSurfaceFaint
@@ -340,6 +432,7 @@ private fun Osd(
 @Composable
 private fun TrackPanel(
     state: PlayerUiState,
+    focusRequester: FocusRequester,
     onSelect: (TrackOption) -> Unit,
     onDisableSubtitles: () -> Unit,
     onClose: () -> Unit,
@@ -347,14 +440,16 @@ private fun TrackPanel(
 ) {
     Column(
         modifier = modifier
-            .width(420.dp)
+            .width(430.dp)
             .fillMaxHeight(0.92f)
             .padding(24.dp)
             .clip(RoundedCornerShape(18.dp))
             .background(Color(0xF20B1120))
             .padding(24.dp)
+            .focusRequester(focusRequester)
+            .focusGroup()
     ) {
-        Text("Pistas", style = MaterialTheme.typography.titleLarge, color = KanalColors.OnBackground)
+        Text("Audio y subtítulos", style = MaterialTheme.typography.titleLarge, color = KanalColors.OnBackground)
         Spacer(Modifier.height(16.dp))
 
         LazyColumn(
