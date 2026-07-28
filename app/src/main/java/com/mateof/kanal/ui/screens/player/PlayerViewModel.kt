@@ -49,7 +49,11 @@ data class PlayerUiState(
     val audioTracks: List<TrackOption> = emptyList(),
     val subtitleTracks: List<TrackOption> = emptyList(),
     val channelIndex: Int = -1,
-    val channelCount: Int = 0
+    val channelCount: Int = 0,
+    /** Days the provider sent guide for, for the in-player guide panel. */
+    val guideDays: List<Long> = emptyList(),
+    val selectedDay: Long = 0L,
+    val dayProgrammes: List<EpgEntity> = emptyList()
 )
 
 @HiltViewModel
@@ -167,9 +171,50 @@ class PlayerViewModel @Inject constructor(
 
     private fun loadGuide(playable: Playable) {
         if (!playable.isLive || playable.epgChannelId.isBlank()) {
-            _state.value = _state.value.copy(now = null, next = null)
+            _state.value = _state.value.copy(
+                now = null,
+                next = null,
+                guideDays = emptyList(),
+                dayProgrammes = emptyList()
+            )
             return
         }
+        viewModelScope.launch {
+            val current = source ?: return@launch
+            val channelId = playable.epgChannelId
+            val nowNext = epg.nowNext(current.id, channelId)
+            val days = epg.availableDays(current.id, channelId)
+            val today = days.firstOrNull() ?: 0L
+            _state.value = _state.value.copy(
+                now = nowNext.now,
+                next = nowNext.next,
+                guideDays = days,
+                selectedDay = today,
+                dayProgrammes = if (today > 0) {
+                    epg.programmesOfDay(current.id, channelId, today)
+                } else {
+                    emptyList()
+                }
+            )
+        }
+    }
+
+    fun selectGuideDay(day: Long) {
+        val channelId = _state.value.playable?.epgChannelId.orEmpty()
+        val current = source ?: return
+        if (channelId.isBlank()) return
+        viewModelScope.launch {
+            _state.value = _state.value.copy(
+                selectedDay = day,
+                dayProgrammes = epg.programmesOfDay(current.id, channelId, day)
+            )
+        }
+    }
+
+    /** Refreshes now/next so the OSD is right after a programme changes over. */
+    fun refreshNowNext() {
+        val playable = _state.value.playable ?: return
+        if (!playable.isLive || playable.epgChannelId.isBlank()) return
         viewModelScope.launch {
             val current = source ?: return@launch
             val nowNext = epg.nowNext(current.id, playable.epgChannelId)

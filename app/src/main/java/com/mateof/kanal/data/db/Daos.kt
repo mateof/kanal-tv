@@ -81,6 +81,23 @@ interface ChannelDao {
     @Query("SELECT COUNT(*) FROM channels WHERE sourceId = :sourceId")
     fun count(sourceId: String): Flow<Int>
 
+    /** Plain list for the guide wall, which needs whole rows rather than pages. */
+    @Query(
+        """
+        SELECT * FROM channels
+        WHERE sourceId = :sourceId
+          AND (:categoryId = '' OR categoryId = :categoryId)
+          AND (:includeAdult = 1 OR adult = 0)
+        ORDER BY position LIMIT :limit
+        """
+    )
+    suspend fun listFor(
+        sourceId: String,
+        categoryId: String,
+        includeAdult: Boolean,
+        limit: Int
+    ): List<ChannelEntity>
+
     /** Channels the playlist gave no `tvg-id` for, to be matched by name. */
     @Query("SELECT * FROM channels WHERE sourceId = :sourceId AND epgChannelId = ''")
     suspend fun withoutEpgId(sourceId: String): List<ChannelEntity>
@@ -265,6 +282,42 @@ interface EpgDao {
 
     @Query("SELECT COUNT(*) FROM epg WHERE sourceId = :sourceId")
     suspend fun count(sourceId: String): Int
+
+    /** Whole guide of one channel, for the day-by-day view. */
+    @Query(
+        """
+        SELECT * FROM epg WHERE sourceId = :sourceId AND channelId = :channelId
+          AND stop > :from ORDER BY start
+        """
+    )
+    suspend fun allFrom(sourceId: String, channelId: String, from: Long): List<EpgEntity>
+
+    /** Span the provider actually gave us for a channel, to build the day tabs. */
+    @Query(
+        """
+        SELECT MIN(start) FROM epg WHERE sourceId = :sourceId AND channelId = :channelId
+        """
+    )
+    suspend fun firstStart(sourceId: String, channelId: String): Long?
+
+    @Query("SELECT MAX(stop) FROM epg WHERE sourceId = :sourceId AND channelId = :channelId")
+    suspend fun lastStop(sourceId: String, channelId: String): Long?
+
+    /** Everything on air for a set of channels in a window: the guide wall. */
+    @Query(
+        """
+        SELECT * FROM epg
+        WHERE sourceId = :sourceId AND channelId IN (:channelIds)
+          AND stop > :from AND start < :to
+        ORDER BY channelId, start
+        """
+    )
+    suspend fun forChannels(
+        sourceId: String,
+        channelIds: List<String>,
+        from: Long,
+        to: Long
+    ): List<EpgEntity>
 
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insertAll(items: List<EpgEntity>)

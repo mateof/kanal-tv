@@ -69,6 +69,12 @@ class LiveViewModel @Inject constructor(
     private val _schedule = MutableStateFlow<List<EpgEntity>>(emptyList())
     val schedule: StateFlow<List<EpgEntity>> = _schedule.asStateFlow()
 
+    private val _guideDays = MutableStateFlow<List<Long>>(emptyList())
+    val guideDays: StateFlow<List<Long>> = _guideDays.asStateFlow()
+
+    private val _selectedDay = MutableStateFlow(0L)
+    val selectedDay: StateFlow<Long> = _selectedDay.asStateFlow()
+
     private val _previewActive = MutableStateFlow(false)
     val previewActive: StateFlow<Boolean> = _previewActive.asStateFlow()
 
@@ -146,8 +152,26 @@ class LiveViewModel @Inject constructor(
             if (_focused.value?.streamId != channel.streamId) return@launch
             _now.value = nowNext.now
             _next.value = nowNext.next
-            val from = System.currentTimeMillis() - 3_600_000L
-            _schedule.value = epg.window(current.id, channelId, from, from + 30 * 3_600_000L)
+
+            val days = epg.availableDays(current.id, channelId)
+            val today = days.firstOrNull() ?: 0L
+            _guideDays.value = days
+            _selectedDay.value = today
+            _schedule.value = if (today > 0) {
+                epg.programmesOfDay(current.id, channelId, today)
+            } else {
+                emptyList()
+            }
+        }
+    }
+
+    fun selectDay(day: Long) {
+        val channel = _focused.value ?: return
+        viewModelScope.launch {
+            val current = activeSource.first() ?: return@launch
+            val channelId = channel.epgChannelId.ifBlank { "stream:${channel.streamId}" }
+            _selectedDay.value = day
+            _schedule.value = epg.programmesOfDay(current.id, channelId, day)
         }
     }
 

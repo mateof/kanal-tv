@@ -90,6 +90,14 @@ class ContentRepository @Inject constructor(
     suspend fun channel(sourceId: String, streamId: String): ChannelEntity? =
         db.channels().byId(sourceId, streamId)
 
+    /** Whole rows for the guide wall, capped so a 40k playlist cannot drown it. */
+    suspend fun channelList(
+        sourceId: String,
+        categoryId: String,
+        limit: Int = 150
+    ): List<ChannelEntity> =
+        db.channels().listFor(sourceId, categoryId, !prefs.settings.first().hideAdult, limit)
+
     suspend fun movie(sourceId: String, streamId: String): MovieEntity? =
         db.movies().byId(sourceId, streamId)
 

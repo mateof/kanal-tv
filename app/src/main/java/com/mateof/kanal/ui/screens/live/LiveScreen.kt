@@ -12,6 +12,7 @@ import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -46,11 +47,13 @@ import com.mateof.kanal.core.formatClock
 import com.mateof.kanal.data.db.ChannelEntity
 import com.mateof.kanal.data.db.EpgEntity
 import com.mateof.kanal.ui.components.ArtworkImage
+import com.mateof.kanal.ui.components.ChannelGuide
 import com.mateof.kanal.ui.components.FocusableSurface
 import com.mateof.kanal.ui.components.KanalButton
 import com.mateof.kanal.ui.components.KanalChip
 import com.mateof.kanal.ui.components.MessageState
 import com.mateof.kanal.ui.components.ThinProgress
+import com.mateof.kanal.ui.components.scrollingTitle
 import com.mateof.kanal.ui.isCompact
 import com.mateof.kanal.ui.theme.KanalColors
 
@@ -63,6 +66,8 @@ fun LiveScreen(onPlay: (String, Long) -> Unit) {
     val now by vm.now.collectAsStateWithLifecycle()
     val next by vm.next.collectAsStateWithLifecycle()
     val schedule by vm.schedule.collectAsStateWithLifecycle()
+    val guideDays by vm.guideDays.collectAsStateWithLifecycle()
+    val selectedDay by vm.selectedDay.collectAsStateWithLifecycle()
     val favorites by vm.favorites.collectAsStateWithLifecycle()
     val source by vm.source.collectAsStateWithLifecycle()
     val nowPlaying by vm.nowPlaying.collectAsStateWithLifecycle()
@@ -93,38 +98,40 @@ fun LiveScreen(onPlay: (String, Long) -> Unit) {
         return
     }
 
-    Row(Modifier.fillMaxSize()) {
-        // --- Categories -----------------------------------------------------
-        LazyColumn(
-            modifier = Modifier
-                .width(250.dp)
-                .fillMaxHeight(),
-            contentPadding = PaddingValues(start = 8.dp, end = 12.dp, top = 28.dp, bottom = 40.dp),
-            verticalArrangement = Arrangement.spacedBy(6.dp)
+    // A 250 dp column of categories plus a 420 dp list of channels leaves the
+    // preview and guide pane with almost nothing on a 960 dp television. The
+    // categories move to a strip of chips across the top instead, which is also
+    // what the guide wall does, so the two screens read the same.
+    Column(Modifier.fillMaxSize()) {
+        LazyRow(
+            contentPadding = PaddingValues(start = 8.dp, end = 40.dp, top = 20.dp),
+            horizontalArrangement = Arrangement.spacedBy(8.dp)
         ) {
             item {
-                Text(
-                    "Categorías",
-                    style = MaterialTheme.typography.labelMedium,
-                    color = KanalColors.OnSurfaceFaint,
-                    modifier = Modifier.padding(start = 12.dp, bottom = 10.dp)
+                KanalChip(
+                    label = "Todos los canales",
+                    selected = selectedCategory == CATEGORY_ALL,
+                    onClick = { vm.selectCategory(CATEGORY_ALL) }
                 )
             }
             item {
-                CategoryRow("Todos los canales", selectedCategory == CATEGORY_ALL) {
-                    vm.selectCategory(CATEGORY_ALL)
-                }
-            }
-            item {
-                CategoryRow("Favoritos", showingFavorites) { vm.selectCategory(CATEGORY_FAVORITES) }
+                KanalChip(
+                    label = "Favoritos",
+                    selected = showingFavorites,
+                    onClick = { vm.selectCategory(CATEGORY_FAVORITES) }
+                )
             }
             items(categories, key = { it.categoryId }) { category ->
-                CategoryRow(category.name, category.categoryId == selectedCategory) {
-                    vm.selectCategory(category.categoryId)
-                }
+                KanalChip(
+                    label = category.name,
+                    selected = category.categoryId == selectedCategory,
+                    onClick = { vm.selectCategory(category.categoryId) }
+                )
             }
         }
+        Spacer(Modifier.height(10.dp))
 
+    Row(Modifier.fillMaxSize()) {
         // --- Channels -------------------------------------------------------
         Box(
             Modifier
@@ -140,7 +147,7 @@ fun LiveScreen(onPlay: (String, Long) -> Unit) {
                     )
                 } else {
                     LazyColumn(
-                        contentPadding = PaddingValues(vertical = 28.dp, horizontal = 6.dp),
+                        contentPadding = PaddingValues(top = 4.dp, bottom = 28.dp, start = 6.dp, end = 6.dp),
                         verticalArrangement = Arrangement.spacedBy(8.dp)
                     ) {
                         items(favoriteChannels, key = { it.streamId }) { channel ->
@@ -156,7 +163,7 @@ fun LiveScreen(onPlay: (String, Long) -> Unit) {
                 }
             } else {
                 LazyColumn(
-                    contentPadding = PaddingValues(vertical = 28.dp, horizontal = 6.dp),
+                    contentPadding = PaddingValues(top = 4.dp, bottom = 28.dp, start = 6.dp, end = 6.dp),
                     verticalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
                     items(count = paged.itemCount) { index ->
@@ -189,6 +196,9 @@ fun LiveScreen(onPlay: (String, Long) -> Unit) {
             now = now,
             next = next,
             schedule = schedule,
+            guideDays = guideDays,
+            selectedDay = selectedDay,
+            onSelectDay = vm::selectDay,
             previewActive = previewActive,
             previewError = previewError,
             player = vm.previewPlayer(),
@@ -204,6 +214,7 @@ fun LiveScreen(onPlay: (String, Long) -> Unit) {
                 .weight(1f)
                 .fillMaxHeight()
         )
+        }
     }
 }
 
@@ -409,6 +420,9 @@ private fun DetailPane(
     now: EpgEntity?,
     next: EpgEntity?,
     schedule: List<EpgEntity>,
+    guideDays: List<Long>,
+    selectedDay: Long,
+    onSelectDay: (Long) -> Unit,
     previewActive: Boolean,
     previewError: String,
     player: androidx.media3.exoplayer.ExoPlayer?,
@@ -429,11 +443,14 @@ private fun DetailPane(
     }
 
     Column(
-        modifier = modifier.padding(start = 24.dp, end = 44.dp, top = 28.dp, bottom = 28.dp)
+        modifier = modifier.padding(start = 24.dp, end = 44.dp, top = 4.dp, bottom = 28.dp)
     ) {
+        // Capped on purpose: at 16:9 the preview eats the whole pane on a short
+        // panel and leaves the guide underneath with no room at all.
         Box(
             Modifier
                 .fillMaxWidth()
+                .heightIn(max = 220.dp)
                 .aspectRatio(16f / 9f)
                 .clip(RoundedCornerShape(18.dp))
                 .background(Color.Black)
@@ -504,7 +521,8 @@ private fun DetailPane(
                 style = MaterialTheme.typography.titleMedium,
                 color = KanalColors.Accent,
                 maxLines = 1,
-                overflow = TextOverflow.Ellipsis
+                softWrap = false,
+                modifier = Modifier.fillMaxWidth().scrollingTitle()
             )
             Spacer(Modifier.height(8.dp))
             ThinProgress(progressOf(now), Modifier.fillMaxWidth())
@@ -544,7 +562,7 @@ private fun DetailPane(
             )
         }
 
-        if (schedule.isNotEmpty()) {
+        if (schedule.isNotEmpty() || guideDays.isNotEmpty()) {
             Spacer(Modifier.height(22.dp))
             Text(
                 "Programación",
@@ -552,67 +570,15 @@ private fun DetailPane(
                 color = KanalColors.OnSurfaceMuted
             )
             Spacer(Modifier.height(10.dp))
-            LazyColumn(
+            ChannelGuide(
+                days = guideDays,
+                selectedDay = selectedDay,
+                programmes = schedule,
                 modifier = Modifier.weight(1f, fill = false),
-                verticalArrangement = Arrangement.spacedBy(6.dp)
-            ) {
-                items(schedule, key = { it.start }) { programme ->
-                    ScheduleRow(
-                        programme = programme,
-                        canReplay = channel.archiveDays > 0 && programme.stop < System.currentTimeMillis(),
-                        onReplay = { onPlayCatchup(programme) }
-                    )
-                }
-            }
-        }
-    }
-}
-
-@Composable
-private fun ScheduleRow(programme: EpgEntity, canReplay: Boolean, onReplay: () -> Unit) {
-    val nowMillis = System.currentTimeMillis()
-    val isLive = programme.start <= nowMillis && programme.stop > nowMillis
-    FocusableSurface(
-        onClick = { if (canReplay) onReplay() },
-        modifier = Modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(10.dp),
-        color = Color.Transparent,
-        focusedColor = KanalColors.SurfaceVariant,
-        focusedScale = 1.0f,
-        enabled = canReplay
-    ) { isFocused ->
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(horizontal = 12.dp, vertical = 8.dp),
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            Text(
-                formatClock(programme.start),
-                style = MaterialTheme.typography.labelMedium,
-                color = if (isLive) KanalColors.Live else KanalColors.OnSurfaceFaint,
-                modifier = Modifier.width(56.dp)
+                archiveAvailable = channel.archiveDays > 0,
+                onSelectDay = onSelectDay,
+                onReplay = onPlayCatchup
             )
-            Text(
-                programme.title,
-                style = MaterialTheme.typography.bodySmall,
-                color = when {
-                    isFocused -> KanalColors.Accent
-                    isLive -> KanalColors.OnBackground
-                    else -> KanalColors.OnSurfaceMuted
-                },
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis,
-                modifier = Modifier.weight(1f)
-            )
-            if (canReplay) {
-                Icon(
-                    Icons.Outlined.Replay,
-                    contentDescription = "Ver repetición",
-                    tint = if (isFocused) KanalColors.Accent else KanalColors.OnSurfaceFaint,
-                    modifier = Modifier.size(16.dp)
-                )
-            }
         }
     }
 }

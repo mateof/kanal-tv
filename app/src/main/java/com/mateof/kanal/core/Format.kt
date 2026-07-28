@@ -5,9 +5,16 @@ import java.util.Date
 import java.util.Locale
 import java.util.concurrent.TimeUnit
 
-private val clock = SimpleDateFormat("HH:mm", Locale.getDefault())
-private val dayAndClock = SimpleDateFormat("EEE d MMM, HH:mm", Locale.getDefault())
-private val day = SimpleDateFormat("EEEE d 'de' MMMM", Locale.getDefault())
+/**
+ * Every user-facing string in this app is Spanish, so the dates are too. Using
+ * the device locale produced "Thursday 30 de July" on an English television.
+ */
+private val SPANISH = Locale("es", "ES")
+
+private val clock = SimpleDateFormat("HH:mm", SPANISH)
+private val dayAndClock = SimpleDateFormat("EEE d MMM, HH:mm", SPANISH)
+private val day = SimpleDateFormat("EEEE d 'de' MMMM", SPANISH)
+private val dayShort = SimpleDateFormat("EEE d MMM", SPANISH)
 
 fun formatClock(epochMillis: Long): String = clock.format(Date(epochMillis))
 
@@ -15,6 +22,10 @@ fun formatDayAndClock(epochMillis: Long): String = dayAndClock.format(Date(epoch
 
 fun formatDay(epochMillis: Long): String =
     day.format(Date(epochMillis)).replaceFirstChar { it.uppercase() }
+
+/** "jue 30 jul" — short enough for a row of day chips. */
+fun formatDayShort(epochMillis: Long): String =
+    dayShort.format(Date(epochMillis)).replaceFirstChar { it.uppercase() }.replace(".", "")
 
 /** "1 h 45 min" / "45 min" / "30 s". */
 fun formatDuration(millis: Long): String {

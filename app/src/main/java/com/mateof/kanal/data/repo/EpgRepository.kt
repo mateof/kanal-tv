@@ -51,6 +51,66 @@ class EpgRepository @Inject constructor(
     suspend fun hasGuide(sourceId: String): Boolean = db.epg().count(sourceId) > 0
 
     /**
+     * Days the provider actually sent guide for, starting at today. Providers
+     * give anything from a few hours to a fortnight, so the tabs are built from
+     * the data instead of from a fixed number.
+     */
+    suspend fun availableDays(sourceId: String, channelId: String): List<Long> =
+        withContext(Dispatchers.IO) {
+            if (channelId.isBlank()) return@withContext emptyList()
+            val first = db.epg().firstStart(sourceId, channelId) ?: return@withContext emptyList()
+            val last = db.epg().lastStop(sourceId, channelId) ?: return@withContext emptyList()
+            val from = maxOf(first, startOfDay(System.currentTimeMillis()))
+            val days = mutableListOf<Long>()
+            var day = startOfDay(from)
+            while (day < last && days.size < 21) {
+                days += day
+                day += DAY
+            }
+            days
+        }
+
+    /** Everything scheduled on [dayStart]'s day for one channel. */
+    suspend fun programmesOfDay(
+        sourceId: String,
+        channelId: String,
+        dayStart: Long
+    ): List<EpgEntity> = withContext(Dispatchers.IO) {
+        if (channelId.isBlank()) emptyList()
+        else db.epg().window(sourceId, channelId, dayStart, dayStart + DAY)
+    }
+
+    /** Rows of the guide wall: programmes of many channels over one window. */
+    suspend fun wall(
+        sourceId: String,
+        channelIds: List<String>,
+        from: Long,
+        to: Long
+    ): Map<String, List<EpgEntity>> = withContext(Dispatchers.IO) {
+        val ids = channelIds.filter { it.isNotBlank() }.distinct()
+        if (ids.isEmpty()) return@withContext emptyMap()
+        db.epg().forChannels(sourceId, ids, from, to).groupBy { it.channelId }
+    }
+
+    /** What is on now plus the following [limit] programmes, for the OSD. */
+    suspend fun upcoming(sourceId: String, channelId: String, limit: Int = 6): List<EpgEntity> =
+        withContext(Dispatchers.IO) {
+            if (channelId.isBlank()) emptyList()
+            else db.epg().upcoming(sourceId, channelId, System.currentTimeMillis(), limit)
+        }
+
+    private fun startOfDay(millis: Long): Long {
+        val calendar = java.util.Calendar.getInstance().apply {
+            timeInMillis = millis
+            set(java.util.Calendar.HOUR_OF_DAY, 0)
+            set(java.util.Calendar.MINUTE, 0)
+            set(java.util.Calendar.SECOND, 0)
+            set(java.util.Calendar.MILLISECOND, 0)
+        }
+        return calendar.timeInMillis
+    }
+
+    /**
      * Last resort when there is no XMLTV: Xtream's own per-channel guide.
      * Titles and descriptions come back base64-encoded.
      */
@@ -84,6 +144,10 @@ class EpgRepository @Inject constructor(
         return runCatching {
             String(android.util.Base64.decode(value, android.util.Base64.DEFAULT), Charsets.UTF_8)
         }.getOrDefault(value)
+    }
+
+    private companion object {
+        const val DAY = 24 * 3_600_000L
     }
 
     private fun ticker(periodMs: Long): Flow<Long> = flow {

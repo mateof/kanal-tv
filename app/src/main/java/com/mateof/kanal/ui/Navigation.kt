@@ -5,6 +5,7 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.outlined.CalendarMonth
 import androidx.compose.material.icons.outlined.Home
 import androidx.compose.material.icons.outlined.LiveTv
 import androidx.compose.material.icons.outlined.Movie
@@ -27,6 +28,7 @@ import com.mateof.kanal.ui.screens.detail.MovieDetailScreen
 import com.mateof.kanal.ui.screens.detail.SeriesDetailScreen
 import com.mateof.kanal.ui.screens.favorites.FavoritesScreen
 import com.mateof.kanal.ui.screens.gate.GateScreen
+import com.mateof.kanal.ui.screens.guide.GuideScreen
 import com.mateof.kanal.ui.screens.home.HomeScreen
 import com.mateof.kanal.ui.screens.live.LiveScreen
 import com.mateof.kanal.ui.screens.logs.LogsScreen
@@ -42,6 +44,7 @@ object Routes {
     const val SETUP = "setup"
     const val HOME = "home"
     const val LIVE = "live"
+    const val GUIDE = "guide"
     const val MOVIES = "movies"
     const val SERIES = "series"
     const val FAVORITES = "favorites"
@@ -60,6 +63,7 @@ object Routes {
 private val RAIL_ITEMS = listOf(
     NavItem(Routes.HOME, "Inicio", Icons.Outlined.Home),
     NavItem(Routes.LIVE, "TV en directo", Icons.Outlined.LiveTv),
+    NavItem(Routes.GUIDE, "Guía", Icons.Outlined.CalendarMonth),
     NavItem(Routes.MOVIES, "Películas", Icons.Outlined.Movie),
     NavItem(Routes.SERIES, "Series", Icons.Outlined.Tv),
     NavItem(Routes.FAVORITES, "Favoritos", Icons.Outlined.Star),
@@ -109,6 +113,12 @@ fun KanalNavHost() {
         composable(Routes.LIVE) {
             WithRail(nav, Routes.LIVE) {
                 LiveScreen(onPlay = { id, start -> nav.navigate(Routes.player("LIVE", id, start)) })
+            }
+        }
+
+        composable(Routes.GUIDE) {
+            WithRail(nav, Routes.GUIDE) {
+                GuideScreen(onPlay = { id -> nav.navigate(Routes.player("LIVE", id)) })
             }
         }
 

@@ -24,6 +24,7 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.AspectRatio
+import androidx.compose.material.icons.outlined.CalendarMonth
 import androidx.compose.material.icons.outlined.ClosedCaption
 import androidx.compose.material.icons.outlined.Forward10
 import androidx.compose.material.icons.outlined.Pause
@@ -65,10 +66,13 @@ import androidx.media3.ui.PlayerView
 import com.mateof.kanal.core.formatClock
 import com.mateof.kanal.core.formatDuration
 import com.mateof.kanal.ui.components.ArtworkImage
+import com.mateof.kanal.ui.components.ChannelGuide
 import com.mateof.kanal.ui.components.ButtonTone
 import com.mateof.kanal.ui.components.FocusableSurface
 import com.mateof.kanal.ui.components.KanalButton
 import com.mateof.kanal.ui.components.ThinProgress
+import com.mateof.kanal.ui.components.scrollingTitle
+import com.mateof.kanal.ui.isCompact
 import com.mateof.kanal.ui.theme.KanalColors
 import kotlinx.coroutines.delay
 
@@ -83,7 +87,7 @@ private const val OSD_TIMEOUT_MS = 6_000L
  * never moves and, on a remote with no MENU key, there is no way in at all.
  * So the modes are explicit and only [Mode.Watching] consumes the arrows.
  */
-private enum class Mode { Watching, Controls, Tracks }
+private enum class Mode { Watching, Controls, Tracks, Guide }
 
 @Composable
 fun PlayerScreen(
@@ -103,6 +107,7 @@ fun PlayerScreen(
     val stageFocus = remember { FocusRequester() }
     val controlsFocus = remember { FocusRequester() }
     val tracksFocus = remember { FocusRequester() }
+    val guideFocus = remember { FocusRequester() }
 
     val isLive = state.playable?.isLive == true
 
@@ -128,6 +133,7 @@ fun PlayerScreen(
             Mode.Watching -> stageFocus
             Mode.Controls -> controlsFocus
             Mode.Tracks -> tracksFocus
+            Mode.Guide -> guideFocus
         }
         repeat(12) {
             if (runCatching { target.requestFocus() }.isSuccess) return@LaunchedEffect
@@ -144,9 +150,18 @@ fun PlayerScreen(
 
     BackHandler {
         when (mode) {
-            Mode.Tracks -> mode = Mode.Controls
+            Mode.Tracks, Mode.Guide -> mode = Mode.Controls
             Mode.Controls -> mode = Mode.Watching
             Mode.Watching -> onBack()
+        }
+    }
+
+    // Keep now/next honest across a programme changeover while the OSD is up.
+    LaunchedEffect(isLive) {
+        if (!isLive) return@LaunchedEffect
+        while (true) {
+            delay(60_000)
+            vm.refreshNowNext()
         }
     }
 
@@ -279,7 +294,8 @@ fun PlayerScreen(
                 onTogglePlay = { vm.togglePlayPause(); poke() },
                 onSeekBack = { vm.seekBy(-10_000); poke() },
                 onSeekForward = { vm.seekBy(10_000); poke() },
-                onOpenTracks = { mode = Mode.Tracks; poke() }
+                onOpenTracks = { mode = Mode.Tracks; poke() },
+                onOpenGuide = { mode = Mode.Guide; poke() }
             )
         }
 
@@ -293,6 +309,68 @@ fun PlayerScreen(
                 modifier = Modifier.align(Alignment.CenterEnd)
             )
         }
+
+        if (mode == Mode.Guide) {
+            GuidePanel(
+                state = state,
+                focusRequester = guideFocus,
+                onSelectDay = { day -> vm.selectGuideDay(day); poke() },
+                onClose = { mode = Mode.Controls },
+                modifier = Modifier.align(Alignment.CenterEnd)
+            )
+        }
+    }
+}
+
+/**
+ * The full guide of the channel being watched, day by day. Deliberately a panel
+ * you open rather than something always on screen: the OSD already gives now
+ * and next, and this is for when the user wants more.
+ */
+@Composable
+private fun GuidePanel(
+    state: PlayerUiState,
+    focusRequester: FocusRequester,
+    onSelectDay: (Long) -> Unit,
+    onClose: () -> Unit,
+    modifier: Modifier = Modifier
+) {
+    Column(
+        modifier = modifier
+            .width(520.dp)
+            .fillMaxHeight(0.94f)
+            .padding(20.dp)
+            .clip(RoundedCornerShape(18.dp))
+            .background(Color(0xF20B1120))
+            .padding(22.dp)
+            .focusRequester(focusRequester)
+            .focusGroup()
+    ) {
+        Text(
+            state.playable?.title.orEmpty(),
+            style = MaterialTheme.typography.titleLarge,
+            color = KanalColors.OnBackground,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis
+        )
+        Text(
+            "Programación",
+            style = MaterialTheme.typography.labelMedium,
+            color = KanalColors.OnSurfaceFaint
+        )
+        Spacer(Modifier.height(14.dp))
+
+        ChannelGuide(
+            days = state.guideDays,
+            selectedDay = state.selectedDay,
+            programmes = state.dayProgrammes,
+            modifier = Modifier.weight(1f),
+            emptyMessage = "El proveedor no envía guía para este canal.",
+            onSelectDay = onSelectDay
+        )
+
+        Spacer(Modifier.height(14.dp))
+        KanalButton("Cerrar", onClose, tone = ButtonTone.Primary)
     }
 }
 
@@ -306,9 +384,11 @@ private fun Osd(
     onTogglePlay: () -> Unit,
     onSeekBack: () -> Unit,
     onSeekForward: () -> Unit,
-    onOpenTracks: () -> Unit
+    onOpenTracks: () -> Unit,
+    onOpenGuide: () -> Unit
 ) {
     val playable = state.playable ?: return
+    val isCompactWidth = isCompact
     Column(
         Modifier
             .fillMaxWidth()
@@ -363,26 +443,61 @@ private fun Osd(
 
         val now = state.now
         if (playable.isLive && now != null) {
-            Text(
-                "${formatClock(now.start)} – ${formatClock(now.stop)}   ${now.title}",
-                style = MaterialTheme.typography.titleMedium,
-                color = KanalColors.Accent,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis
-            )
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Text(
+                    "${formatClock(now.start)} – ${formatClock(now.stop)}",
+                    style = MaterialTheme.typography.labelMedium,
+                    color = KanalColors.OnSurfaceMuted
+                )
+                Spacer(Modifier.width(14.dp))
+                // A long programme name is exactly the part worth reading, so it
+                // scrolls instead of being cut with an ellipsis.
+                Text(
+                    now.title,
+                    style = MaterialTheme.typography.titleMedium,
+                    color = KanalColors.Accent,
+                    maxLines = 1,
+                    softWrap = false,
+                    modifier = Modifier
+                        .weight(1f)
+                        .scrollingTitle()
+                )
+            }
             Spacer(Modifier.height(8.dp))
             val total = (now.stop - now.start).toFloat()
             val elapsed = (System.currentTimeMillis() - now.start).toFloat()
             ThinProgress(if (total > 0) elapsed / total else 0f, Modifier.fillMaxWidth())
-            state.next?.let {
-                Spacer(Modifier.height(8.dp))
+
+            if (now.description.isNotBlank()) {
+                Spacer(Modifier.height(10.dp))
                 Text(
-                    "Después · ${formatClock(it.start)}  ${it.title}",
+                    now.description,
                     style = MaterialTheme.typography.bodySmall,
-                    color = KanalColors.OnSurfaceFaint,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis
+                    color = KanalColors.OnSurfaceMuted,
+                    maxLines = 2,
+                    overflow = TextOverflow.Ellipsis,
+                    modifier = Modifier.fillMaxWidth(if (isCompactWidth) 1f else 0.72f)
                 )
+            }
+            state.next?.let { next ->
+                Spacer(Modifier.height(8.dp))
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Text(
+                        "DESPUÉS  ",
+                        style = MaterialTheme.typography.labelSmall,
+                        color = KanalColors.Secondary
+                    )
+                    Text(
+                        "${formatClock(next.start)}  ${next.title}",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = KanalColors.OnSurfaceFaint,
+                        maxLines = 1,
+                        softWrap = false,
+                        modifier = Modifier
+                            .weight(1f)
+                            .scrollingTitle()
+                    )
+                }
             }
         } else if (state.durationMs > 0) {
             ThinProgress(
@@ -417,20 +532,23 @@ private fun Osd(
                 KanalButton("10 s", onSeekBack, icon = Icons.Outlined.Replay10)
                 KanalButton("10 s", onSeekForward, icon = Icons.Outlined.Forward10)
             }
+            if (playable.isLive && state.guideDays.isNotEmpty()) {
+                KanalButton(
+                    text = "Guía",
+                    onClick = onOpenGuide,
+                    icon = Icons.Outlined.CalendarMonth,
+                    tone = ButtonTone.Primary
+                )
+            }
             KanalButton(resizeLabel, onCycleResize, icon = Icons.Outlined.AspectRatio)
-            KanalButton(
-                text = "Audio y subtítulos",
-                onClick = onOpenTracks,
-                icon = Icons.Outlined.Tune,
-                tone = if (playable.isLive) ButtonTone.Primary else ButtonTone.Neutral
-            )
+            KanalButton("Audio y subtítulos", onOpenTracks, icon = Icons.Outlined.Tune)
         }
 
         Spacer(Modifier.height(14.dp))
         Text(
             text = when {
                 controlsActive -> "Izquierda y derecha para moverte por los botones · ATRÁS vuelve al vídeo"
-                playable.isLive -> "Arriba y abajo cambian de canal · OK abre los controles · ATRÁS sale"
+                playable.isLive -> "Arriba y abajo cambian de canal · OK abre los controles y la guía · ATRÁS sale"
                 else -> "Izquierda y derecha ±10 s · OK abre los controles · ATRÁS sale"
             },
             style = MaterialTheme.typography.labelSmall,
