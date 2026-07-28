@@ -20,6 +20,19 @@
     <uses-feature
         android:name="android.hardware.microphone"
         android:required="false" />
+    <!--
+      A TV panel does not rotate, so many Android TV devices declare neither
+      screen orientation feature. Locking the activity to landscape makes aapt
+      imply android.hardware.screen.landscape as *required*, and installers that
+      check features then reject the APK with INSTALL_FAILED_MISSING_FEATURE.
+      Declaring both as optional overrides the implied requirement.
+    -->
+    <uses-feature
+        android:name="android.hardware.screen.landscape"
+        android:required="false" />
+    <uses-feature
+        android:name="android.hardware.screen.portrait"
+        android:required="false" />
 
     <!-- Android 11+ package visibility: needed to hand a stream to an external player. -->
     <queries>
@@ -56,7 +69,6 @@
             android:exported="true"
             android:label="@string/app_name"
             android:launchMode="singleTask"
-            android:screenOrientation="landscape"
             android:theme="@style/Theme.Kanal.Splash">
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
