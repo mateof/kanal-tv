@@ -53,15 +53,6 @@ export JAVA_HOME="/ruta/a/un/jdk-21"
 
 Hace falta un `local.properties` con `sdk.dir` apuntando al SDK de Android.
 
-## Releases
-
-Cada push a `main` dispara `.github/workflows/release.yml`, que firma el APK con el
-keystore guardado en los secrets del repo y publica una GitHub Release etiquetada con el
-`versionName` de `app/build.gradle.kts`. Hay que **subir `versionCode` y `versionName`
-antes de commitear**, o la etiqueta chocará con la anterior.
-
-El keystore se genera una sola vez con `setup-signing.ps1` (fuera de git).
-
 ## Licencia
 
 GPL-3.0. Ver [LICENSE](LICENSE).
