@@ -13,6 +13,7 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.items
@@ -37,8 +38,10 @@ import com.mateof.kanal.data.db.CategoryEntity
 import com.mateof.kanal.data.repo.CatalogSort
 import com.mateof.kanal.ui.components.FocusableSurface
 import com.mateof.kanal.ui.components.KanalButton
+import com.mateof.kanal.ui.components.KanalChip
 import com.mateof.kanal.ui.components.MessageState
 import com.mateof.kanal.ui.components.PosterCard
+import com.mateof.kanal.ui.isCompact
 import com.mateof.kanal.ui.theme.KanalColors
 
 @Composable
@@ -66,7 +69,7 @@ fun MoviesScreen(onOpen: (String) -> Unit) {
                 imageUrl = movie.cover,
                 subtitle = movie.categoryName,
                 rating = movie.rating,
-                width = 176.dp,
+                width = if (isCompact) null else 176.dp,
                 onClick = { onOpen(movie.streamId) }
             )
         }
@@ -98,7 +101,7 @@ fun SeriesScreen(onOpen: (String) -> Unit) {
                 imageUrl = serie.cover,
                 subtitle = serie.categoryName,
                 rating = serie.rating,
-                width = 176.dp,
+                width = if (isCompact) null else 176.dp,
                 onClick = { onOpen(serie.seriesId) }
             )
         }
@@ -117,6 +120,21 @@ private fun CatalogLayout(
     itemCount: Int,
     grid: androidx.compose.foundation.lazy.grid.LazyGridScope.() -> Unit
 ) {
+    if (isCompact) {
+        CompactCatalog(
+            title = title,
+            icon = icon,
+            categories = categories,
+            selectedCategory = selectedCategory,
+            sort = sort,
+            onSelectCategory = onSelectCategory,
+            onCycleSort = onCycleSort,
+            itemCount = itemCount,
+            grid = grid
+        )
+        return
+    }
+
     Row(Modifier.fillMaxSize()) {
         LazyColumn(
             modifier = Modifier
@@ -181,6 +199,76 @@ private fun CatalogLayout(
                     content = grid
                 )
             }
+        }
+    }
+}
+
+@Composable
+private fun CompactCatalog(
+    title: String,
+    icon: ImageVector,
+    categories: List<CategoryEntity>,
+    selectedCategory: String,
+    sort: CatalogSort,
+    onSelectCategory: (String) -> Unit,
+    onCycleSort: () -> Unit,
+    itemCount: Int,
+    grid: androidx.compose.foundation.lazy.grid.LazyGridScope.() -> Unit
+) {
+    Column(Modifier.fillMaxSize()) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(start = 16.dp, end = 16.dp, top = 20.dp, bottom = 10.dp),
+            verticalAlignment = androidx.compose.ui.Alignment.CenterVertically
+        ) {
+            Column(Modifier.weight(1f)) {
+                Text(title, style = MaterialTheme.typography.headlineSmall, color = KanalColors.OnBackground)
+                Text(
+                    "$itemCount elementos",
+                    style = MaterialTheme.typography.labelSmall,
+                    color = KanalColors.OnSurfaceFaint
+                )
+            }
+            KanalButton(text = sort.label, onClick = onCycleSort, icon = Icons.Outlined.Sort)
+        }
+
+        LazyRow(
+            contentPadding = PaddingValues(horizontal = 16.dp),
+            horizontalArrangement = Arrangement.spacedBy(8.dp)
+        ) {
+            item {
+                KanalChip(
+                    label = "Todas",
+                    selected = selectedCategory.isEmpty(),
+                    onClick = { onSelectCategory("") }
+                )
+            }
+            items(categories, key = { it.categoryId }) { category ->
+                KanalChip(
+                    label = category.name,
+                    selected = category.categoryId == selectedCategory,
+                    onClick = { onSelectCategory(category.categoryId) }
+                )
+            }
+        }
+        Spacer(Modifier.height(12.dp))
+
+        if (itemCount == 0) {
+            MessageState(
+                title = "Nada por aquí",
+                description = "Sincroniza la fuente o prueba con otra categoría.",
+                icon = icon
+            )
+        } else {
+            LazyVerticalGrid(
+                columns = GridCells.Adaptive(112.dp),
+                contentPadding = PaddingValues(start = 12.dp, end = 12.dp, bottom = 24.dp),
+                horizontalArrangement = Arrangement.spacedBy(10.dp),
+                verticalArrangement = Arrangement.spacedBy(10.dp),
+                modifier = Modifier.fillMaxSize(),
+                content = grid
+            )
         }
     }
 }

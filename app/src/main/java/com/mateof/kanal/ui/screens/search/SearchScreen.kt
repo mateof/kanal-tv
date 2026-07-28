@@ -29,6 +29,7 @@ import com.mateof.kanal.ui.components.ChannelCard
 import com.mateof.kanal.ui.components.MessageState
 import com.mateof.kanal.ui.components.PosterCard
 import com.mateof.kanal.ui.components.SearchField
+import com.mateof.kanal.ui.contentInset
 import com.mateof.kanal.ui.screens.home.CardRow
 import com.mateof.kanal.ui.theme.KanalColors
 import dagger.hilt.android.lifecycle.HiltViewModel
@@ -94,7 +95,7 @@ fun SearchScreen(
         verticalArrangement = Arrangement.spacedBy(22.dp)
     ) {
         item {
-            Column(Modifier.padding(start = 40.dp, end = 60.dp)) {
+            Column(Modifier.padding(start = contentInset, end = contentInset)) {
                 Text("Buscar", style = MaterialTheme.typography.headlineMedium, color = KanalColors.OnBackground)
                 Spacer(Modifier.height(16.dp))
                 SearchField(

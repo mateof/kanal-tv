@@ -45,13 +45,14 @@ fun PosterCard(
     subtitle: String = "",
     rating: Double = 0.0,
     progress: Float = 0f,
-    width: Dp = 168.dp,
+    /** Null lets the card fill its slot, which is what a phone grid needs. */
+    width: Dp? = 168.dp,
     onClick: () -> Unit,
     onFocusState: (Boolean) -> Unit = {}
 ) {
     FocusableSurface(
         onClick = onClick,
-        modifier = modifier.width(width),
+        modifier = if (width != null) modifier.width(width) else modifier.fillMaxWidth(),
         color = KanalColors.BackgroundElevated,
         focusedColor = KanalColors.BackgroundElevated,
         onFocusState = onFocusState

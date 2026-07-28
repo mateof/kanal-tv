@@ -30,6 +30,8 @@ import com.mateof.kanal.core.formatClock
 import com.mateof.kanal.data.model.ContentKind
 import com.mateof.kanal.data.repo.SyncState
 import com.mateof.kanal.ui.Routes
+import com.mateof.kanal.ui.contentInset
+import com.mateof.kanal.ui.isCompact
 import com.mateof.kanal.ui.components.ButtonTone
 import com.mateof.kanal.ui.components.ChannelCard
 import com.mateof.kanal.ui.components.ContinueCard
@@ -73,8 +75,8 @@ fun HomeScreen(
     LazyColumn(
         modifier = Modifier.fillMaxSize(),
         contentPadding = PaddingValues(
-            start = 8.dp,
-            end = Spacing.screenHorizontal,
+            start = if (isCompact) 0.dp else 8.dp,
+            end = if (isCompact) 0.dp else Spacing.screenHorizontal,
             top = Spacing.screenVertical,
             bottom = 60.dp
         ),
@@ -105,7 +107,11 @@ fun HomeScreen(
             item {
                 val label = (syncState as? SyncState.Running)?.step ?: "Sincronizando…"
                 val progress = (syncState as? SyncState.Running)?.progress ?: -1f
-                StepProgress(label, progress, Modifier.padding(end = 200.dp))
+                StepProgress(
+                    label,
+                    progress,
+                    Modifier.padding(start = contentInset, end = if (isCompact) contentInset else 200.dp)
+                )
             }
         }
 
@@ -210,7 +216,7 @@ fun HomeScreen(
         if (!state.isEmpty) {
             item {
                 Row(
-                    modifier = Modifier.padding(start = 40.dp, top = 8.dp),
+                    modifier = Modifier.padding(start = contentInset, top = 8.dp),
                     horizontalArrangement = Arrangement.spacedBy(14.dp)
                 ) {
                     KanalButton("Ir a TV en directo", { onNavigate(Routes.LIVE) }, tone = ButtonTone.Primary)
@@ -231,10 +237,49 @@ private fun HomeHeader(
     refreshing: Boolean,
     onRefresh: () -> Unit
 ) {
+    val counts = buildString {
+        if (sourceName.isNotBlank()) append(sourceName).append(" · ")
+        append("$channels canales · $movies películas · $series series")
+    }
+    val refreshButton: @Composable () -> Unit = {
+        KanalButton(
+            text = if (refreshing) "Sincronizando…" else "Actualizar",
+            onClick = onRefresh,
+            icon = Icons.Outlined.Refresh,
+            enabled = !refreshing
+        )
+    }
+
+    if (isCompact) {
+        // Upright the greeting, the counts and the button do not fit on one
+        // line; the clock goes away too, the status bar already has it.
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(start = contentInset, end = contentInset, bottom = 4.dp)
+        ) {
+            Text(
+                greeting(),
+                style = MaterialTheme.typography.headlineSmall,
+                color = KanalColors.OnBackground,
+                maxLines = 1
+            )
+            Spacer(Modifier.height(4.dp))
+            Text(
+                counts,
+                style = MaterialTheme.typography.bodySmall,
+                color = KanalColors.OnSurfaceMuted
+            )
+            Spacer(Modifier.height(12.dp))
+            refreshButton()
+        }
+        return
+    }
+
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .padding(start = 40.dp, bottom = 4.dp),
+            .padding(start = contentInset, bottom = 4.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
         Column(Modifier.weight(1f)) {
@@ -244,14 +289,7 @@ private fun HomeHeader(
                 color = KanalColors.OnBackground
             )
             Spacer(Modifier.height(6.dp))
-            Text(
-                buildString {
-                    if (sourceName.isNotBlank()) append(sourceName).append(" · ")
-                    append("$channels canales · $movies películas · $series series")
-                },
-                style = MaterialTheme.typography.bodyMedium,
-                color = KanalColors.OnSurfaceMuted
-            )
+            Text(counts, style = MaterialTheme.typography.bodyMedium, color = KanalColors.OnSurfaceMuted)
         }
         Text(
             formatClock(System.currentTimeMillis()),
@@ -259,12 +297,7 @@ private fun HomeHeader(
             color = KanalColors.OnSurfaceMuted
         )
         Spacer(Modifier.width(24.dp))
-        KanalButton(
-            text = if (refreshing) "Sincronizando…" else "Actualizar",
-            onClick = onRefresh,
-            icon = Icons.Outlined.Refresh,
-            enabled = !refreshing
-        )
+        refreshButton()
     }
 }
 
@@ -286,10 +319,10 @@ fun CardRow(
     content: androidx.compose.foundation.lazy.LazyListScope.() -> Unit
 ) {
     Column(Modifier.fillMaxWidth()) {
-        SectionHeader(title, Modifier.padding(start = 40.dp, end = 8.dp), trailing)
+        SectionHeader(title, Modifier.padding(start = contentInset, end = 8.dp), trailing)
         Spacer(Modifier.height(14.dp))
         LazyRow(
-            contentPadding = PaddingValues(horizontal = 40.dp, vertical = 8.dp),
+            contentPadding = PaddingValues(horizontal = contentInset, vertical = 8.dp),
             horizontalArrangement = Arrangement.spacedBy(Spacing.item),
             content = content
         )

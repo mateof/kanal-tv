@@ -16,6 +16,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
@@ -47,8 +48,10 @@ import com.mateof.kanal.data.db.EpgEntity
 import com.mateof.kanal.ui.components.ArtworkImage
 import com.mateof.kanal.ui.components.FocusableSurface
 import com.mateof.kanal.ui.components.KanalButton
+import com.mateof.kanal.ui.components.KanalChip
 import com.mateof.kanal.ui.components.MessageState
 import com.mateof.kanal.ui.components.ThinProgress
+import com.mateof.kanal.ui.isCompact
 import com.mateof.kanal.ui.theme.KanalColors
 
 @Composable
@@ -71,6 +74,24 @@ fun LiveScreen(onPlay: (String, Long) -> Unit) {
     val showingFavorites = selectedCategory == CATEGORY_FAVORITES
 
     DisposableEffect(Unit) { onDispose { vm.stopPreview() } }
+
+    if (isCompact) {
+        // Upright there is room for one column only: categories become a strip
+        // of chips and the preview pane is dropped — on a phone a tap goes
+        // straight to full screen anyway.
+        CompactLive(
+            categories = categories,
+            selectedCategory = selectedCategory,
+            channels = if (showingFavorites) favoriteChannels else null,
+            paged = paged,
+            nowPlaying = nowPlaying,
+            favorites = favorites,
+            sourceId = source?.id.orEmpty(),
+            onSelectCategory = vm::selectCategory,
+            onPlay = { id -> onPlay(id, 0L) }
+        )
+        return
+    }
 
     Row(Modifier.fillMaxSize()) {
         // --- Categories -----------------------------------------------------
@@ -183,6 +204,106 @@ fun LiveScreen(onPlay: (String, Long) -> Unit) {
                 .weight(1f)
                 .fillMaxHeight()
         )
+    }
+}
+
+@Composable
+private fun CompactLive(
+    categories: List<com.mateof.kanal.data.db.CategoryEntity>,
+    selectedCategory: String,
+    channels: List<ChannelEntity>?,
+    paged: androidx.paging.compose.LazyPagingItems<ChannelEntity>,
+    nowPlaying: Map<String, EpgEntity>,
+    favorites: Set<String>,
+    sourceId: String,
+    onSelectCategory: (String) -> Unit,
+    onPlay: (String) -> Unit
+) {
+    Column(Modifier.fillMaxSize()) {
+        Text(
+            "TV en directo",
+            style = MaterialTheme.typography.headlineSmall,
+            color = KanalColors.OnBackground,
+            modifier = Modifier.padding(start = 16.dp, end = 16.dp, top = 20.dp, bottom = 12.dp)
+        )
+        LazyRow(
+            contentPadding = PaddingValues(horizontal = 16.dp),
+            horizontalArrangement = Arrangement.spacedBy(8.dp)
+        ) {
+            item {
+                KanalChip(
+                    label = "Todos",
+                    selected = selectedCategory == CATEGORY_ALL,
+                    onClick = { onSelectCategory(CATEGORY_ALL) }
+                )
+            }
+            item {
+                KanalChip(
+                    label = "Favoritos",
+                    selected = selectedCategory == CATEGORY_FAVORITES,
+                    onClick = { onSelectCategory(CATEGORY_FAVORITES) }
+                )
+            }
+            items(categories, key = { it.categoryId }) { category ->
+                KanalChip(
+                    label = category.name,
+                    selected = category.categoryId == selectedCategory,
+                    onClick = { onSelectCategory(category.categoryId) }
+                )
+            }
+        }
+        Spacer(Modifier.height(12.dp))
+
+        if (channels != null) {
+            if (channels.isEmpty()) {
+                MessageState(
+                    title = "Sin favoritos",
+                    description = "Marca un canal con la estrella para tenerlo aquí.",
+                    icon = Icons.Filled.Star
+                )
+            } else {
+                LazyColumn(
+                    contentPadding = PaddingValues(horizontal = 12.dp, vertical = 4.dp),
+                    verticalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    items(channels, key = { it.streamId }) { channel ->
+                        ChannelListRow(
+                            channel = channel,
+                            now = nowPlaying[channel.epgChannelId],
+                            isFavorite = true,
+                            onFocused = {},
+                            onClick = { onPlay(channel.streamId) }
+                        )
+                    }
+                }
+            }
+        } else {
+            LazyColumn(
+                contentPadding = PaddingValues(horizontal = 12.dp, vertical = 4.dp),
+                verticalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                items(count = paged.itemCount) { index ->
+                    val channel = paged[index] ?: return@items
+                    ChannelListRow(
+                        channel = channel,
+                        now = nowPlaying[channel.epgChannelId],
+                        isFavorite = favorites.contains("LIVE:$sourceId:${channel.streamId}"),
+                        onFocused = {},
+                        onClick = { onPlay(channel.streamId) }
+                    )
+                }
+                if (paged.itemCount == 0) {
+                    item {
+                        MessageState(
+                            title = "No hay canales",
+                            description = "Sincroniza la fuente desde Ajustes.",
+                            icon = Icons.Outlined.LiveTv,
+                            modifier = Modifier.height(320.dp)
+                        )
+                    }
+                }
+            }
+        }
     }
 }
 

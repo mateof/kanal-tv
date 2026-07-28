@@ -164,6 +164,67 @@ private fun NavRailItem(
     }
 }
 
+/**
+ * Phone-upright counterpart of [NavRail]. Icons only: seven destinations with
+ * labels do not fit across 360 dp, and on a phone the icon plus the highlighted
+ * state is enough.
+ */
+@Composable
+fun BottomNav(
+    items: List<NavItem>,
+    selectedRoute: String,
+    onSelect: (String) -> Unit,
+    modifier: Modifier = Modifier
+) {
+    Row(
+        modifier = modifier
+            .fillMaxWidth()
+            .background(KanalColors.BackgroundElevated)
+            .padding(horizontal = 4.dp, vertical = 6.dp),
+        horizontalArrangement = Arrangement.SpaceEvenly,
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        items.forEach { item ->
+            val selected = item.route == selectedRoute
+            FocusableSurface(
+                onClick = { onSelect(item.route) },
+                modifier = Modifier.weight(1f),
+                shape = RoundedCornerShape(12.dp),
+                color = Color.Transparent,
+                focusedColor = KanalColors.Accent,
+                focusedScale = 1.0f
+            ) { isFocused ->
+                val tint = when {
+                    isFocused -> Color(0xFF06231F)
+                    selected -> KanalColors.Accent
+                    else -> KanalColors.OnSurfaceFaint
+                }
+                Column(
+                    modifier = Modifier
+                        .align(Alignment.Center)
+                        .padding(vertical = 8.dp),
+                    horizontalAlignment = Alignment.CenterHorizontally
+                ) {
+                    Icon(
+                        item.icon,
+                        contentDescription = item.label,
+                        tint = tint,
+                        modifier = Modifier.size(22.dp)
+                    )
+                    if (selected) {
+                        Spacer(Modifier.height(3.dp))
+                        Box(
+                            Modifier
+                                .size(width = 14.dp, height = 2.dp)
+                                .background(tint, RoundedCornerShape(50))
+                        )
+                    }
+                }
+            }
+        }
+    }
+}
+
 /** Left-edge scrim that keeps the rail readable over bright artwork. */
 @Composable
 fun RailScrim(modifier: Modifier = Modifier) {

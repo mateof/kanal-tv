@@ -43,6 +43,7 @@ import com.mateof.kanal.core.log.LogLine
 import com.mateof.kanal.ui.components.ButtonTone
 import com.mateof.kanal.ui.components.KanalButton
 import com.mateof.kanal.ui.components.KanalChip
+import com.mateof.kanal.ui.screenPadding
 import com.mateof.kanal.ui.theme.KanalColors
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -117,7 +118,7 @@ fun LogsScreen(onBack: () -> Unit) {
     Column(
         Modifier
             .fillMaxSize()
-            .padding(start = 48.dp, end = 48.dp, top = 32.dp, bottom = 28.dp)
+            .padding(start = screenPadding, end = screenPadding, top = 32.dp, bottom = 28.dp)
     ) {
         Text("Registro", style = MaterialTheme.typography.headlineMedium, color = KanalColors.OnBackground)
         Spacer(Modifier.height(6.dp))

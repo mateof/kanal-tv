@@ -45,6 +45,8 @@ import com.mateof.kanal.ui.components.SectionHeader
 import com.mateof.kanal.ui.components.SettingSwitchRow
 import com.mateof.kanal.ui.components.StepProgress
 import com.mateof.kanal.ui.components.UpdateViewModel
+import com.mateof.kanal.ui.contentInset
+import com.mateof.kanal.ui.isCompact
 import com.mateof.kanal.ui.theme.KanalColors
 
 @Composable
@@ -68,7 +70,12 @@ fun SettingsScreen(
 
     LazyColumn(
         modifier = Modifier.fillMaxSize(),
-        contentPadding = PaddingValues(start = 40.dp, end = 80.dp, top = 32.dp, bottom = 70.dp),
+        contentPadding = PaddingValues(
+            start = contentInset,
+            end = if (isCompact) contentInset else 80.dp,
+            top = 32.dp,
+            bottom = 70.dp
+        ),
         verticalArrangement = Arrangement.spacedBy(14.dp)
     ) {
         item {
@@ -148,7 +155,7 @@ fun SettingsScreen(
                     onValueChange = { userAgentDraft = it },
                     label = "User-Agent por defecto",
                     supportingText = "Algunos proveedores bloquean agentes desconocidos.",
-                    modifier = Modifier.width(560.dp)
+                    modifier = if (isCompact) Modifier.fillMaxWidth() else Modifier.width(560.dp)
                 )
                 Spacer(Modifier.width(16.dp))
                 KanalButton("Guardar", { vm.setUserAgent(userAgentDraft) })

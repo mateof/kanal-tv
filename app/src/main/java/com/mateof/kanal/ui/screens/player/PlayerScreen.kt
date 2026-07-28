@@ -6,6 +6,7 @@ import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.foundation.background
 import androidx.compose.foundation.focusable
+import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -52,6 +53,7 @@ import androidx.compose.ui.input.key.KeyEventType
 import androidx.compose.ui.input.key.key
 import androidx.compose.ui.input.key.onKeyEvent
 import androidx.compose.ui.input.key.type
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -152,6 +154,14 @@ fun PlayerScreen(
         Modifier
             .fillMaxSize()
             .background(Color.Black)
+            // A finger has no OK key. Tapping the picture opens the controls and
+            // tapping outside them puts it away again. The buttons are drawn on
+            // top and consume their own taps, so they are unaffected.
+            .pointerInput(Unit) {
+                detectTapGestures {
+                    if (mode == Mode.Watching) openControls() else mode = Mode.Watching
+                }
+            }
             .focusRequester(stageFocus)
             .focusable()
             .onKeyEvent { event ->

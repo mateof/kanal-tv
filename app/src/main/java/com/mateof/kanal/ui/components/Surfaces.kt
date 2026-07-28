@@ -1,12 +1,15 @@
 package com.mateof.kanal.ui.components
 
+import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.spring
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.interaction.collectIsPressedAsState
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxScope
 import androidx.compose.foundation.layout.padding
@@ -25,6 +28,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Shape
+import androidx.compose.ui.graphics.compositeOver
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -55,12 +59,31 @@ fun FocusableSurface(
 ) {
     var focused by remember { mutableStateOf(false) }
     val notifyFocus by rememberUpdatedState(onFocusState)
-    val scale by animateFloatAsState(
-        targetValue = if (focused) focusedScale else 1f,
-        animationSpec = spring(dampingRatio = 0.7f, stiffness = 900f),
-        label = "focusScale"
-    )
     val interactionSource = remember { MutableInteractionSource() }
+
+    // A finger produces no focus, so without this a tap looks like nothing
+    // happened until the action itself lands. The ripple is deliberately not
+    // used: it would fight the focus highlight on a television.
+    val pressed by interactionSource.collectIsPressedAsState()
+
+    val scale by animateFloatAsState(
+        targetValue = when {
+            pressed -> focusedScale * 0.96f
+            focused -> focusedScale
+            else -> 1f
+        },
+        animationSpec = spring(dampingRatio = 0.7f, stiffness = 900f),
+        label = "surfaceScale"
+    )
+    val background by animateColorAsState(
+        targetValue = when {
+            focused -> focusedColor
+            pressed -> focusedColor.copy(alpha = 0.45f).compositeOver(color)
+            else -> color
+        },
+        animationSpec = tween(120),
+        label = "surfaceBackground"
+    )
 
     Box(
         modifier = modifier
@@ -76,11 +99,11 @@ fun FocusableSurface(
                 }
             }
             .clip(shape)
-            .background(if (focused) focusedColor else color)
+            .background(background)
             .border(
                 BorderStroke(
-                    width = if (focused) 3.dp else 1.dp,
-                    color = if (focused) focusBorderColor else restingBorderColor
+                    width = if (focused || pressed) 3.dp else 1.dp,
+                    color = if (focused || pressed) focusBorderColor else restingBorderColor
                 ),
                 shape
             )

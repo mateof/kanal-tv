@@ -7,7 +7,10 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Typography
 import androidx.compose.material3.darkColorScheme
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.ui.Modifier
+import com.mateof.kanal.ui.LocalLayoutMode
+import com.mateof.kanal.ui.currentLayoutMode
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.TextStyle
@@ -93,12 +96,14 @@ val AppBackgroundBrush: Brush
 @Composable
 fun KanalTheme(content: @Composable () -> Unit) {
     MaterialTheme(colorScheme = KanalColorScheme, typography = KanalTypography) {
-        Box(
-            Modifier
-                .fillMaxSize()
-                .background(AppBackgroundBrush)
-        ) {
-            content()
+        CompositionLocalProvider(LocalLayoutMode provides currentLayoutMode()) {
+            Box(
+                Modifier
+                    .fillMaxSize()
+                    .background(AppBackgroundBrush)
+            ) {
+                content()
+            }
         }
     }
 }

@@ -1,6 +1,7 @@
 package com.mateof.kanal.ui
 
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.material.icons.Icons
@@ -19,6 +20,7 @@ import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
 import androidx.navigation.navArgument
+import com.mateof.kanal.ui.components.BottomNav
 import com.mateof.kanal.ui.components.NavItem
 import com.mateof.kanal.ui.components.NavRail
 import com.mateof.kanal.ui.screens.detail.MovieDetailScreen
@@ -202,13 +204,20 @@ private fun WithRail(
     selected: String,
     content: @Composable () -> Unit
 ) {
-    Row(Modifier.fillMaxSize()) {
-        NavRail(
-            items = RAIL_ITEMS,
-            selectedRoute = selected,
-            onSelect = { route -> if (route != selected) nav.navigateTop(route) }
-        )
-        Box(Modifier.fillMaxSize()) { content() }
+    val onSelect: (String) -> Unit = { route -> if (route != selected) nav.navigateTop(route) }
+
+    if (isCompact) {
+        // Upright on a phone there is no room beside the content, so the
+        // destinations move to the bottom edge, within thumb reach.
+        Column(Modifier.fillMaxSize()) {
+            Box(Modifier.weight(1f)) { content() }
+            BottomNav(RAIL_ITEMS, selected, onSelect)
+        }
+    } else {
+        Row(Modifier.fillMaxSize()) {
+            NavRail(items = RAIL_ITEMS, selectedRoute = selected, onSelect = onSelect)
+            Box(Modifier.fillMaxSize()) { content() }
+        }
     }
 }
 
