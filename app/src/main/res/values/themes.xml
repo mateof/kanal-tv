@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources xmlns:tools="http://schemas.android.com/tools">
+
+    <style name="Theme.Kanal" parent="android:Theme.Material.NoActionBar">
+        <item name="android:windowBackground">@color/kanal_background</item>
+        <item name="android:colorBackground">@color/kanal_background</item>
+        <item name="android:statusBarColor">@android:color/transparent</item>
+        <item name="android:navigationBarColor">@android:color/transparent</item>
+        <item name="android:windowLightStatusBar" tools:targetApi="23">false</item>
+    </style>
+
+    <!-- Splash while the process starts; MainActivity swaps to Theme.Kanal. -->
+    <style name="Theme.Kanal.Splash" parent="Theme.SplashScreen">
+        <item name="windowSplashScreenBackground">@color/kanal_background</item>
+        <item name="windowSplashScreenAnimatedIcon">@drawable/ic_splash_logo</item>
+        <item name="postSplashScreenTheme">@style/Theme.Kanal</item>
+    </style>
+</resources>

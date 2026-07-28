@@ -1,0 +1,59 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Leanback launcher banner (320x180). Mark on the left, "KANAL" spelled out
+     with stroked paths, since a VectorDrawable cannot render text. -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="320dp"
+    android:height="180dp"
+    android:viewportWidth="320"
+    android:viewportHeight="180">
+
+    <path
+        android:fillColor="#07090F"
+        android:pathData="M0,0 h320 v180 h-320 z" />
+
+    <!-- Mark -->
+    <path
+        android:fillColor="#35E0C8"
+        android:pathData="M24,90 h7 a3,3 0 0 1 3,3 v14 a3,3 0 0 1 -3,3 h-7 a3,3 0 0 1 -3,-3 v-14 a3,3 0 0 1 3,-3 z" />
+    <path
+        android:fillColor="#5AD9E8"
+        android:pathData="M37,77 h7 a3,3 0 0 1 3,3 v27 a3,3 0 0 1 -3,3 h-7 a3,3 0 0 1 -3,-3 v-27 a3,3 0 0 1 3,-3 z" />
+    <path
+        android:fillColor="#7C6BFF"
+        android:pathData="M50,64 h7 a3,3 0 0 1 3,3 v40 a3,3 0 0 1 -3,3 h-7 a3,3 0 0 1 -3,-3 v-40 a3,3 0 0 1 3,-3 z" />
+    <path
+        android:fillColor="#FFFFFF"
+        android:pathData="M66,68 L66,110 L88,89 Z" />
+
+    <!-- KANAL -->
+    <path
+        android:strokeColor="#FFFFFF"
+        android:strokeWidth="6"
+        android:strokeLineCap="round"
+        android:strokeLineJoin="round"
+        android:pathData="M115,70 L115,110 M115,90 L137,70 M115,90 L137,110" />
+    <path
+        android:strokeColor="#FFFFFF"
+        android:strokeWidth="6"
+        android:strokeLineCap="round"
+        android:strokeLineJoin="round"
+        android:pathData="M151,110 L162,70 L173,110 M155,98 L169,98" />
+    <path
+        android:strokeColor="#FFFFFF"
+        android:strokeWidth="6"
+        android:strokeLineCap="round"
+        android:strokeLineJoin="round"
+        android:pathData="M187,110 L187,70 L209,110 L209,70" />
+    <path
+        android:strokeColor="#FFFFFF"
+        android:strokeWidth="6"
+        android:strokeLineCap="round"
+        android:strokeLineJoin="round"
+        android:pathData="M223,110 L234,70 L245,110 M227,98 L241,98" />
+    <path
+        android:strokeColor="#35E0C8"
+        android:strokeWidth="6"
+        android:strokeLineCap="round"
+        android:strokeLineJoin="round"
+        android:pathData="M259,70 L259,110 L281,110" />
+</vector>

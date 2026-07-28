@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<paths>
+    <!-- App-private external files dir, where downloaded update APKs land. -->
+    <external-files-path name="updates" path="updates/" />
+    <!-- Exported diagnostic logs, shared out with ACTION_SEND. -->
+    <external-files-path name="exported-logs" path="exported-logs/" />
+</paths>
