@@ -41,18 +41,13 @@ class PlayerFactory @Inject constructor(
         val httpFactory = OkHttpDataSource.Factory(http.client)
             .setUserAgent(userAgent)
 
-        // Resilient mode puts FFmpeg *before* the hardware audio decoder. A
-        // damaged AC3/AAC frame makes MediaCodec give up, while libavcodec skips
-        // it and keeps going — which is what a glitchy provider needs. It costs
-        // CPU, so it is only done when the user asks for it.
+        // The hardware decoders always go first. Putting FFmpeg ahead of them
+        // was tried and reverted: ExoPlayer paces video off the audio clock, and
+        // the software audio path drifted enough to run the picture fast, drain
+        // the buffer and stall in a loop. Decoder fallback still hands anything
+        // the device cannot manage over to FFmpeg.
         val renderers = NextRenderersFactory(context)
-            .setExtensionRendererMode(
-                if (resilient) {
-                    DefaultRenderersFactory.EXTENSION_RENDERER_MODE_PREFER
-                } else {
-                    DefaultRenderersFactory.EXTENSION_RENDERER_MODE_ON
-                }
-            )
+            .setExtensionRendererMode(DefaultRenderersFactory.EXTENSION_RENDERER_MODE_ON)
             .setEnableDecoderFallback(true)
 
         val extractors = DefaultExtractorsFactory()
