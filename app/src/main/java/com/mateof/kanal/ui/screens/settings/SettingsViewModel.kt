@@ -99,6 +99,7 @@ class SettingsViewModel @Inject constructor(
     fun setBufferProfile(value: BufferProfile) = viewModelScope.launch { prefs.setBufferProfile(value) }
     fun setPreview(value: Boolean) = viewModelScope.launch { prefs.setPreviewEnabled(value) }
     fun setKeepLastChannel(value: Boolean) = viewModelScope.launch { prefs.setKeepLastChannel(value) }
+    fun setResilient(value: Boolean) = viewModelScope.launch { prefs.setResilientPlayback(value) }
     fun setAutoUpdate(value: Boolean) = viewModelScope.launch { prefs.setAutoUpdate(value) }
     fun setHideAdult(value: Boolean) = viewModelScope.launch { prefs.setHideAdult(value) }
     fun setVerboseHttp(value: Boolean) = viewModelScope.launch { prefs.setVerboseHttpLog(value) }

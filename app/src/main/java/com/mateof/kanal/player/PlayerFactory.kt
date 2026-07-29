@@ -15,6 +15,8 @@ import androidx.media3.exoplayer.trackselection.DefaultTrackSelector
 import androidx.media3.extractor.DefaultExtractorsFactory
 import com.mateof.kanal.core.log.FileLogger
 import com.mateof.kanal.data.net.HttpProvider
+import androidx.media3.exoplayer.upstream.DefaultLoadErrorHandlingPolicy
+import androidx.media3.exoplayer.upstream.LoadErrorHandlingPolicy
 import com.mateof.kanal.data.prefs.BufferProfile
 import dagger.hilt.android.qualifiers.ApplicationContext
 import io.github.anilbeesetti.nextlib.media3ext.ffdecoder.NextRenderersFactory
@@ -35,12 +37,22 @@ class PlayerFactory @Inject constructor(
      * (EXTENSION_RENDERER_MODE_ON) so hardware is still preferred and software
      * only kicks in for what the device cannot handle.
      */
-    fun create(userAgent: String, profile: BufferProfile): ExoPlayer {
+    fun create(userAgent: String, profile: BufferProfile, resilient: Boolean = false): ExoPlayer {
         val httpFactory = OkHttpDataSource.Factory(http.client)
             .setUserAgent(userAgent)
 
+        // Resilient mode puts FFmpeg *before* the hardware audio decoder. A
+        // damaged AC3/AAC frame makes MediaCodec give up, while libavcodec skips
+        // it and keeps going — which is what a glitchy provider needs. It costs
+        // CPU, so it is only done when the user asks for it.
         val renderers = NextRenderersFactory(context)
-            .setExtensionRendererMode(DefaultRenderersFactory.EXTENSION_RENDERER_MODE_ON)
+            .setExtensionRendererMode(
+                if (resilient) {
+                    DefaultRenderersFactory.EXTENSION_RENDERER_MODE_PREFER
+                } else {
+                    DefaultRenderersFactory.EXTENSION_RENDERER_MODE_ON
+                }
+            )
             .setEnableDecoderFallback(true)
 
         val extractors = DefaultExtractorsFactory()
@@ -67,16 +79,27 @@ class PlayerFactory @Inject constructor(
             )
         }
 
+        // A dropout is a load error, and the default policy gives up after three
+        // tries. Insisting for longer turns many "se cortó" into a hiccup.
+        val mediaSourceFactory =
+            DefaultMediaSourceFactory(DefaultDataSource.Factory(context, httpFactory), extractors)
+                .setLoadErrorHandlingPolicy(
+                    if (resilient) StubbornLoadErrorPolicy() else DefaultLoadErrorHandlingPolicy()
+                )
+
         return ExoPlayer.Builder(context, renderers)
-            .setMediaSourceFactory(
-                DefaultMediaSourceFactory(DefaultDataSource.Factory(context, httpFactory), extractors)
-            )
+            .setMediaSourceFactory(mediaSourceFactory)
             .setLoadControl(loadControl)
             .setTrackSelector(trackSelector)
             .setHandleAudioBecomingNoisy(true)
             .setWakeMode(C.WAKE_MODE_NETWORK)
             .build()
-            .also { logger.d("Player", "Reproductor creado (buffer ${profile.name}, UA '$userAgent')") }
+            .also {
+                logger.d(
+                    "Player",
+                    "Reproductor creado (buffer ${profile.name}, tolerante=$resilient, UA '$userAgent')"
+                )
+            }
     }
 
     /**
@@ -96,5 +119,21 @@ class PlayerFactory @Inject constructor(
                 androidx.media3.common.MediaMetadata.Builder().setTitle(title).build()
             )
             .build()
+    }
+}
+
+/**
+ * Retries a failed chunk far more often than the default three attempts, with a
+ * short flat back-off. On IPTV a load error is usually a momentary dropout, and
+ * giving up on it is what the user sees as the picture dying.
+ */
+@UnstableApi
+private class StubbornLoadErrorPolicy : DefaultLoadErrorHandlingPolicy() {
+    override fun getMinimumLoadableRetryCount(dataType: Int): Int = 12
+
+    override fun getRetryDelayMsFor(info: LoadErrorHandlingPolicy.LoadErrorInfo): Long {
+        val previous = super.getRetryDelayMsFor(info)
+        if (previous == C.TIME_UNSET) return C.TIME_UNSET
+        return previous.coerceAtMost(2_000L)
     }
 }

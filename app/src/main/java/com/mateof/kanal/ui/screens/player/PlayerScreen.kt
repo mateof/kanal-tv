@@ -297,13 +297,26 @@ fun PlayerScreen(
         }
 
         if (state.loading || (state.buffering && state.error.isBlank())) {
-            CircularProgressIndicator(
-                color = KanalColors.Accent,
-                strokeWidth = 3.dp,
-                modifier = Modifier
-                    .align(Alignment.Center)
-                    .size(56.dp)
-            )
+            Column(
+                modifier = Modifier.align(Alignment.Center),
+                horizontalAlignment = Alignment.CenterHorizontally
+            ) {
+                CircularProgressIndicator(
+                    color = KanalColors.Accent,
+                    strokeWidth = 3.dp,
+                    modifier = Modifier.size(56.dp)
+                )
+                // Say what is happening: a silent reconnection looks identical to
+                // a stall, and the user deserves to know the app is on it.
+                if (state.reconnectAttempt > 0) {
+                    Spacer(Modifier.height(16.dp))
+                    Text(
+                        "Reconectando… (${state.reconnectAttempt})",
+                        style = MaterialTheme.typography.labelLarge,
+                        color = KanalColors.OnSurfaceMuted
+                    )
+                }
+            }
         }
 
         if (state.error.isNotBlank()) {

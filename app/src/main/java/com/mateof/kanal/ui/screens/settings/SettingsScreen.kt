@@ -150,6 +150,16 @@ fun SettingsScreen(
         }
         item {
             SettingSwitchRow(
+                title = "Aguantar cortes del servidor",
+                description = "Si la emisión se corta, reconecta sola varias veces en lugar de dar error, " +
+                    "insiste más ante fallos de red y decodifica el audio por software, que tolera mejor " +
+                    "los paquetes dañados. Súbelo con el búfer al máximo si tu proveedor va justo.",
+                checked = settings.resilientPlayback,
+                onCheckedChange = vm::setResilient
+            )
+        }
+        item {
+            SettingSwitchRow(
                 title = "Recordar el último canal",
                 description = "Al salir de un canal con ATRÁS sigue sonando en la vista previa. " +
                     "Desde la lista, ATRÁS vuelve a ponerlo a pantalla completa; dos veces seguidas sale.",

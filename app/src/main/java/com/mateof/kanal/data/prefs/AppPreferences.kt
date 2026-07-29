@@ -34,13 +34,15 @@ enum class StreamFormat(val label: String, val extension: String) {
 enum class BufferProfile(val label: String, val minBufferMs: Int, val maxBufferMs: Int, val startMs: Int) {
     LOW("Bajo (zapping rápido)", 1_500, 15_000, 800),
     NORMAL("Normal", 5_000, 30_000, 1_500),
-    HIGH("Alto (conexión inestable)", 15_000, 60_000, 3_000)
+    HIGH("Alto (conexión inestable)", 15_000, 60_000, 3_000),
+    MAXIMUM("Máximo (servidor con cortes)", 45_000, 180_000, 5_000)
 }
 
 data class Settings(
     val streamFormat: StreamFormat = StreamFormat.TS,
     val previewEnabled: Boolean = true,
     val keepLastChannel: Boolean = true,
+    val resilientPlayback: Boolean = true,
     val previewDelayMs: Int = 1_200,
     val bufferProfile: BufferProfile = BufferProfile.NORMAL,
     val autoUpdate: Boolean = true,
@@ -69,6 +71,7 @@ class AppPreferences @Inject constructor(
         val STREAM_FORMAT = stringPreferencesKey("stream_format")
         val PREVIEW_ENABLED = booleanPreferencesKey("preview_enabled")
         val KEEP_LAST_CHANNEL = booleanPreferencesKey("keep_last_channel")
+        val RESILIENT = booleanPreferencesKey("resilient_playback")
         val PREVIEW_DELAY = intPreferencesKey("preview_delay")
         val BUFFER_PROFILE = stringPreferencesKey("buffer_profile")
         val AUTO_UPDATE = booleanPreferencesKey("auto_update")
@@ -184,6 +187,7 @@ class AppPreferences @Inject constructor(
             } ?: StreamFormat.TS,
             previewEnabled = prefs[Keys.PREVIEW_ENABLED] ?: true,
             keepLastChannel = prefs[Keys.KEEP_LAST_CHANNEL] ?: true,
+            resilientPlayback = prefs[Keys.RESILIENT] ?: true,
             previewDelayMs = prefs[Keys.PREVIEW_DELAY] ?: 1_200,
             bufferProfile = prefs[Keys.BUFFER_PROFILE]?.let { name ->
                 BufferProfile.entries.firstOrNull { it.name == name }
@@ -201,6 +205,7 @@ class AppPreferences @Inject constructor(
     suspend fun setStreamFormat(value: StreamFormat) = edit { it[Keys.STREAM_FORMAT] = value.name }
     suspend fun setPreviewEnabled(value: Boolean) = edit { it[Keys.PREVIEW_ENABLED] = value }
     suspend fun setKeepLastChannel(value: Boolean) = edit { it[Keys.KEEP_LAST_CHANNEL] = value }
+    suspend fun setResilientPlayback(value: Boolean) = edit { it[Keys.RESILIENT] = value }
     suspend fun setBufferProfile(value: BufferProfile) = edit { it[Keys.BUFFER_PROFILE] = value.name }
     suspend fun setAutoUpdate(value: Boolean) = edit { it[Keys.AUTO_UPDATE] = value }
     suspend fun setUserAgent(value: String) = edit { it[Keys.USER_AGENT] = value }

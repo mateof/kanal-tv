@@ -28,6 +28,9 @@ import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import javax.inject.Inject
 
+/** How many silent reconnections before the user is told something is wrong. */
+private const val MAX_RECONNECTS = 6
+
 data class TrackOption(
     val id: String,
     val label: String,
@@ -50,6 +53,8 @@ data class PlayerUiState(
     val subtitleTracks: List<TrackOption> = emptyList(),
     val channelIndex: Int = -1,
     val channelCount: Int = 0,
+    /** Non-zero while silently reconnecting after a dropout. */
+    val reconnectAttempt: Int = 0,
     /** Days the provider sent guide for, for the in-player guide panel. */
     val guideDays: List<Long> = emptyList(),
     val selectedDay: Long = 0L,
@@ -80,6 +85,9 @@ class PlayerViewModel @Inject constructor(
     /** Urls still to try for the current item, in order. */
     private var candidates: List<String> = emptyList()
     private var candidateIndex = 0
+    private var reconnectJob: Job? = null
+    private var reconnects = 0
+    private var resilient = false
 
     fun load(kind: String, itemId: String, startMillis: Long) {
         val key = "$kind/$itemId/$startMillis"
@@ -142,7 +150,14 @@ class PlayerViewModel @Inject constructor(
 
     private suspend fun start(playable: Playable) {
         val settings = prefs.settings.first()
-        val exo = player ?: playerFactory.create(playable.userAgent, settings.bufferProfile).also {
+        resilient = settings.resilientPlayback
+        reconnectJob?.cancel()
+        reconnects = 0
+        val exo = player ?: playerFactory.create(
+            playable.userAgent,
+            settings.bufferProfile,
+            settings.resilientPlayback
+        ).also {
             it.addListener(listener)
             player = it
         }
@@ -161,7 +176,8 @@ class PlayerViewModel @Inject constructor(
             loading = false,
             error = "",
             channelIndex = index,
-            channelCount = channelIds.size
+            channelCount = channelIds.size,
+            reconnectAttempt = 0
         )
         logger.i("Player", "Reproduciendo '${playable.title}'")
 
@@ -244,6 +260,7 @@ class PlayerViewModel @Inject constructor(
         override fun onPlayerError(error: PlaybackException) {
             logger.w("Player", "Error de reproducción: ${error.errorCodeName}")
             if (tryNextCandidate(error)) return
+            if (scheduleReconnect(error)) return
             logger.e("Player", "Sin más formatos que probar", error)
             _state.value = _state.value.copy(
                 error = friendlyError(error),
@@ -260,6 +277,11 @@ class PlayerViewModel @Inject constructor(
         }
 
         override fun onIsPlayingChanged(isPlaying: Boolean) {
+            // A clean run means the dropout is over; let it earn its retries back.
+            if (isPlaying && _state.value.reconnectAttempt > 0) {
+                reconnects = 0
+                _state.value = _state.value.copy(reconnectAttempt = 0)
+            }
             _state.value = _state.value.copy(playing = isPlaying)
             if (!isPlaying) recordProgress()
         }
@@ -298,6 +320,58 @@ class PlayerViewModel @Inject constructor(
         PlaybackException.ERROR_CODE_IO_BAD_HTTP_STATUS,
         PlaybackException.ERROR_CODE_IO_FILE_NOT_FOUND,
         PlaybackException.ERROR_CODE_IO_UNSPECIFIED -> true
+
+        else -> false
+    }
+
+    /**
+     * A stream that dies mid-programme is almost always the provider hiccuping,
+     * not something the user can act on. Rather than dropping an error on the
+     * screen, reconnect quietly a few times and only give up if it keeps failing.
+     *
+     * @return true when a reconnection was queued.
+     */
+    private fun scheduleReconnect(error: PlaybackException): Boolean {
+        if (!resilient) return false
+        if (!isRecoverable(error)) return false
+        if (reconnects >= MAX_RECONNECTS) return false
+        val exo = player ?: return false
+
+        reconnects++
+        val delayMs = (1_000L * reconnects).coerceAtMost(6_000L)
+        logger.i("Player", "Reconectando en ${delayMs}ms (intento $reconnects/$MAX_RECONNECTS)")
+        _state.value = _state.value.copy(
+            reconnectAttempt = reconnects,
+            error = "",
+            buffering = true
+        )
+
+        reconnectJob?.cancel()
+        reconnectJob = viewModelScope.launch {
+            delay(delayMs)
+            // Always come back on the candidate that was working.
+            candidates.getOrNull(candidateIndex)?.let { url ->
+                exo.setMediaItem(playerFactory.mediaItem(url, _state.value.playable?.title.orEmpty()))
+            }
+            exo.prepare()
+            exo.playWhenReady = true
+        }
+        return true
+    }
+
+    /**
+     * Only reconnect when the *connection* broke. Decoding and container errors
+     * usually mean the source itself is damaged — a weak aerial feeding a DVB
+     * tuner, for instance — and restarting the stream on every corrupt frame
+     * replaces a momentary artefact with a full rebuffer. Riding it out is
+     * better, and ExoPlayer already skips what it cannot decode.
+     */
+    private fun isRecoverable(error: PlaybackException): Boolean = when (error.errorCode) {
+        PlaybackException.ERROR_CODE_IO_NETWORK_CONNECTION_FAILED,
+        PlaybackException.ERROR_CODE_IO_NETWORK_CONNECTION_TIMEOUT,
+        PlaybackException.ERROR_CODE_IO_BAD_HTTP_STATUS,
+        PlaybackException.ERROR_CODE_IO_UNSPECIFIED,
+        PlaybackException.ERROR_CODE_TIMEOUT -> true
 
         else -> false
     }
@@ -373,7 +447,8 @@ class PlayerViewModel @Inject constructor(
 
     fun retry() {
         val exo = player ?: return
-        _state.value = _state.value.copy(error = "", buffering = true)
+        reconnects = 0
+        _state.value = _state.value.copy(error = "", buffering = true, reconnectAttempt = 0)
         // Start the candidate walk over: the channel may simply have been down.
         candidateIndex = 0
         candidates.firstOrNull()?.let { url ->
@@ -418,6 +493,7 @@ class PlayerViewModel @Inject constructor(
 
     override fun onCleared() {
         recordProgress()
+        reconnectJob?.cancel()
         ticker?.cancel()
         player?.release()
         player = null
