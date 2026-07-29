@@ -2,9 +2,8 @@ package com.mateof.kanal.ui.components
 
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.background
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.focusGroup
-import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -38,6 +37,7 @@ import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -92,12 +92,10 @@ fun ProgrammeDialog(
         modifier = modifier
             .fillMaxSize()
             .background(Color(0xE0040609))
-            // Tapping the dimmed area closes, as a modal should.
-            .clickable(
-                interactionSource = remember { MutableInteractionSource() },
-                indication = null,
-                onClick = onDismiss
-            ),
+            // Tap-to-dismiss with pointerInput, never clickable: clickable adds a
+            // focus target, and a full-screen one swallows every arrow press,
+            // leaving the sheet's own buttons unreachable from a remote.
+            .pointerInput(Unit) { detectTapGestures { onDismiss() } },
         contentAlignment = Alignment.Center
     ) {
         Column(
@@ -113,7 +111,6 @@ fun ProgrammeDialog(
                     )
                 )
                 .padding(if (isCompact) 22.dp else 32.dp)
-                .focusRequester(focus)
                 .focusGroup()
         ) {
             // --- Channel line -------------------------------------------------
@@ -216,7 +213,7 @@ fun ProgrammeDialog(
                 if (detail.canReplay && onReplay != null) {
                     KanalButton("Ver repetición", onReplay, icon = Icons.Outlined.Replay)
                 }
-                KanalButton("Cerrar", onDismiss)
+                KanalButton("Cerrar", onDismiss, modifier = Modifier.focusRequester(focus))
             }
         }
     }

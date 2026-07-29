@@ -55,6 +55,7 @@ import androidx.compose.ui.input.key.Key
 import androidx.compose.ui.input.key.KeyEventType
 import androidx.compose.ui.input.key.key
 import androidx.compose.ui.input.key.onKeyEvent
+import androidx.compose.ui.input.key.onPreviewKeyEvent
 import androidx.compose.ui.input.key.type
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.ContentScale
@@ -93,6 +94,14 @@ private const val OSD_TIMEOUT_MS = 6_000L
  */
 private enum class Mode { Watching, Controls, Tracks, Guide }
 
+/** One button of the control bar, so the first can be given the focus anchor. */
+private data class ControlAction(
+    val label: String,
+    val icon: androidx.compose.ui.graphics.vector.ImageVector,
+    val tone: ButtonTone,
+    val onClick: () -> Unit
+)
+
 @Composable
 fun PlayerScreen(
     kind: String,
@@ -108,6 +117,8 @@ fun PlayerScreen(
     var osdVisible by remember { mutableStateOf(true) }
     var osdTick by remember { mutableIntStateOf(0) }
     var resizeMode by remember { mutableIntStateOf(AspectRatioFrameLayout.RESIZE_MODE_FIT) }
+    // Set when OK opens the control bar, cleared when its key-up is swallowed.
+    var swallowCentreUp by remember { mutableStateOf(false) }
 
     val stageFocus = remember { FocusRequester() }
     val controlsFocus = remember { FocusRequester() }
@@ -135,7 +146,9 @@ fun PlayerScreen(
     // The control bar and the track panel appear with the same frame that
     // changes the mode, so their target may not be attached yet: keep trying
     // for a moment instead of silently leaving focus on the video.
-    LaunchedEffect(mode) {
+    // Also keyed on the sheet: when it closes, focus has to come back to the bar
+    // or the arrows have nothing to move from and the remote goes dead.
+    LaunchedEffect(mode, detail == null) {
         val target = when (mode) {
             Mode.Watching -> stageFocus
             Mode.Controls -> controlsFocus
@@ -155,7 +168,7 @@ fun PlayerScreen(
         osdVisible = false
     }
 
-    BackHandler(enabled = detail == null) {
+    fun goBack() {
         when (mode) {
             Mode.Tracks, Mode.Guide -> mode = Mode.Controls
             Mode.Controls -> mode = Mode.Watching
@@ -164,6 +177,11 @@ fun PlayerScreen(
             Mode.Watching -> if (osdVisible) osdVisible = false else onBack(liveChannelId())
         }
     }
+
+    // Kept for gesture navigation, which never produces a key event. The remote's
+    // BACK key is handled in the key preview below, because with the player in
+    // the tree the event never reached this dispatcher.
+    BackHandler(enabled = detail == null) { goBack() }
 
     // Keep now/next honest across a programme changeover while the OSD is up.
     LaunchedEffect(isLive) {
@@ -184,6 +202,29 @@ fun PlayerScreen(
             .pointerInput(Unit) {
                 detectTapGestures {
                     if (mode == Mode.Watching) openControls() else mode = Mode.Watching
+                }
+            }
+            // Preview, not onKeyEvent: a key event reaches the focused child
+            // first and only then bubbles to its ancestors. Compose fires a click
+            // on KEY_UP, so the up of the very OK that opened the bar was landing
+            // on the button that had just taken focus — one press opened the bar
+            // and activated its first button. Only the root sees the event early
+            // enough to swallow it.
+            .onPreviewKeyEvent { event ->
+                // BACK is handled here rather than through BackHandler: with the
+                // player view in the tree the key never reached the activity's
+                // dispatcher, so the panels could not be closed with the remote.
+                // The sheet keeps its own handler, so let it through for that.
+                if (event.key == Key.Back && detail == null) {
+                    if (event.type == KeyEventType.KeyUp) goBack()
+                    return@onPreviewKeyEvent true
+                }
+                val centre = event.key == Key.DirectionCenter || event.key == Key.Enter
+                if (swallowCentreUp && centre && event.type == KeyEventType.KeyUp) {
+                    swallowCentreUp = false
+                    true
+                } else {
+                    false
                 }
             }
             .focusRequester(stageFocus)
@@ -219,6 +260,7 @@ fun PlayerScreen(
 
                     // The only way into the controls on a remote without MENU.
                     Key.DirectionCenter, Key.Enter -> {
+                        swallowCentreUp = true
                         openControls()
                         true
                     }
@@ -546,43 +588,48 @@ private fun Osd(
 
         Spacer(Modifier.height(18.dp))
 
+        // Focus goes to a real button, never to a container: requesting focus on
+        // a focus group can silently land nowhere, and then the arrows have no
+        // anchor to search from and the remote appears dead.
+        val actions = buildList {
+            if (!playable.isLive) {
+                add(
+                    ControlAction(
+                        label = if (state.playing) "Pausa" else "Reproducir",
+                        icon = if (state.playing) Icons.Outlined.Pause else Icons.Outlined.PlayArrow,
+                        tone = ButtonTone.Primary,
+                        onClick = onTogglePlay
+                    )
+                )
+                add(ControlAction("10 s", Icons.Outlined.Replay10, ButtonTone.Neutral, onSeekBack))
+                add(ControlAction("10 s", Icons.Outlined.Forward10, ButtonTone.Neutral, onSeekForward))
+            }
+            if (playable.isLive && state.now != null) {
+                add(ControlAction("Ficha", Icons.Outlined.Info, ButtonTone.Primary, onOpenDetail))
+            }
+            if (playable.isLive && state.guideDays.isNotEmpty()) {
+                add(ControlAction("Guía", Icons.Outlined.CalendarMonth, ButtonTone.Neutral, onOpenGuide))
+            }
+            add(ControlAction(resizeLabel, Icons.Outlined.AspectRatio, ButtonTone.Neutral, onCycleResize))
+            add(ControlAction("Audio y subtítulos", Icons.Outlined.Tune, ButtonTone.Neutral, onOpenTracks))
+        }
+
         // FlowRow, not Row: on a phone the five controls do not fit across one
         // line and the last of them ended up clipped off the screen.
         FlowRow(
-            modifier = Modifier
-                .fillMaxWidth()
-                .focusRequester(controlsFocus)
-                .focusGroup(),
+            modifier = Modifier.fillMaxWidth().focusGroup(),
             horizontalArrangement = Arrangement.spacedBy(12.dp),
             verticalArrangement = Arrangement.spacedBy(10.dp)
         ) {
-            if (!playable.isLive) {
+            actions.forEachIndexed { index, action ->
                 KanalButton(
-                    text = if (state.playing) "Pausa" else "Reproducir",
-                    onClick = onTogglePlay,
-                    icon = if (state.playing) Icons.Outlined.Pause else Icons.Outlined.PlayArrow,
-                    tone = ButtonTone.Primary
-                )
-                KanalButton("10 s", onSeekBack, icon = Icons.Outlined.Replay10)
-                KanalButton("10 s", onSeekForward, icon = Icons.Outlined.Forward10)
-            }
-            if (playable.isLive && state.now != null) {
-                KanalButton(
-                    text = "Ficha",
-                    onClick = onOpenDetail,
-                    icon = Icons.Outlined.Info,
-                    tone = ButtonTone.Primary
+                    text = action.label,
+                    onClick = action.onClick,
+                    icon = action.icon,
+                    tone = action.tone,
+                    modifier = if (index == 0) Modifier.focusRequester(controlsFocus) else Modifier
                 )
             }
-            if (playable.isLive && state.guideDays.isNotEmpty()) {
-                KanalButton(
-                    text = "Guía",
-                    onClick = onOpenGuide,
-                    icon = Icons.Outlined.CalendarMonth
-                )
-            }
-            KanalButton(resizeLabel, onCycleResize, icon = Icons.Outlined.AspectRatio)
-            KanalButton("Audio y subtítulos", onOpenTracks, icon = Icons.Outlined.Tune)
         }
 
         Spacer(Modifier.height(14.dp))
