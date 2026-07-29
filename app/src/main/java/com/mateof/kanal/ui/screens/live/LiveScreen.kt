@@ -28,8 +28,14 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.activity.compose.BackHandler
 import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.mutableLongStateOf
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -52,13 +58,23 @@ import com.mateof.kanal.ui.components.FocusableSurface
 import com.mateof.kanal.ui.components.KanalButton
 import com.mateof.kanal.ui.components.KanalChip
 import com.mateof.kanal.ui.components.MessageState
+import com.mateof.kanal.ui.components.ProgrammeDetail
+import com.mateof.kanal.ui.components.ProgrammeDialog
 import com.mateof.kanal.ui.components.ThinProgress
 import com.mateof.kanal.ui.components.scrollingTitle
 import com.mateof.kanal.ui.isCompact
 import com.mateof.kanal.ui.theme.KanalColors
 
+/** Two BACK presses closer than this count as "get me out of here". */
+private const val DOUBLE_BACK_MS = 900L
+
 @Composable
-fun LiveScreen(onPlay: (String, Long) -> Unit) {
+fun LiveScreen(
+    onPlay: (String, Long) -> Unit,
+    /** Channel just left behind in the player, or null when arriving fresh. */
+    resumedChannelId: String? = null,
+    onBack: () -> Unit = {}
+) {
     val vm: LiveViewModel = hiltViewModel()
     val categories by vm.categories.collectAsStateWithLifecycle()
     val selectedCategory by vm.selectedCategory.collectAsStateWithLifecycle()
@@ -75,7 +91,36 @@ fun LiveScreen(onPlay: (String, Long) -> Unit) {
     val previewError by vm.previewError.collectAsStateWithLifecycle()
     val favoriteChannels by vm.favoriteChannels.collectAsStateWithLifecycle()
 
+    var detail by remember { mutableStateOf<ProgrammeDetail?>(null) }
+    val settings by vm.settings.collectAsStateWithLifecycle()
     val paged = vm.channels.collectAsLazyPagingItems()
+
+    // Coming back from the player: keep that channel sounding in the preview
+    // instead of going silent, and remember it for the BACK shortcut below.
+    var resumeTarget by remember { mutableStateOf<String?>(null) }
+    var arrivedAt by remember { mutableLongStateOf(0L) }
+    val compactLayout = isCompact
+    LaunchedEffect(resumedChannelId) {
+        val id = resumedChannelId ?: return@LaunchedEffect
+        if (!settings.keepLastChannel) return@LaunchedEffect
+        resumeTarget = id
+        arrivedAt = System.currentTimeMillis()
+        // Upright there is no preview pane to show it in, and starting the
+        // player anyway would leave audio going with nothing on screen. The
+        // BACK shortcut below still works there.
+        if (!compactLayout) vm.resumeChannel(id)
+    }
+
+    // BACK returns to the channel full screen. Two quick presses — the one that
+    // left the player and this one — mean "I want out", so leave instead.
+    BackHandler(enabled = settings.keepLastChannel && resumeTarget != null && detail == null) {
+        val target = resumeTarget
+        if (System.currentTimeMillis() - arrivedAt < DOUBLE_BACK_MS || target == null) {
+            onBack()
+        } else {
+            onPlay(target, 0L)
+        }
+    }
     val showingFavorites = selectedCategory == CATEGORY_FAVORITES
 
     DisposableEffect(Unit) { onDispose { vm.stopPreview() } }
@@ -98,6 +143,7 @@ fun LiveScreen(onPlay: (String, Long) -> Unit) {
         return
     }
 
+    Box(Modifier.fillMaxSize()) {
     // A 250 dp column of categories plus a 420 dp list of channels leaves the
     // preview and guide pane with almost nothing on a 960 dp television. The
     // categories move to a strip of chips across the top instead, which is also
@@ -207,14 +253,40 @@ fun LiveScreen(onPlay: (String, Long) -> Unit) {
             } == true,
             onToggleFavorite = { focused?.let(vm::toggleFavorite) },
             onPlay = { focused?.let { onPlay(it.streamId, 0L) } },
-            onPlayCatchup = { programme ->
-                focused?.let { onPlay(it.streamId, programme.start) }
+            onProgrammeClick = { programme ->
+                focused?.let { channel ->
+                    detail = ProgrammeDetail(
+                        programme = programme,
+                        channelName = channel.name,
+                        channelLogo = channel.logo,
+                        channelStreamId = channel.streamId,
+                        canReplay = channel.archiveDays > 0 &&
+                            programme.stop < System.currentTimeMillis()
+                    )
+                }
             },
             modifier = Modifier
                 .weight(1f)
                 .fillMaxHeight()
         )
         }
+    }
+
+    detail?.let { open ->
+        ProgrammeDialog(
+            detail = open,
+            onDismiss = { detail = null },
+            onReplay = if (open.canReplay) {
+                {
+                    val programme = open.programme
+                    detail = null
+                    onPlay(open.channelStreamId, programme.start)
+                }
+            } else {
+                null
+            }
+        )
+    }
     }
 }
 
@@ -429,7 +501,7 @@ private fun DetailPane(
     isFavorite: Boolean,
     onToggleFavorite: () -> Unit,
     onPlay: () -> Unit,
-    onPlayCatchup: (EpgEntity) -> Unit,
+    onProgrammeClick: (EpgEntity) -> Unit,
     modifier: Modifier = Modifier
 ) {
     if (channel == null) {
@@ -577,7 +649,7 @@ private fun DetailPane(
                 modifier = Modifier.weight(1f, fill = false),
                 archiveAvailable = channel.archiveDays > 0,
                 onSelectDay = onSelectDay,
-                onReplay = onPlayCatchup
+                onProgrammeClick = onProgrammeClick
             )
         }
     }

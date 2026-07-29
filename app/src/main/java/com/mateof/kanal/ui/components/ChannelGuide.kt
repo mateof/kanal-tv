@@ -52,7 +52,8 @@ fun ChannelGuide(
     archiveAvailable: Boolean = false,
     emptyMessage: String = "No hay guía para este canal.",
     onSelectDay: (Long) -> Unit,
-    onReplay: (EpgEntity) -> Unit = {}
+    /** Opening the sheet is the default action; replaying lives inside it. */
+    onProgrammeClick: (EpgEntity) -> Unit = {}
 ) {
     val listState = rememberLazyListState()
     val nowMillis = System.currentTimeMillis()
@@ -98,7 +99,7 @@ fun ChannelGuide(
                 GuideEntry(
                     programme = programme,
                     canReplay = archiveAvailable && programme.stop < nowMillis,
-                    onReplay = { onReplay(programme) }
+                    onClick = { onProgrammeClick(programme) }
                 )
             }
         }
@@ -109,19 +110,18 @@ fun ChannelGuide(
 private fun GuideEntry(
     programme: EpgEntity,
     canReplay: Boolean,
-    onReplay: () -> Unit
+    onClick: () -> Unit
 ) {
     val nowMillis = System.currentTimeMillis()
     val isLive = programme.start <= nowMillis && programme.stop > nowMillis
 
     FocusableSurface(
-        onClick = { if (canReplay) onReplay() },
+        onClick = onClick,
         modifier = Modifier.fillMaxWidth(),
         shape = RoundedCornerShape(10.dp),
         color = if (isLive) KanalColors.SurfaceVariant else Color.Transparent,
         focusedColor = KanalColors.Accent,
-        focusedScale = 1.0f,
-        enabled = canReplay
+        focusedScale = 1.0f
     ) { focused ->
         val contentColor = when {
             focused -> Color(0xFF06231F)

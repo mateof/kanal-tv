@@ -40,6 +40,7 @@ enum class BufferProfile(val label: String, val minBufferMs: Int, val maxBufferM
 data class Settings(
     val streamFormat: StreamFormat = StreamFormat.TS,
     val previewEnabled: Boolean = true,
+    val keepLastChannel: Boolean = true,
     val previewDelayMs: Int = 1_200,
     val bufferProfile: BufferProfile = BufferProfile.NORMAL,
     val autoUpdate: Boolean = true,
@@ -67,6 +68,7 @@ class AppPreferences @Inject constructor(
 
         val STREAM_FORMAT = stringPreferencesKey("stream_format")
         val PREVIEW_ENABLED = booleanPreferencesKey("preview_enabled")
+        val KEEP_LAST_CHANNEL = booleanPreferencesKey("keep_last_channel")
         val PREVIEW_DELAY = intPreferencesKey("preview_delay")
         val BUFFER_PROFILE = stringPreferencesKey("buffer_profile")
         val AUTO_UPDATE = booleanPreferencesKey("auto_update")
@@ -181,6 +183,7 @@ class AppPreferences @Inject constructor(
                 StreamFormat.entries.firstOrNull { it.name == name }
             } ?: StreamFormat.TS,
             previewEnabled = prefs[Keys.PREVIEW_ENABLED] ?: true,
+            keepLastChannel = prefs[Keys.KEEP_LAST_CHANNEL] ?: true,
             previewDelayMs = prefs[Keys.PREVIEW_DELAY] ?: 1_200,
             bufferProfile = prefs[Keys.BUFFER_PROFILE]?.let { name ->
                 BufferProfile.entries.firstOrNull { it.name == name }
@@ -197,6 +200,7 @@ class AppPreferences @Inject constructor(
 
     suspend fun setStreamFormat(value: StreamFormat) = edit { it[Keys.STREAM_FORMAT] = value.name }
     suspend fun setPreviewEnabled(value: Boolean) = edit { it[Keys.PREVIEW_ENABLED] = value }
+    suspend fun setKeepLastChannel(value: Boolean) = edit { it[Keys.KEEP_LAST_CHANNEL] = value }
     suspend fun setBufferProfile(value: BufferProfile) = edit { it[Keys.BUFFER_PROFILE] = value.name }
     suspend fun setAutoUpdate(value: Boolean) = edit { it[Keys.AUTO_UPDATE] = value }
     suspend fun setUserAgent(value: String) = edit { it[Keys.USER_AGENT] = value }

@@ -33,7 +33,8 @@ fun formatDuration(millis: Long): String {
     val hours = TimeUnit.MILLISECONDS.toHours(millis)
     val minutes = TimeUnit.MILLISECONDS.toMinutes(millis) % 60
     return when {
-        hours > 0 -> "${hours} h ${minutes} min"
+        hours > 0 && minutes > 0 -> "$hours h $minutes min"
+        hours > 0 -> "$hours h"
         minutes > 0 -> "$minutes min"
         else -> "${TimeUnit.MILLISECONDS.toSeconds(millis)} s"
     }

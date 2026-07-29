@@ -149,6 +149,15 @@ fun SettingsScreen(
             )
         }
         item {
+            SettingSwitchRow(
+                title = "Recordar el último canal",
+                description = "Al salir de un canal con ATRÁS sigue sonando en la vista previa. " +
+                    "Desde la lista, ATRÁS vuelve a ponerlo a pantalla completa; dos veces seguidas sale.",
+                checked = settings.keepLastChannel,
+                onCheckedChange = vm::setKeepLastChannel
+            )
+        }
+        item {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 KanalTextField(
                     value = userAgentDraft,

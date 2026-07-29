@@ -14,6 +14,8 @@ import androidx.compose.material.icons.outlined.Settings
 import androidx.compose.material.icons.outlined.Star
 import androidx.compose.material.icons.outlined.Tv
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.compose.ui.Modifier
 import androidx.navigation.NavHostController
 import androidx.navigation.NavType
@@ -59,6 +61,9 @@ object Routes {
     /** kind is LIVE / MOVIE / SERIES; [start] is only used for catch-up. */
     fun player(kind: String, itemId: String, start: Long = 0L) = "player/$kind/$itemId?start=$start"
 }
+
+/** Saved-state key carrying the channel from the player back to the list. */
+private const val RESUMED_CHANNEL = "resumed_channel"
 
 private val RAIL_ITEMS = listOf(
     NavItem(Routes.HOME, "Inicio", Icons.Outlined.Home),
@@ -110,9 +115,24 @@ fun KanalNavHost() {
             }
         }
 
-        composable(Routes.LIVE) {
+        composable(Routes.LIVE) { entry ->
+            // The player hands the channel back through the saved state so the
+            // list can keep it playing in the preview.
+            val resumed by entry.savedStateHandle
+                .getStateFlow<String?>(RESUMED_CHANNEL, null)
+                .collectAsStateWithLifecycle()
             WithRail(nav, Routes.LIVE) {
-                LiveScreen(onPlay = { id, start -> nav.navigate(Routes.player("LIVE", id, start)) })
+                LiveScreen(
+                    onPlay = { id, start ->
+                        entry.savedStateHandle[RESUMED_CHANNEL] = null
+                        nav.navigate(Routes.player("LIVE", id, start))
+                    },
+                    resumedChannelId = resumed,
+                    onBack = {
+                        entry.savedStateHandle[RESUMED_CHANNEL] = null
+                        if (!nav.popBackStack()) nav.navigateTop(Routes.HOME)
+                    }
+                )
             }
         }
 
@@ -202,7 +222,10 @@ fun KanalNavHost() {
                 kind = entry.arguments?.getString("kind").orEmpty(),
                 itemId = entry.arguments?.getString("itemId").orEmpty(),
                 startMillis = entry.arguments?.getLong("start") ?: 0L,
-                onBack = { nav.popBackStack() }
+                onBack = { liveChannelId ->
+                    nav.previousBackStackEntry?.savedStateHandle?.set(RESUMED_CHANNEL, liveChannelId)
+                    nav.popBackStack()
+                }
             )
         }
     }

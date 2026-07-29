@@ -27,6 +27,9 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -46,6 +49,8 @@ import com.mateof.kanal.ui.components.KanalButton
 import com.mateof.kanal.ui.components.KanalChip
 import com.mateof.kanal.ui.components.LoadingState
 import com.mateof.kanal.ui.components.MessageState
+import com.mateof.kanal.ui.components.ProgrammeDetail
+import com.mateof.kanal.ui.components.ProgrammeDialog
 import com.mateof.kanal.ui.components.scrollingTitle
 import com.mateof.kanal.ui.isCompact
 import com.mateof.kanal.ui.theme.KanalColors
@@ -71,6 +76,7 @@ fun GuideScreen(onPlay: (String) -> Unit) {
     val channelColumn: Dp = if (compact) 108.dp else 190.dp
     val rowHeight: Dp = if (compact) 62.dp else 72.dp
 
+    var detail by remember { mutableStateOf<ProgrammeDetail?>(null) }
     val horizontal = rememberScrollState()
     val totalMinutes = ((state.windowEnd - state.windowStart) / 60_000L).toInt().coerceAtLeast(1)
 
@@ -85,9 +91,14 @@ fun GuideScreen(onPlay: (String) -> Unit) {
             Column(Modifier.weight(1f)) {
                 Text("Guía", style = MaterialTheme.typography.headlineSmall, color = KanalColors.OnBackground)
                 Text(
-                    if (state.rows.isEmpty()) "" else {
-                        "${state.rows.size} canales" + if (state.truncated) " (primeros ${GuideViewModel.CHANNEL_LIMIT})" else ""
+                    when {
+                        state.rows.isEmpty() -> ""
+                        compact -> "${state.rows.size} canales"
+                        else -> "${state.rows.size} canales · pulsa un programa para su ficha" +
+                            if (state.truncated) " · primeros ${GuideViewModel.CHANNEL_LIMIT}" else ""
                     },
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
                     style = MaterialTheme.typography.labelSmall,
                     color = KanalColors.OnSurfaceFaint
                 )
@@ -175,7 +186,18 @@ fun GuideScreen(onPlay: (String) -> Unit) {
                                     totalMinutes = totalMinutes,
                                     minuteWidth = minuteWidth,
                                     onFocused = { vm.onProgrammeFocused(row.channel, it) },
-                                    onClick = { onPlay(row.channel.streamId) }
+                                    // Pulsar un programa abre su ficha; para ir al
+                                    // canal está su propio botón, a la izquierda.
+                                    onClick = { programme ->
+                                        detail = ProgrammeDetail(
+                                            programme = programme,
+                                            channelName = row.channel.name,
+                                            channelLogo = row.channel.logo,
+                                            channelStreamId = row.channel.streamId,
+                                            canReplay = row.channel.archiveDays > 0 &&
+                                                programme.stop < System.currentTimeMillis()
+                                        )
+                                    }
                                 )
                             }
                         }
@@ -188,6 +210,17 @@ fun GuideScreen(onPlay: (String) -> Unit) {
                 }
             }
         }
+    }
+
+    detail?.let { open ->
+        ProgrammeDialog(
+            detail = open,
+            onDismiss = { detail = null },
+            onGoToChannel = {
+                detail = null
+                onPlay(open.channelStreamId)
+            }
+        )
     }
 }
 
@@ -262,7 +295,7 @@ private fun ProgrammeStrip(
     totalMinutes: Int,
     minuteWidth: Dp,
     onFocused: (EpgEntity) -> Unit,
-    onClick: () -> Unit
+    onClick: (EpgEntity) -> Unit
 ) {
     if (programmes.isEmpty()) {
         Box(
@@ -296,7 +329,7 @@ private fun ProgrammeStrip(
                 programme = programme,
                 width = minuteWidth * minutes,
                 onFocused = { onFocused(programme) },
-                onClick = onClick
+                onClick = { onClick(programme) }
             )
             cursor = programme.stop
         }

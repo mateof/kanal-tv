@@ -8,6 +8,7 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.focusable
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -27,6 +28,7 @@ import androidx.compose.material.icons.outlined.AspectRatio
 import androidx.compose.material.icons.outlined.CalendarMonth
 import androidx.compose.material.icons.outlined.ClosedCaption
 import androidx.compose.material.icons.outlined.Forward10
+import androidx.compose.material.icons.outlined.Info
 import androidx.compose.material.icons.outlined.Pause
 import androidx.compose.material.icons.outlined.PlayArrow
 import androidx.compose.material.icons.outlined.Replay10
@@ -70,6 +72,8 @@ import com.mateof.kanal.ui.components.ChannelGuide
 import com.mateof.kanal.ui.components.ButtonTone
 import com.mateof.kanal.ui.components.FocusableSurface
 import com.mateof.kanal.ui.components.KanalButton
+import com.mateof.kanal.ui.components.ProgrammeDetail
+import com.mateof.kanal.ui.components.ProgrammeDialog
 import com.mateof.kanal.ui.components.ThinProgress
 import com.mateof.kanal.ui.components.scrollingTitle
 import com.mateof.kanal.ui.isCompact
@@ -94,7 +98,8 @@ fun PlayerScreen(
     kind: String,
     itemId: String,
     startMillis: Long,
-    onBack: () -> Unit
+    /** Receives the live channel just watched, so the list can keep it playing. */
+    onBack: (String?) -> Unit
 ) {
     val vm: PlayerViewModel = hiltViewModel()
     val state by vm.state.collectAsStateWithLifecycle()
@@ -108,8 +113,10 @@ fun PlayerScreen(
     val controlsFocus = remember { FocusRequester() }
     val tracksFocus = remember { FocusRequester() }
     val guideFocus = remember { FocusRequester() }
+    var detail by remember { mutableStateOf<ProgrammeDetail?>(null) }
 
     val isLive = state.playable?.isLive == true
+    fun liveChannelId(): String? = state.playable?.takeIf { it.isLive }?.itemId
 
     fun poke() {
         osdVisible = true
@@ -148,11 +155,13 @@ fun PlayerScreen(
         osdVisible = false
     }
 
-    BackHandler {
+    BackHandler(enabled = detail == null) {
         when (mode) {
             Mode.Tracks, Mode.Guide -> mode = Mode.Controls
             Mode.Controls -> mode = Mode.Watching
-            Mode.Watching -> onBack()
+            // The title sitting over the picture has to go the moment BACK is
+            // pressed, not on the next auto-hide tick.
+            Mode.Watching -> if (osdVisible) osdVisible = false else onBack(liveChannelId())
         }
     }
 
@@ -271,7 +280,7 @@ fun PlayerScreen(
                 Spacer(Modifier.height(20.dp))
                 Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                     KanalButton("Reintentar", vm::retry, tone = ButtonTone.Primary)
-                    KanalButton("Volver", onBack)
+                    KanalButton("Volver", { onBack(liveChannelId()) })
                 }
             }
         }
@@ -295,7 +304,15 @@ fun PlayerScreen(
                 onSeekBack = { vm.seekBy(-10_000); poke() },
                 onSeekForward = { vm.seekBy(10_000); poke() },
                 onOpenTracks = { mode = Mode.Tracks; poke() },
-                onOpenGuide = { mode = Mode.Guide; poke() }
+                onOpenGuide = { mode = Mode.Guide; poke() },
+                onOpenDetail = {
+                    val now = state.now ?: return@Osd
+                    detail = ProgrammeDetail(
+                        programme = now,
+                        channelName = state.playable?.title.orEmpty(),
+                        channelLogo = state.playable?.logo.orEmpty()
+                    )
+                }
             )
         }
 
@@ -310,11 +327,22 @@ fun PlayerScreen(
             )
         }
 
+        detail?.let { open ->
+            ProgrammeDialog(detail = open, onDismiss = { detail = null; poke() })
+        }
+
         if (mode == Mode.Guide) {
             GuidePanel(
                 state = state,
                 focusRequester = guideFocus,
                 onSelectDay = { day -> vm.selectGuideDay(day); poke() },
+                onProgrammeClick = { programme ->
+                    detail = ProgrammeDetail(
+                        programme = programme,
+                        channelName = state.playable?.title.orEmpty(),
+                        channelLogo = state.playable?.logo.orEmpty()
+                    )
+                },
                 onClose = { mode = Mode.Controls },
                 modifier = Modifier.align(Alignment.CenterEnd)
             )
@@ -332,6 +360,7 @@ private fun GuidePanel(
     state: PlayerUiState,
     focusRequester: FocusRequester,
     onSelectDay: (Long) -> Unit,
+    onProgrammeClick: (com.mateof.kanal.data.db.EpgEntity) -> Unit,
     onClose: () -> Unit,
     modifier: Modifier = Modifier
 ) {
@@ -366,7 +395,8 @@ private fun GuidePanel(
             programmes = state.dayProgrammes,
             modifier = Modifier.weight(1f),
             emptyMessage = "El proveedor no envía guía para este canal.",
-            onSelectDay = onSelectDay
+            onSelectDay = onSelectDay,
+            onProgrammeClick = onProgrammeClick
         )
 
         Spacer(Modifier.height(14.dp))
@@ -385,7 +415,8 @@ private fun Osd(
     onSeekBack: () -> Unit,
     onSeekForward: () -> Unit,
     onOpenTracks: () -> Unit,
-    onOpenGuide: () -> Unit
+    onOpenGuide: () -> Unit,
+    onOpenDetail: () -> Unit
 ) {
     val playable = state.playable ?: return
     val isCompactWidth = isCompact
@@ -515,12 +546,15 @@ private fun Osd(
 
         Spacer(Modifier.height(18.dp))
 
-        Row(
+        // FlowRow, not Row: on a phone the five controls do not fit across one
+        // line and the last of them ended up clipped off the screen.
+        FlowRow(
             modifier = Modifier
+                .fillMaxWidth()
                 .focusRequester(controlsFocus)
                 .focusGroup(),
             horizontalArrangement = Arrangement.spacedBy(12.dp),
-            verticalAlignment = Alignment.CenterVertically
+            verticalArrangement = Arrangement.spacedBy(10.dp)
         ) {
             if (!playable.isLive) {
                 KanalButton(
@@ -532,12 +566,19 @@ private fun Osd(
                 KanalButton("10 s", onSeekBack, icon = Icons.Outlined.Replay10)
                 KanalButton("10 s", onSeekForward, icon = Icons.Outlined.Forward10)
             }
+            if (playable.isLive && state.now != null) {
+                KanalButton(
+                    text = "Ficha",
+                    onClick = onOpenDetail,
+                    icon = Icons.Outlined.Info,
+                    tone = ButtonTone.Primary
+                )
+            }
             if (playable.isLive && state.guideDays.isNotEmpty()) {
                 KanalButton(
                     text = "Guía",
                     onClick = onOpenGuide,
-                    icon = Icons.Outlined.CalendarMonth,
-                    tone = ButtonTone.Primary
+                    icon = Icons.Outlined.CalendarMonth
                 )
             }
             KanalButton(resizeLabel, onCycleResize, icon = Icons.Outlined.AspectRatio)

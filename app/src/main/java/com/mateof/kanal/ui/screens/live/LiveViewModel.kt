@@ -129,6 +129,20 @@ class LiveViewModel @Inject constructor(
         stopPreview()
     }
 
+    /**
+     * Puts a channel straight into the preview, no dwell delay: the user just
+     * came back from watching it full screen and it should not go quiet.
+     */
+    fun resumeChannel(streamId: String) {
+        viewModelScope.launch {
+            val current = activeSource.first() ?: return@launch
+            val channel = content.channel(current.id, streamId) ?: return@launch
+            _focused.value = channel
+            loadGuideFor(channel)
+            schedulePreview(channel, immediate = true)
+        }
+    }
+
     fun onChannelFocused(channel: ChannelEntity) {
         if (_focused.value?.streamId == channel.streamId) return
         _focused.value = channel
@@ -179,7 +193,7 @@ class LiveViewModel @Inject constructor(
      * Starts a muted-free preview only after the focus has settled: zapping
      * through a list must not fire one connection per channel.
      */
-    private fun schedulePreview(channel: ChannelEntity) {
+    private fun schedulePreview(channel: ChannelEntity, immediate: Boolean = false) {
         previewJob?.cancel()
         _previewError.value = ""
         player?.stop()
@@ -188,7 +202,7 @@ class LiveViewModel @Inject constructor(
         previewJob = viewModelScope.launch {
             val config = prefs.settings.first()
             if (!config.previewEnabled) return@launch
-            delay(config.previewDelayMs.toLong())
+            if (!immediate) delay(config.previewDelayMs.toLong())
             val current = activeSource.first() ?: return@launch
             if (_focused.value?.streamId != channel.streamId) return@launch
 
