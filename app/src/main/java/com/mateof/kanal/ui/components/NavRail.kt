@@ -4,6 +4,8 @@ import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -67,6 +69,10 @@ fun NavRail(
         label = "railBackground"
     )
 
+    // Seven destinations plus the header do not fit on a 540 dp television, and a
+    // fixed column just hides the last of them: the user could reach Ajustes with
+    // the D-pad but never see where the focus was. Scrolling the rail lets
+    // Compose bring each item into view as the focus reaches it.
     Column(
         modifier = modifier
             .width(width)
@@ -74,13 +80,14 @@ fun NavRail(
             .background(
                 Brush.horizontalGradient(0f to background, 1f to Color.Transparent)
             )
-            .padding(vertical = 24.dp),
+            .verticalScroll(rememberScrollState())
+            .padding(vertical = 20.dp),
         horizontalAlignment = Alignment.Start
     ) {
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(start = 26.dp, bottom = 28.dp),
+                .padding(start = 26.dp, bottom = 20.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
             Icon(
