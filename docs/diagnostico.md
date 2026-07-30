@@ -1,107 +1,90 @@
 # Diagnóstico
 
-## El registro
+## Registro
 
-Kanal anota lo que hace en un fichero: sincronizaciones, peticiones, reproducciones, errores.
-Se ve en **Ajustes → Ver registro**, con filtro por nivel (todo, info, avisos, errores).
+Kanal escribe en un fichero lo que hace: sincronizaciones, peticiones, reproducciones y
+errores. Se consulta en **Ajustes → Ver registro**, con filtro por nivel (todo, información,
+avisos, errores).
 
-Desde ahí se puede:
+Acciones disponibles:
 
-- **Compartir** — abre el selector del sistema, útil en móvil y tablet.
-- **Exportar a fichero** — deja el registro en el almacenamiento y muestra la ruta en
-  pantalla, porque en una tele muchas veces no hay a dónde compartir.
+- **Compartir** — abre el selector del sistema. Disponible en móvil y tablet.
+- **Exportar a fichero** — guarda el registro en el almacenamiento y muestra la ruta.
 - **Borrar**.
 
-Las URL van **redactadas** en el registro: no lleva usuarios ni contraseñas de tu panel. Aun
-así, mira lo que envías antes de pegarlo en un sitio público.
+Las URL se registran redactadas: no incluyen credenciales del panel.
 
-Con **Registro detallado de red** activado se anota además cada petición HTTP. Enciéndelo sólo
-mientras buscas un fallo concreto.
+La opción **Registro detallado de red** añade una entrada por cada petición HTTP. Conviene
+activarla sólo mientras se investiga un fallo concreto.
 
 ## Actualizaciones
 
-Kanal mira las releases de este repositorio y avisa en la portada cuando hay una nueva.
+Kanal consulta las releases del repositorio y avisa en la portada cuando hay una versión
+nueva. **Actualizar** descarga el APK e inicia la instalación.
 
-<img src="img/movil-actualizacion.png" width="300" alt="Aviso de nueva versión">
+La primera vez, Android solicita permiso para instalar aplicaciones desde Kanal. Si se
+deniega, el aviso lo indica y la operación puede repetirse.
 
-**Actualizar** descarga el APK y lanza la instalación. La primera vez Android pide permiso
-para instalar aplicaciones desde Kanal; si lo deniegas, el aviso lo recuerda y se puede
-reintentar.
+La comprobación automática se realiza como máximo una vez cada seis horas.
 
-La comprobación automática se limita a una vez cada seis horas para no molestar al proveedor
-ni a GitHub.
+## Problemas frecuentes
 
-## Se ve a cortes
+### La emisión no arranca
 
-Antes de tocar nada en la app, **mide el stream**. Un minuto con ffmpeg distingue tres cosas
-que se parecen mucho en pantalla y se arreglan en capas distintas:
+Kanal prueba otros contenedores para el mismo canal antes de mostrar un error. Si aun así
+falla, las causas habituales son:
 
-```bash
-ffmpeg -hide_banner -loglevel warning -i "URL_DEL_STREAM" -t 60 -f null - 2> errores.txt
-sort errores.txt | sed 's/[0-9]\+/N/g' | sort | uniq -c | sort -rn | head -20
-```
+| Síntoma | Causa probable |
+| --- | --- |
+| «El servidor no envía vídeo en ningún formato reconocible» | Canal caído, o límite de conexiones del proveedor alcanzado |
+| «El servidor rechazó la emisión» | Demasiadas conexiones simultáneas abiertas |
+| «La emisión ya no existe en el servidor» | El canal ha desaparecido del panel; conviene sincronizar |
+| «El dispositivo no puede decodificar esta emisión» | Códec no soportado por el aparato |
 
-| Lo que sale | Qué es | Dónde se arregla |
-| --- | --- | --- |
-| `Packet corrupt`, `non-existing PPS`, `Missing reference picture` | La fuente llega **dañada** | En el origen: antena, sintonizador, cable |
-| Timeouts, conexión cerrada, HTTP 5xx | Problema de **red o servidor** | «Aguantar cortes del servidor» ayuda |
-| Nada raro, pero a tirones | **Caudal** insuficiente | Búfer más grande |
+Probar otro canal permite distinguir entre un problema del canal y uno de la cuenta.
 
-**Ninguna opción del reproductor arregla bits que ya llegan rotos.** Si el diagnóstico es
-corrupción de origen, lo que toca es mirar la instalación, no la app.
+### La imagen se corta
 
-### Si la fuente es un TVHeadend propio
+Conviene identificar el origen antes de modificar ajustes:
 
-Dos comprobaciones que ahorran mucho tiempo:
+- **Cortes con reconexión o errores de red**: activar
+  [«Aguantar cortes del servidor»](ajustes.md#aguantar-cortes-del-servidor).
+- **Imagen a tirones sin errores**: aumentar el
+  [búfer](ajustes.md#búfer). Un búfer mayor retrasa el arranque pero absorbe mejor las
+  variaciones de caudal.
+- **Artefactos, bloques o congelaciones puntuales**: la señal llega dañada desde el origen.
+  Ninguna opción del reproductor reconstruye datos que llegan corruptos; el problema está en
+  la instalación o en el proveedor.
 
-```bash
-# calidad de señal del sintonizador
-curl -s "http://SERVIDOR:9981/api/status/inputs"
-# perfiles de emisión disponibles
-curl -s "http://SERVIDOR:9981/api/profile/list"
-```
+### La aplicación no se instala
 
-En `status/inputs`, con `signal_scale = 2` el valor de `signal` son milésimas de dBm. **Señal
-fuerte con SNR bajo es saturación**, no señal débil: si hay amplificador, hay que bajarle la
-ganancia o quitarlo. Lo contrario de lo que dice el instinto.
+Por orden de frecuencia:
 
-TVHeadend acepta `?profile=` también en la playlist:
+1. **Falta de espacio** en el aparato. Es la causa más común y el mensaje del sistema no
+   suele indicarlo.
+2. **Orígenes desconocidos** no permitidos para la aplicación desde la que se instala.
+3. **Versión anterior firmada con otra clave**. Es necesario desinstalarla primero.
 
-```
-http://SERVIDOR:9981/playlist/channels?profile=UN_PERFIL_DE_TRANSCODIFICACION
-```
-
-Con el perfil `pass` entrega el TS crudo con todos sus errores; con uno de transcodificación,
-ffmpeg del servidor recodifica y oculta los daños. Cuesta CPU en el servidor, y los perfiles
-`webtv` de serie **bajan la resolución** —conviene mirar a cuánto— así que merece la pena
-crearse uno que mantenga 1080p.
-
-## «Error de contenedor no soportado»
-
-Significa que el servidor no envía vídeo en un formato reconocible en esa URL. Kanal ya prueba
-por su cuenta el otro contenedor y la ruta antigua antes de dar el error, así que si llega
-hasta aquí normalmente es que **el canal está caído** o que se alcanzó el **límite de
-conexiones** del proveedor. Prueba otro canal: si va, era eso.
-
-## No instala en la tele
-
-Por orden de probabilidad:
-
-1. **Espacio libre.** En las teles de 8 GB es la causa más común y el mensaje no lo dice.
-2. **Orígenes desconocidos** sin permitir para la app desde la que instalas.
-3. Una **versión anterior firmada con otra clave**: hay que desinstalarla primero.
-
-Para ver el motivo real en vez de adivinar:
+Para obtener el motivo exacto:
 
 ```bash
-adb install -r kanal-x.y.z.apk    # imprime el INSTALL_FAILED_... concreto
+adb install -r kanal-x.y.z.apk
 ```
 
-## Recoger un fallo para reportarlo
+El comando devuelve el código `INSTALL_FAILED_...` correspondiente.
 
-1. Ajustes → **Registro detallado de red** encendido.
-2. Reproduce el fallo.
-3. Ajustes → Ver registro → **Exportar a fichero**.
-4. Apaga otra vez el registro detallado.
+### Un ajuste no parece tener efecto
 
-Con eso y la versión instalada (aparece en Ajustes) hay bastante para empezar a mirar.
+El búfer y el agente de usuario se aplican al crear el reproductor. La vista previa de la
+lista de canales se reconstruye al cambiar estos ajustes, pero una reproducción ya iniciada
+mantiene los valores con los que empezó. Al abrir el canal de nuevo se aplican los nuevos.
+
+## Recoger información para un informe de error
+
+1. Activar **Registro detallado de red** en Ajustes.
+2. Reproducir el fallo.
+3. **Ver registro → Exportar a fichero**.
+4. Desactivar de nuevo el registro detallado.
+
+Conviene adjuntar también la versión instalada, que aparece en Ajustes, y el modelo del
+aparato.

@@ -1,74 +1,71 @@
 # Primeros pasos
 
-## Instalar
+## Instalación
 
-Descarga el APK de la [última release](https://github.com/mateof/kanal-tv/releases/latest) e
-instálalo por cualquiera de estas vías:
+Descargar el APK de la [última release](https://github.com/mateof/kanal-tv/releases/latest) e
+instalarlo por cualquiera de estas vías:
 
-- **Downloader** (o el navegador de la tele) apuntando a la URL del APK.
-- **`adb install kanal-x.y.z.apk`** desde un ordenador en la misma red.
-- El **gestor de archivos** de la tele, si permite instalar de orígenes desconocidos.
+- **Downloader** o el navegador del aparato, indicando la URL del APK.
+- **`adb install kanal-x.y.z.apk`** desde un equipo en la misma red.
+- El **gestor de archivos** del aparato, si permite instalar desde orígenes desconocidos.
 
-A partir de ahí la propia app avisa de las versiones nuevas y las instala sola.
+Una vez instalada, la aplicación avisa de las versiones nuevas y las instala por sí misma.
 
-Requisitos: **Android 6.0 (API 23)** o superior, que cubre los Fire TV Stick de 2015-2018.
+**Requisitos**: Android 6.0 (API 23) o superior.
 
-> Si la instalación falla con un «Aplicación no instalada» sin más explicación, lo primero
-> que hay que descartar es el **espacio libre**: en las teles con 8 GB se llena antes de lo
-> que parece. Para ver el motivo real: `adb install -r kanal.apk` da el
-> `INSTALL_FAILED_...` concreto.
+## Alta de la fuente
 
-## Añadir la fuente
+Al iniciarse por primera vez, Kanal solicita una fuente. Admite dos tipos.
 
-Al abrirla por primera vez, Kanal pide una fuente. Hay dos tipos.
+### Xtream Codes y Dispatcharr
 
-### Xtream Codes (y Dispatcharr)
-
-| Campo | Qué poner |
+| Campo | Descripción |
 | --- | --- |
-| Nombre | El que quieras, sólo es para distinguirla |
-| URL del servidor | `http://host:puerto` — pégala tal cual |
-| Usuario y contraseña | Los del panel |
-| URL de la guía | Opcional; vacía usa el `xmltv.php` del propio servidor |
-| User-Agent | Opcional; algunos proveedores sólo responden a uno concreto |
+| Nombre | Etiqueta para identificar la fuente |
+| URL del servidor | `http://host:puerto` |
+| Usuario y contraseña | Credenciales del panel |
+| URL de la guía | Opcional. En blanco, se utiliza el `xmltv.php` del propio servidor |
+| User-Agent | Opcional. Algunos proveedores exigen uno concreto |
 
-No hace falta limpiar la URL: si pegas `http://host:8080/player_api.php?username=…`, Kanal
-recorta lo que sobra y se queda con la base.
+No es necesario depurar la URL: si incluye `/player_api.php` o parámetros de consulta, Kanal
+los descarta y conserva la base.
 
 ### Lista M3U
 
-| Campo | Qué poner |
+| Campo | Descripción |
 | --- | --- |
-| Nombre | El que quieras |
-| URL de la lista | El `.m3u` o `.m3u8` |
-| URL de la guía XMLTV | Opcional; si la lista anuncia `url-tvg`, Kanal la coge de ahí |
+| Nombre | Etiqueta para identificar la fuente |
+| URL de la lista | Dirección del `.m3u` o `.m3u8` |
+| URL de la guía XMLTV | Opcional. Si la lista declara `url-tvg`, se utiliza ese valor |
 | User-Agent | Opcional |
 
-De cada `#EXTINF` se leen `tvg-id`, `tvg-name`, `tvg-logo`, `group-title` y `catchup-days`.
-Los canales, las películas y las series se distinguen por la ruta de la URL (`/live/`,
-`/movie/`, `/series/`), y los episodios se agrupan en series por el patrón `S01 E02` del
-nombre.
+De cada entrada `#EXTINF` se leen los atributos `tvg-id`, `tvg-name`, `tvg-logo`,
+`group-title` y `catchup-days`.
 
-### Probar antes de guardar
+La clasificación entre canales, películas y series se realiza según la ruta de la URL
+(`/live/`, `/movie/`, `/series/`). Los episodios se agrupan en series a partir del patrón
+`S01 E02` presente en el nombre.
 
-**Probar conexión** hace la comprobación sin guardar nada: en Xtream autentica y dice con qué
-usuario ha entrado y cuántas conexiones tienes abiertas; en M3U sólo comprueba que la lista
-responde.
+### Comprobación previa
 
-## Sincronizar
+**Probar conexión** valida la fuente sin guardarla. En Xtream Codes autentica y devuelve el
+usuario, el estado de la cuenta y el número de conexiones activas. En M3U comprueba que la
+lista responde.
 
-**Guardar y empezar** descarga el catálogo y la guía. La primera vez es la más lenta, porque
-baja todo. Después:
+## Sincronización
 
-- **Sincronización automática** (en Ajustes) refresca el catálogo al abrir la app, cada 6, 12,
-  24 o 48 horas, o nunca.
-- **Sincronizar todo** y **Actualizar sólo la guía** fuerzan una pasada cuando quieras.
+**Guardar y empezar** descarga el catálogo y la guía. La primera sincronización es la más
+larga. Posteriormente:
 
-La base de datos local es **sólo caché**: cada sincronización reemplaza el contenido anterior
-de esa fuente, así que un canal que el proveedor quite desaparece también aquí. Los
-favoritos y el historial no viven ahí y no se pierden.
+- La **sincronización automática** refresca el catálogo al abrir la aplicación con la
+  periodicidad configurada en Ajustes.
+- **Sincronizar todo** y **Actualizar sólo la guía** permiten forzar una actualización.
 
-## Varias fuentes
+La base de datos local funciona como caché: cada sincronización reemplaza el contenido
+anterior de esa fuente. Los favoritos y el historial se almacenan aparte y no se ven
+afectados.
 
-Puedes tener varias y cambiar de una a otra en Ajustes con **Usar**. Sólo hay una activa a la
-vez, y el contenido que se ve es siempre el de esa.
+## Múltiples fuentes
+
+Es posible dar de alta varias fuentes y alternar entre ellas desde Ajustes mediante **Usar**.
+Sólo una permanece activa, y el contenido mostrado corresponde siempre a esa fuente.

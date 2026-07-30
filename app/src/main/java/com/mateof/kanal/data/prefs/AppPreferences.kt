@@ -63,7 +63,8 @@ data class Settings(
     val verboseHttpLog: Boolean = false,
     val autoSyncHours: Int = 12,
     val sleepTimerMinutes: Int = SleepTimer.DEFAULT_MINUTES,
-    val stillWatching: Boolean = true
+    val stillWatching: Boolean = true,
+    val subtitlesEnabled: Boolean = false
 )
 
 const val DEFAULT_USER_AGENT = "VLC/3.0.20 LibVLC/3.0.20"
@@ -97,6 +98,7 @@ class AppPreferences @Inject constructor(
         val LANGUAGE = stringPreferencesKey("language")
         val SLEEP_MINUTES = intPreferencesKey("sleep_minutes")
         val STILL_WATCHING = booleanPreferencesKey("still_watching")
+        val SUBTITLES = booleanPreferencesKey("subtitles_enabled")
     }
 
     // --- Sources -------------------------------------------------------------
@@ -216,7 +218,8 @@ class AppPreferences @Inject constructor(
             verboseHttpLog = prefs[Keys.VERBOSE_HTTP] ?: false,
             autoSyncHours = prefs[Keys.AUTO_SYNC_HOURS] ?: 12,
             sleepTimerMinutes = prefs[Keys.SLEEP_MINUTES] ?: SleepTimer.DEFAULT_MINUTES,
-            stillWatching = prefs[Keys.STILL_WATCHING] ?: true
+            stillWatching = prefs[Keys.STILL_WATCHING] ?: true,
+            subtitlesEnabled = prefs[Keys.SUBTITLES] ?: false
         )
     }
 
@@ -241,6 +244,7 @@ class AppPreferences @Inject constructor(
     suspend fun setLanguage(value: AppLanguage) = edit { it[Keys.LANGUAGE] = value.name }
     suspend fun setSleepTimerMinutes(value: Int) = edit { it[Keys.SLEEP_MINUTES] = value }
     suspend fun setStillWatching(value: Boolean) = edit { it[Keys.STILL_WATCHING] = value }
+    suspend fun setSubtitlesEnabled(value: Boolean) = edit { it[Keys.SUBTITLES] = value }
 
     val lastUpdateCheck: Flow<Long> = context.dataStore.data.map { it[Keys.LAST_UPDATE_CHECK] ?: 0L }
     suspend fun setLastUpdateCheck(value: Long) = edit { it[Keys.LAST_UPDATE_CHECK] = value }

@@ -94,6 +94,9 @@ class PlayerViewModel @Inject constructor(
     private var candidateIndex = 0
     private var reconnectJob: Job? = null
     private var reconnects = 0
+
+    /** Stamped when a stream is queued, to time how long the picture takes. */
+    private var startedAt = 0L
     private var resilient = false
 
     fun load(kind: String, itemId: String, startMillis: Long) {
@@ -156,6 +159,7 @@ class PlayerViewModel @Inject constructor(
     }
 
     private suspend fun start(playable: Playable) {
+        startedAt = System.currentTimeMillis()
         val settings = prefs.settings.first()
         resilient = settings.resilientPlayback
         reconnectJob?.cancel()
@@ -163,7 +167,8 @@ class PlayerViewModel @Inject constructor(
         val exo = player ?: playerFactory.create(
             playable.userAgent,
             settings.bufferProfile,
-            settings.resilientPlayback
+            settings.resilientPlayback,
+            settings.subtitlesEnabled
         ).also {
             it.addListener(listener)
             player = it
@@ -284,6 +289,10 @@ class PlayerViewModel @Inject constructor(
         }
 
         override fun onIsPlayingChanged(isPlaying: Boolean) {
+            if (isPlaying && startedAt > 0) {
+                logger.i("Player", "Primera imagen en ${System.currentTimeMillis() - startedAt} ms")
+                startedAt = 0
+            }
             // A clean run means the dropout is over; let it earn its retries back.
             if (isPlaying && _state.value.reconnectAttempt > 0) {
                 reconnects = 0
@@ -416,9 +425,14 @@ class PlayerViewModel @Inject constructor(
     fun selectTrack(option: TrackOption) {
         val exo = player ?: return
         val group = exo.currentTracks.groups.getOrNull(option.groupIndex) ?: return
+        val isSubtitle = group.type == C.TRACK_TYPE_TEXT
         exo.trackSelectionParameters = exo.trackSelectionParameters.buildUpon()
+            // Picking a subtitle has to lift the type-wide block as well, or the
+            // override is set on a track type that stays switched off.
+            .apply { if (isSubtitle) setTrackTypeDisabled(C.TRACK_TYPE_TEXT, false) }
             .setOverrideForType(TrackSelectionOverride(group.mediaTrackGroup, option.trackIndex))
             .build()
+        if (isSubtitle) rememberSubtitles(true)
     }
 
     fun disableSubtitles() {
@@ -426,6 +440,12 @@ class PlayerViewModel @Inject constructor(
         exo.trackSelectionParameters = exo.trackSelectionParameters.buildUpon()
             .setTrackTypeDisabled(C.TRACK_TYPE_TEXT, true)
             .build()
+        rememberSubtitles(false)
+    }
+
+    /** Subtitles are off until asked for, and the answer outlives the channel. */
+    private fun rememberSubtitles(enabled: Boolean) = viewModelScope.launch {
+        prefs.setSubtitlesEnabled(enabled)
     }
 
     fun togglePlayPause() {

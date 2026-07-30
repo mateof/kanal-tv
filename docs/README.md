@@ -1,59 +1,54 @@
 # Documentación de Kanal
 
-Kanal es un reproductor de televisión para **Android TV, Google TV y Fire TV**. Se conecta
-a un panel **Xtream Codes** (incluido Dispatcharr) o a una **lista M3U**, y descarga la guía
-de programación en **XMLTV**.
+Kanal es un reproductor de televisión para **Android TV, Google TV y Fire TV**. Se conecta a
+un panel **Xtream Codes** (incluido Dispatcharr) o a una **lista M3U**, y descarga la guía de
+programación en formato **XMLTV**.
 
-Kanal no incluye ni proporciona contenido: hace falta una fuente propia.
+Kanal no incluye ni proporciona contenido. Requiere una fuente propia.
 
 ## Índice
 
-| Documento | De qué va |
+| Documento | Contenido |
 | --- | --- |
-| [Primeros pasos](primeros-pasos.md) | Instalar, añadir la fuente y sincronizar |
-| [Televisión en directo](television.md) | Lista de canales, guía, reproductor y mando |
-| [Películas y series](peliculas-y-series.md) | Catálogos, fichas y continuar viendo |
-| [Ajustes](ajustes.md) | Todos los ajustes, uno a uno |
-| [Diagnóstico](diagnostico.md) | Registro, actualizaciones y qué hacer si falla |
+| [Primeros pasos](primeros-pasos.md) | Instalación, alta de la fuente y sincronización |
+| [Televisión en directo](television.md) | Lista de canales, guía, reproductor y manejo con mando |
+| [Películas y series](peliculas-y-series.md) | Catálogos, fichas y reanudación |
+| [Ajustes](ajustes.md) | Referencia de todos los ajustes |
+| [Diagnóstico](diagnostico.md) | Registro, actualizaciones y resolución de problemas |
 
-## Qué se ve al abrirla
+## Pantalla de inicio
 
 ![Pantalla de inicio](img/inicio.png)
 
-La portada reúne lo último sincronizado, lo que estabas viendo y los canales favoritos.
-El menú de la izquierda se queda en iconos y sólo se despliega cuando tiene el foco, para
-que el contenido no baile cada vez que te mueves.
+Reúne el contenido sincronizado recientemente, las reproducciones sin terminar y los canales
+marcados como favoritos. El menú lateral permanece contraído en iconos y se despliega
+únicamente cuando recibe el foco.
 
 ## Televisión en directo
 
 ![TV en directo](img/tv-en-directo.png)
 
-Lista de canales a la izquierda, y a la derecha una **vista previa** del canal enfocado con
-lo que dan ahora, lo que viene después y la programación del día. Sin salir de la lista.
+La lista de canales ocupa la columna izquierda. El panel derecho muestra una vista previa del
+canal enfocado junto con el programa en emisión, el siguiente y la programación del día.
 
 ## Reproductor
 
 ![Reproductor](img/reproductor.png)
 
-Sobre la imagen, lo justo: canal, programa, cuánto queda y los cuatro botones que hacen
-falta. Desaparece solo, y vuelve con cualquier tecla.
+La información en pantalla incluye canal, programa, progreso y los controles principales. Se
+oculta automáticamente y reaparece con cualquier pulsación.
 
-## Guía
+## Guía de programación
 
 ![Guía](img/guia.png)
 
-Un muro con todos los canales a la vez, con los bloques a escala real de duración. Se
-mueve por horas con **−2 h / Ahora / +2 h** y se filtra por categoría.
+Muestra todos los canales simultáneamente, con los bloques dimensionados según la duración
+real de cada programa. La franja horaria se desplaza en tramos de dos horas y admite filtrado
+por categoría.
 
-## En el móvil
+## Disposición vertical
 
-Kanal es una app de televisión primero, pero funciona al tacto y en vertical. Cada pantalla
-mantiene su diseño ancho intacto y **añade** una variante estrecha, así que nada de lo hecho
-para el móvil puede estropear la tele.
+Kanal está diseñado para televisión. En móvil y tablet admite manejo táctil y disposición
+vertical: cada pantalla conserva su diseño ancho y añade una variante estrecha.
 
-<img src="img/movil-tv-en-directo.png" width="300" alt="TV en directo en vertical">
-
-## Sobre estas capturas
-
-Están hechas en un emulador con una **fuente de demostración inventada** —canales, guía y
-carátulas generadas para la ocasión— y no con un proveedor real.
+<img src="img/movil-tv-en-directo.png" width="300" alt="TV en directo en disposición vertical">

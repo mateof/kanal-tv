@@ -1,49 +1,47 @@
 # Películas y series
 
-## Los catálogos
+## Catálogos
 
 ![Películas](img/peliculas.png)
 
-Las categorías del proveedor a la izquierda, la rejilla de carátulas a la derecha. El botón de
-arriba cambia el **orden**: el del proveedor, por nombre, por añadido recientemente o por
-valoración.
+Las categorías del proveedor ocupan la columna izquierda y las carátulas la rejilla derecha.
+El botón superior alterna el criterio de ordenación: orden del proveedor, nombre, añadido
+recientemente o valoración.
 
-Las series funcionan igual, en su propia pestaña.
+Las series disponen de una sección equivalente.
 
 ## Fichas
 
-Al abrir una película se ve la carátula grande, la sinopsis, el año, la duración, la
-valoración, la dirección y el reparto —lo que el proveedor haya enviado— y los botones para
-reproducir o marcar como favorita.
+La ficha de una película muestra carátula, sinopsis, año, duración, valoración, dirección y
+reparto, junto con los botones de reproducción y de favoritos.
 
-En una serie, además, un selector de **temporada** y la lista de episodios de esa temporada.
+En las series se añade un selector de temporada y el listado de episodios correspondiente.
 
-Los datos vienen del panel tal cual, y los paneles son irregulares: si falta la sinopsis o la
-carátula, es que no la mandan. Kanal lee los campos de forma tolerante, aceptando números
-como texto o colecciones vacías servidas como `{}` en vez de `[]`, porque en la práctica cada
-panel lo hace a su manera.
+Los metadatos proceden del panel. Su disponibilidad varía según el proveedor: los campos
+ausentes no se muestran. Kanal admite las variaciones habituales de formato, como valores
+numéricos enviados como texto o colecciones vacías representadas mediante `{}`.
 
-## Continuar viendo
+## Reanudación
 
-Kanal guarda **dónde lo dejaste** en cada película y episodio. Al volver a abrirlo, el botón
-principal dice «Continuar desde 42 min» y hay opción de empezar de cero.
+Kanal registra la posición de cada película y episodio. Al abrirlos de nuevo, el botón
+principal ofrece continuar desde ese punto, con la alternativa de empezar desde el principio.
 
-Lo pendiente aparece en la portada, en **Continuar viendo**, con una barra de lo visto. Lo
-terminado desaparece de esa fila.
+El contenido pendiente aparece en la portada, bajo **Continuar viendo**, con indicación del
+progreso. Los títulos completados dejan de mostrarse.
 
-El historial se guarda en el aparato, no en el proveedor, y se borra desde
+El historial se almacena en el aparato y puede borrarse desde
 [Ajustes](ajustes.md#borrar-historial).
 
 ## Favoritos
 
-La estrella marca canales, películas y series por igual, y todo lo marcado se reúne en la
-pestaña **Favoritos**. En la lista de canales, además, **Favoritos** es una categoría más de
-la tira de arriba.
+Canales, películas y series admiten marcado como favoritos, y todos ellos se agrupan en la
+sección **Favoritos**. En la lista de canales, además, **Favoritos** figura como una categoría
+más de la franja superior.
 
-## Buscar
+## Búsqueda
 
-El buscador va sobre los canales, las películas y las series de la fuente activa, a partir de
-dos letras. Es **insensible a acentos y mayúsculas**: «cancion» encuentra «Canción».
+La búsqueda abarca canales, películas y series de la fuente activa a partir de dos
+caracteres, sin distinguir mayúsculas ni acentos.
 
-Para ordenar los canales alfabéticamente se ignora la numeración de delante, así que
-`101. La 1` y `|ES| La 1` acaban donde uno espera y no todos juntos en los números.
+En la ordenación alfabética de canales se ignora la numeración inicial, de modo que entradas
+como `101. La 1` o `|ES| La 1` se ordenan por el nombre del canal.

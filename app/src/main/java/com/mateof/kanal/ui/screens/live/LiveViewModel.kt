@@ -90,6 +90,9 @@ class LiveViewModel @Inject constructor(
      *  does not mislabel a channel that plays fine once opened. */
     private var previewCandidates: List<String> = emptyList()
     private var previewIndex = 0
+
+    /** What the cached preview player was built for. */
+    private var playerSignature = ""
     private var previewTitle = ""
 
     val source: StateFlow<Source?> =
@@ -222,7 +225,17 @@ class LiveViewModel @Inject constructor(
     }
 
     private fun ensurePlayer(userAgent: String, config: Settings): ExoPlayer {
+        // The buffer profile is baked into the player when it is built, so a
+        // cached one keeps whatever was set when it was created. Without this
+        // check, changing the buffer in Settings and coming straight back to the
+        // list appears to do nothing at all.
+        val signature = "${config.bufferProfile.name}|$userAgent"
+        if (player != null && signature != playerSignature) {
+            logger.d("Preview", "Ajustes cambiados, se rehace el reproductor de vista previa")
+            releasePlayer()
+        }
         player?.let { return it }
+        playerSignature = signature
         val created = playerFactory.create(userAgent, config.bufferProfile)
         created.addListener(object : Player.Listener {
             override fun onPlayerError(error: PlaybackException) {
@@ -265,10 +278,15 @@ class LiveViewModel @Inject constructor(
     fun isFavorite(sourceId: String, streamId: String): Boolean =
         favorites.value.contains(favoriteKey(ContentKind.LIVE, sourceId, streamId))
 
-    override fun onCleared() {
-        previewJob?.cancel()
+    private fun releasePlayer() {
         player?.release()
         player = null
+        _previewActive.value = false
+    }
+
+    override fun onCleared() {
+        previewJob?.cancel()
+        releasePlayer()
         super.onCleared()
     }
 }

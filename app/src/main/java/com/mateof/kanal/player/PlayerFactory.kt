@@ -37,7 +37,12 @@ class PlayerFactory @Inject constructor(
      * (EXTENSION_RENDERER_MODE_ON) so hardware is still preferred and software
      * only kicks in for what the device cannot handle.
      */
-    fun create(userAgent: String, profile: BufferProfile, resilient: Boolean = false): ExoPlayer {
+    fun create(
+        userAgent: String,
+        profile: BufferProfile,
+        resilient: Boolean = false,
+        subtitles: Boolean = false
+    ): ExoPlayer {
         val httpFactory = OkHttpDataSource.Factory(http.client)
             .setUserAgent(userAgent)
 
@@ -67,6 +72,11 @@ class PlayerFactory @Inject constructor(
             setParameters(
                 buildUponParameters()
                     .setPreferredAudioLanguages("spa", "es", "esp")
+                    // Subtitles stay off unless they were asked for. A preferred
+                    // text language on its own is enough for the selector to turn
+                    // on any matching track it finds, which is why channels that
+                    // carry subtitles used to come up with them burned on screen.
+                    .setTrackTypeDisabled(C.TRACK_TYPE_TEXT, !subtitles)
                     .setPreferredTextLanguages("spa", "es")
                     // Sticks report absurd max sizes; let the renderer decide.
                     .setExceedRendererCapabilitiesIfNecessary(true)
@@ -92,7 +102,9 @@ class PlayerFactory @Inject constructor(
             .also {
                 logger.d(
                     "Player",
-                    "Reproductor creado (buffer ${profile.name}, tolerante=$resilient, UA '$userAgent')"
+                    "Reproductor creado (buffer ${profile.name}: arranque ${profile.startMs} ms, " +
+                        "mínimo ${profile.minBufferMs} ms, máximo ${profile.maxBufferMs} ms; " +
+                        "tolerante=$resilient, subtítulos=$subtitles, UA '$userAgent')"
                 )
             }
     }
