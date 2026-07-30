@@ -34,6 +34,8 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import coil.compose.AsyncImage
+import androidx.compose.ui.res.stringResource
+import com.mateof.kanal.R
 import com.mateof.kanal.ui.theme.KanalColors
 
 /** Poster tile for films and series. */
@@ -165,7 +167,7 @@ fun ChannelCard(
                 if (isFavorite) {
                     Icon(
                         Icons.Filled.Star,
-                        contentDescription = "Favorito",
+                        contentDescription = stringResource(R.string.common_favorite),
                         tint = KanalColors.Warning,
                         modifier = Modifier
                             .align(Alignment.TopEnd)
@@ -192,7 +194,7 @@ fun ChannelCard(
                     overflow = TextOverflow.Ellipsis
                 )
                 Text(
-                    text = nowTitle.ifBlank { "Sin guía" },
+                    text = nowTitle.ifBlank { stringResource(R.string.common_no_guide) },
                     style = MaterialTheme.typography.labelSmall,
                     color = KanalColors.OnSurfaceFaint,
                     maxLines = 1,
@@ -203,7 +205,7 @@ fun ChannelCard(
     }
 }
 
-/** Wide row used by "continuar viendo". */
+/** Wide row used by stringResource(R.string.home_continue_watching). */
 @Composable
 fun ContinueCard(
     title: String,

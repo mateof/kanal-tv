@@ -37,6 +37,11 @@ import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewModelScope
+import androidx.compose.ui.res.stringResource
+import com.mateof.kanal.R
+import com.mateof.kanal.core.UiText
+import com.mateof.kanal.core.resolve
+import com.mateof.kanal.core.resolveOrEmpty
 import com.mateof.kanal.core.log.FileLogger
 import com.mateof.kanal.core.log.LogLevel
 import com.mateof.kanal.core.log.LogLine
@@ -66,8 +71,8 @@ class LogsViewModel @Inject constructor(
     private val _exported = MutableStateFlow<File?>(null)
     val exported: StateFlow<File?> = _exported.asStateFlow()
 
-    private val _status = MutableStateFlow("")
-    val status: StateFlow<String> = _status.asStateFlow()
+    private val _status = MutableStateFlow<UiText?>(null)
+    val status: StateFlow<UiText?> = _status.asStateFlow()
 
     val header: String get() = logger.header()
 
@@ -76,25 +81,25 @@ class LogsViewModel @Inject constructor(
     }
 
     fun export(onReady: (File) -> Unit = {}) = viewModelScope.launch {
-        _status.value = "Exportando…"
+        _status.value = UiText(R.string.logs_exporting)
         val file = logger.export()
         _exported.value = file
         _status.value = if (file != null) {
             onReady(file)
-            "Guardado en ${file.absolutePath}"
+            UiText(R.string.logs_saved, file.absolutePath)
         } else {
-            "No se pudo exportar el registro."
+            UiText(R.string.logs_export_failed)
         }
     }
 
     fun clear() = viewModelScope.launch {
         logger.clear()
-        _status.value = "Registro borrado."
+        _status.value = UiText(R.string.logs_cleared)
     }
 
     fun reloadFromDisk() = viewModelScope.launch {
         val text = logger.readAll(maxChars = 40_000)
-        _status.value = "El fichero ocupa ${text.length} caracteres."
+        _status.value = UiText(R.string.logs_size, text.length)
     }
 }
 
@@ -105,6 +110,7 @@ fun LogsScreen(onBack: () -> Unit) {
     val lines by vm.lines.collectAsStateWithLifecycle()
     val minLevel by vm.minLevel.collectAsStateWithLifecycle()
     val status by vm.status.collectAsStateWithLifecycle()
+    val shareTitle = stringResource(R.string.logs_share_title)
 
     BackHandler { onBack() }
 
@@ -120,7 +126,7 @@ fun LogsScreen(onBack: () -> Unit) {
             .fillMaxSize()
             .padding(start = screenPadding, end = screenPadding, top = 32.dp, bottom = 28.dp)
     ) {
-        Text("Registro", style = MaterialTheme.typography.headlineMedium, color = KanalColors.OnBackground)
+        Text(stringResource(R.string.logs_title), style = MaterialTheme.typography.headlineMedium, color = KanalColors.OnBackground)
         Spacer(Modifier.height(6.dp))
         Text(
             vm.header.trim().replace("\n", "   ·   "),
@@ -133,10 +139,10 @@ fun LogsScreen(onBack: () -> Unit) {
             LogLevel.entries.forEach { level ->
                 KanalChip(
                     label = when (level) {
-                        LogLevel.DEBUG -> "Todo"
-                        LogLevel.INFO -> "Info"
-                        LogLevel.WARN -> "Avisos"
-                        LogLevel.ERROR -> "Errores"
+                        LogLevel.DEBUG -> stringResource(R.string.logs_all)
+                        LogLevel.INFO -> stringResource(R.string.logs_info)
+                        LogLevel.WARN -> stringResource(R.string.logs_warnings)
+                        LogLevel.ERROR -> stringResource(R.string.logs_errors)
                     },
                     selected = level == minLevel,
                     onClick = { vm.setMinLevel(level) }
@@ -159,7 +165,7 @@ fun LogsScreen(onBack: () -> Unit) {
             if (visible.isEmpty()) {
                 item {
                     Text(
-                        "No hay nada registrado todavía.",
+                        stringResource(R.string.logs_empty),
                         style = MaterialTheme.typography.bodyMedium,
                         color = KanalColors.OnSurfaceFaint
                     )
@@ -180,18 +186,18 @@ fun LogsScreen(onBack: () -> Unit) {
             }
         }
 
-        if (status.isNotBlank()) {
+        status?.let { statusText ->
             Spacer(Modifier.height(10.dp))
-            Text(status, style = MaterialTheme.typography.labelMedium, color = KanalColors.Accent)
+            Text(statusText.resolve(), style = MaterialTheme.typography.labelMedium, color = KanalColors.Accent)
         }
 
         Spacer(Modifier.height(16.dp))
         Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-            KanalButton("Exportar a fichero", { vm.export() }, icon = Icons.Outlined.Download, tone = ButtonTone.Primary)
-            KanalButton("Compartir", { vm.export { file -> shareLog(context, file) } }, icon = Icons.Outlined.Share)
-            KanalButton("Recargar", vm::reloadFromDisk, icon = Icons.Outlined.Refresh)
-            KanalButton("Borrar", vm::clear, icon = Icons.Outlined.Delete, tone = ButtonTone.Danger)
-            KanalButton("Volver", onBack)
+            KanalButton(stringResource(R.string.logs_export), { vm.export() }, icon = Icons.Outlined.Download, tone = ButtonTone.Primary)
+            KanalButton(stringResource(R.string.logs_share), { vm.export { file -> shareLog(context, file, shareTitle, shareTitle) } }, icon = Icons.Outlined.Share)
+            KanalButton(stringResource(R.string.logs_reload), vm::reloadFromDisk, icon = Icons.Outlined.Refresh)
+            KanalButton(stringResource(R.string.logs_clear), vm::clear, icon = Icons.Outlined.Delete, tone = ButtonTone.Danger)
+            KanalButton(stringResource(R.string.common_back), onBack)
         }
     }
 }
@@ -200,16 +206,16 @@ fun LogsScreen(onBack: () -> Unit) {
  * On a TV there is often nothing to share to, so the export path is shown on
  * screen as well; the chooser is a convenience for phones and tablets.
  */
-private fun shareLog(context: Context, file: File) {
+private fun shareLog(context: Context, file: File, chooserTitle: String, subject: String) {
     runCatching {
         val uri = FileProvider.getUriForFile(context, "${context.packageName}.fileprovider", file)
         val intent = Intent(Intent.ACTION_SEND).apply {
             type = "text/plain"
             putExtra(Intent.EXTRA_STREAM, uri)
-            putExtra(Intent.EXTRA_SUBJECT, "Registro de Kanal")
+            putExtra(Intent.EXTRA_SUBJECT, subject)
             addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_ACTIVITY_NEW_TASK)
         }
-        context.startActivity(Intent.createChooser(intent, "Compartir registro").apply {
+        context.startActivity(Intent.createChooser(intent, chooserTitle).apply {
             addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
         })
     }

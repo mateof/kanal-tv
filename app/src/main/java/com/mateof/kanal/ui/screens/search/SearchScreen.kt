@@ -22,6 +22,8 @@ import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewModelScope
+import androidx.compose.ui.res.stringResource
+import com.mateof.kanal.R
 import com.mateof.kanal.data.prefs.AppPreferences
 import com.mateof.kanal.data.repo.ContentRepository
 import com.mateof.kanal.data.repo.SearchResults
@@ -96,18 +98,18 @@ fun SearchScreen(
     ) {
         item {
             Column(Modifier.padding(start = contentInset, end = contentInset)) {
-                Text("Buscar", style = MaterialTheme.typography.headlineMedium, color = KanalColors.OnBackground)
+                Text(stringResource(R.string.nav_search), style = MaterialTheme.typography.headlineMedium, color = KanalColors.OnBackground)
                 Spacer(Modifier.height(16.dp))
                 SearchField(
                     value = query,
                     onValueChange = vm::onQueryChange,
-                    placeholder = "Canal, película o serie…",
+                    placeholder = stringResource(R.string.search_hint),
                     modifier = Modifier.fillMaxWidth(0.6f)
                 )
                 if (searching) {
                     Spacer(Modifier.height(10.dp))
                     Text(
-                        "Buscando…",
+                        stringResource(R.string.search_searching),
                         style = MaterialTheme.typography.labelMedium,
                         color = KanalColors.OnSurfaceFaint
                     )
@@ -125,8 +127,8 @@ fun SearchScreen(
         if (query.trim().length < 2) {
             item {
                 MessageState(
-                    title = "Escribe al menos dos letras",
-                    description = "Kanal busca en los canales, las películas y las series de la fuente activa.",
+                    title = stringResource(R.string.search_min_letters),
+                    description = stringResource(R.string.search_help),
                     icon = Icons.Outlined.Search,
                     modifier = Modifier.height(340.dp)
                 )
@@ -134,8 +136,8 @@ fun SearchScreen(
         } else if (results.isEmpty && !searching) {
             item {
                 MessageState(
-                    title = "Sin resultados",
-                    description = "Prueba con otro término.",
+                    title = stringResource(R.string.search_no_results),
+                    description = stringResource(R.string.search_try_other),
                     icon = Icons.Outlined.Search,
                     modifier = Modifier.height(340.dp)
                 )
@@ -144,7 +146,7 @@ fun SearchScreen(
 
         if (results.channels.isNotEmpty()) {
             item {
-                CardRow(title = "Canales", trailing = "${results.channels.size}") {
+                CardRow(title = stringResource(R.string.common_channels), trailing = "${results.channels.size}") {
                     items(results.channels, key = { it.streamId }) { channel ->
                         ChannelCard(
                             name = channel.name,
@@ -158,7 +160,7 @@ fun SearchScreen(
         }
         if (results.movies.isNotEmpty()) {
             item {
-                CardRow(title = "Películas", trailing = "${results.movies.size}") {
+                CardRow(title = stringResource(R.string.common_movies), trailing = "${results.movies.size}") {
                     items(results.movies, key = { it.streamId }) { movie ->
                         PosterCard(
                             title = movie.name,
@@ -173,7 +175,7 @@ fun SearchScreen(
         }
         if (results.series.isNotEmpty()) {
             item {
-                CardRow(title = "Series", trailing = "${results.series.size}") {
+                CardRow(title = stringResource(R.string.common_series), trailing = "${results.series.size}") {
                     items(results.series, key = { it.seriesId }) { serie ->
                         PosterCard(
                             title = serie.name,

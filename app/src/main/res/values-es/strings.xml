@@ -1,0 +1,352 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Idiomas -->
+    <string name="language">Idioma</string>
+    <string name="language_description">Kanal usa el idioma de la televisión. Si no está traducido, se muestra en gallego.</string>
+    <string name="language_auto">Automático</string>
+    <string name="language_galego">Galego</string>
+    <string name="language_castelan">Castellano</string>
+    <string name="language_english">English</string>
+
+    <!-- Navegación -->
+    <string name="nav_home">Inicio</string>
+    <string name="nav_live">TV en directo</string>
+    <string name="nav_guide">Guía</string>
+    <string name="nav_movies">Películas</string>
+    <string name="nav_series">Series</string>
+    <string name="nav_favorites">Favoritos</string>
+    <string name="nav_search">Buscar</string>
+    <string name="nav_settings">Ajustes</string>
+
+    <!-- Común -->
+    <string name="common_back">Volver</string>
+    <string name="common_close">Cerrar</string>
+    <string name="common_cancel">Cancelar</string>
+    <string name="common_save">Guardar</string>
+    <string name="common_retry">Reintentar</string>
+    <string name="common_loading">Cargando…</string>
+    <string name="common_failed">Algo ha fallado</string>
+    <string name="common_all_f">Todas</string>
+    <string name="common_all_m">Todos</string>
+    <string name="common_now">Ahora</string>
+    <string name="common_today">Hoy</string>
+    <string name="common_tomorrow">Mañana</string>
+    <string name="common_live_badge">EN DIRECTO</string>
+    <string name="common_no_guide">Sin guía</string>
+    <string name="common_favorite">Favorito</string>
+    <string name="common_channels">Canales</string>
+    <string name="common_movies">Películas</string>
+    <string name="common_series">Series</string>
+    <string name="common_search_hint">Buscar…</string>
+    <string name="common_sure">¿Seguro?</string>
+    <string name="common_working">Trabajando…</string>
+
+    <plurals name="count_channels">
+        <item quantity="one">%d canal</item>
+        <item quantity="other">%d canales</item>
+    </plurals>
+    <plurals name="count_movies">
+        <item quantity="one">%d película</item>
+        <item quantity="other">%d películas</item>
+    </plurals>
+    <plurals name="count_series">
+        <item quantity="one">%d serie</item>
+        <item quantity="other">%d series</item>
+    </plurals>
+    <plurals name="count_programmes">
+        <item quantity="one">%d programa</item>
+        <item quantity="other">%d programas</item>
+    </plurals>
+
+    <!-- Inicio -->
+    <string name="home_morning">Buenos días</string>
+    <string name="home_afternoon">Buenas tardes</string>
+    <string name="home_evening">Buenas noches</string>
+    <string name="home_preparing">Preparando tu tele…</string>
+    <string name="home_go_live">Ir a TV en directo</string>
+    <string name="home_refresh">Actualizar</string>
+    <string name="home_syncing">Sincronizando…</string>
+    <string name="home_sync_now">Sincronizar ahora</string>
+    <string name="home_empty_title">Todavía no hay contenido</string>
+    <string name="home_empty_body">Sincroniza la fuente para descargar canales, películas y series.</string>
+    <string name="home_continue">Continuar viendo</string>
+    <string name="home_recent">Vistos hace poco</string>
+    <string name="home_favorite_channels">Canales favoritos</string>
+    <string name="home_new_movies">Películas añadidas</string>
+    <string name="home_new_series">Series añadidas</string>
+    <string name="home_see_all">Ver todas</string>
+    <string name="home_kind_live">Directo</string>
+    <string name="home_kind_movie">Película</string>
+    <string name="home_kind_series">Serie</string>
+    <string name="home_continue_watching">continuar viendo</string>
+
+    <!-- TV en directo -->
+    <string name="live_all_channels">Todos los canales</string>
+    <string name="live_no_channels">No hay canales</string>
+    <string name="live_sync_hint">Sincroniza la fuente desde Ajustes.</string>
+    <string name="live_pick_channel">Elige un canal</string>
+    <string name="live_pick_channel_body">Muévete por la lista para ver la vista previa y la guía.</string>
+    <string name="live_no_favorites">Sin favoritos</string>
+    <string name="live_no_favorites_body">Marca un canal con la estrella para tenerlo aquí.</string>
+    <string name="live_watch_now">Ver ahora</string>
+    <string name="live_schedule">Programación</string>
+    <string name="live_add_favorite">Añadir a favoritos</string>
+    <string name="live_remove_favorite">Quitar de favoritos</string>
+    <string name="live_channel_number">Canal %s</string>
+    <string name="live_next_up">Después · %1$s %2$s</string>
+    <string name="live_preview_failed">No se pudo cargar la vista previa</string>
+
+    <!-- Guía -->
+    <string name="guide_building">Montando la guía…</string>
+    <string name="guide_no_channels">No hay canales</string>
+    <string name="guide_no_guide_body">El proveedor no ha enviado programación para estos canales.</string>
+    <string name="guide_no_guide_hint">Prueba a actualizar la guía desde Ajustes.</string>
+    <string name="guide_no_guide_slot">Sin guía en esta franja</string>
+    <string name="guide_now">AHORA</string>
+    <string name="guide_channel_empty">No hay guía para este canal.</string>
+    <string name="guide_replay">Ver repetición</string>
+
+    <!-- Ficha de programa -->
+    <string name="programme_no_description">El proveedor no ha enviado descripción para este programa.</string>
+    <string name="programme_watch_channel">Ver canal</string>
+    <string name="programme_starts_in">empieza en %s</string>
+    <string name="programme_remaining">quedan %s</string>
+    <string name="programme_finished">ya emitido</string>
+
+    <!-- Reproductor -->
+    <string name="player_guide">Guía</string>
+    <string name="player_adjust">Ajustar</string>
+    <string name="player_audio_subtitles">Audio y subtítulos</string>
+    <string name="player_audio">Audio</string>
+    <string name="player_subtitles">Subtítulos</string>
+    <string name="player_no_subtitles">Sin subtítulos</string>
+    <string name="player_details">Ficha</string>
+    <string name="player_play">Reproducir</string>
+    <string name="player_pause">Pausa</string>
+    <string name="player_zoom">Zoom</string>
+    <string name="player_stretch">Estirar</string>
+    <string name="player_next_label">DESPUÉS</string>
+    <string name="player_no_guide">El proveedor no envía guía para este canal.</string>
+    <string name="player_no_audio_tracks">Sin pistas de audio alternativas.</string>
+    <string name="player_no_subtitle_tracks">Esta emisión no trae subtítulos.</string>
+    <string name="player_track_number">Pista %d</string>
+    <string name="player_reconnecting">Reconectando… (%d)</string>
+    <string name="player_hint_live">Arriba y abajo cambian de canal · OK abre los controles y la guía · ATRÁS sale</string>
+    <string name="player_hint_vod">Izquierda y derecha ±10 s · OK abre los controles · ATRÁS sale</string>
+    <string name="player_hint_controls">Izquierda y derecha para moverte por los botones · ATRÁS vuelve al vídeo</string>
+
+    <!-- Errores de reproducción -->
+    <string name="error_no_source">No hay ninguna fuente activa.</string>
+    <string name="error_not_found">No se encontró el contenido.</string>
+    <string name="error_no_connection">No se pudo conectar con el servidor.</string>
+    <string name="error_gone">La emisión ya no existe en el servidor.</string>
+    <string name="error_rejected">El servidor rechazó la emisión. ¿Demasiadas conexiones abiertas?</string>
+    <string name="error_decode">El dispositivo no puede decodificar esta emisión.</string>
+    <string name="error_container">El servidor no envía vídeo en ningún formato reconocible. Suele ser un canal caído o el límite de conexiones alcanzado.</string>
+    <string name="error_generic">No se pudo reproducir (%s).</string>
+
+    <!-- Favoritos -->
+    <string name="favorites_empty_title">Aún no has marcado nada</string>
+    <string name="favorites_empty_body">Usa el botón de estrella en un canal, película o serie para tenerlo siempre a mano.</string>
+
+    <!-- Buscar -->
+    <string name="search_hint">Canal, película o serie…</string>
+    <string name="search_searching">Buscando…</string>
+    <string name="search_min_letters">Escribe al menos dos letras</string>
+    <string name="search_help">Kanal busca en los canales, las películas y las series de la fuente activa.</string>
+    <string name="search_no_results">Sin resultados</string>
+    <string name="search_try_other">Prueba con otro término.</string>
+
+    <!-- Catálogo -->
+    <string name="catalog_categories">Categorías</string>
+    <string name="catalog_empty_title">Nada por aquí</string>
+    <string name="catalog_empty_body">Sincroniza la fuente o prueba con otra categoría.</string>
+
+    <!-- Fichas -->
+    <string name="detail_loading">Cargando ficha…</string>
+    <string name="detail_loading_episodes">Cargando episodios…</string>
+    <string name="detail_play">Reproducir</string>
+    <string name="detail_resume">Continuar desde %s</string>
+    <string name="detail_add_favorite">Añadir a favoritos</string>
+    <string name="detail_in_favorites">En favoritos</string>
+    <string name="detail_season">Temporada %d</string>
+    <string name="detail_director">Dirección: %s</string>
+    <string name="detail_cast">Reparto: %s</string>
+    <string name="detail_no_episodes">Esta serie no tiene episodios disponibles.</string>
+    <string name="detail_movie_not_found">No se encontró la película.</string>
+    <string name="detail_series_not_found">No se encontró la serie.</string>
+
+    <!-- Alta de fuente -->
+    <string name="setup_title_new">Añade tu primera fuente</string>
+    <string name="setup_title_edit">Editar fuente</string>
+    <string name="setup_intro">Kanal se conecta a un panel Xtream Codes (incluido Dispatcharr) o a una lista M3U. La guía de programación se descarga en formato XMLTV.</string>
+    <string name="setup_xtream">Xtream Codes</string>
+    <string name="setup_m3u">Lista M3U</string>
+    <string name="setup_name">Nombre</string>
+    <string name="setup_name_placeholder">Mi proveedor</string>
+    <string name="setup_server_url">URL del servidor</string>
+    <string name="setup_server_url_hint">Pégala tal cual; si trae /player_api.php se recorta sola.</string>
+    <string name="setup_server_placeholder">http://midominio.com:8080</string>
+    <string name="setup_m3u_url">URL de la lista M3U</string>
+    <string name="setup_m3u_placeholder">http://…/lista.m3u</string>
+    <string name="setup_user">Usuario</string>
+    <string name="setup_password">Contraseña</string>
+    <string name="setup_epg_url">URL de la guía (opcional)</string>
+    <string name="setup_epg_url_hint">Si se deja vacía se usa xmltv.php del propio servidor.</string>
+    <string name="setup_epg_url_m3u">URL de la guía XMLTV (opcional)</string>
+    <string name="setup_epg_url_m3u_hint">Si la lista anuncia url-tvg, Kanal la coge de ahí.</string>
+    <string name="setup_user_agent">User-Agent (opcional)</string>
+    <string name="setup_user_agent_hint">Algunos proveedores sólo responden a un agente concreto.</string>
+    <string name="setup_save_start">Guardar y empezar</string>
+    <string name="setup_save_sync">Guardar y sincronizar</string>
+    <string name="setup_test">Probar conexión</string>
+    <string name="setup_tip">Consejo: pega la URL del servidor tal cual (http://host:puerto). Si trae /player_api.php o parámetros, Kanal los recorta solo.</string>
+    <string name="setup_connecting">Conectando…</string>
+    <string name="setup_saving">Guardando…</string>
+    <string name="setup_connected">Conectado como %1$s. Estado: %2$s</string>
+    <string name="setup_list_ok">La lista responde correctamente.</string>
+    <string name="setup_connect_failed">No se pudo conectar.</string>
+
+    <!-- Ajustes -->
+    <string name="settings_title">Ajustes</string>
+    <string name="settings_sources">Fuentes</string>
+    <string name="settings_add_source">Añadir fuente</string>
+    <string name="settings_sync_all">Sincronizar todo</string>
+    <string name="settings_sync_guide_only">Actualizar sólo la guía</string>
+    <string name="settings_use">Usar</string>
+    <string name="settings_edit">Editar</string>
+    <string name="settings_delete">Eliminar</string>
+    <string name="settings_active">activa</string>
+    <string name="settings_last_sync">última sincronización %s</string>
+    <string name="settings_never_synced">sin sincronizar</string>
+
+    <string name="settings_playback">Reproducción</string>
+    <string name="settings_stream_format">Formato de emisión</string>
+    <string name="settings_stream_format_desc">MPEG-TS va mejor en la mayoría de paneles; HLS es más tolerante con redes lentas.</string>
+    <string name="stream_format_ts">MPEG-TS (.ts)</string>
+    <string name="stream_format_hls">HLS (.m3u8)</string>
+    <string name="settings_buffer">Búfer</string>
+    <string name="settings_buffer_desc">Un búfer bajo cambia de canal antes; uno alto aguanta mejor los cortes.</string>
+    <string name="buffer_low">Bajo (zapping rápido)</string>
+    <string name="buffer_normal">Normal</string>
+    <string name="buffer_high">Alto (conexión inestable)</string>
+    <string name="buffer_maximum">Máximo (servidor con cortes)</string>
+    <string name="settings_preview">Vista previa en la lista de canales</string>
+    <string name="settings_preview_desc">Reproduce el canal enfocado en el panel de la derecha tras un momento.</string>
+    <string name="settings_resilient">Aguantar cortes del servidor</string>
+    <string name="settings_resilient_desc">Si la emisión se corta, reconecta sola varias veces en lugar de dar error e insiste más ante los fallos de red. Súbelo con el búfer al máximo si tu proveedor va justo.</string>
+    <string name="settings_keep_channel">Recordar el último canal</string>
+    <string name="settings_keep_channel_desc">Al salir de un canal con ATRÁS sigue sonando en la vista previa. Desde la lista, ATRÁS vuelve a ponerlo a pantalla completa; dos veces seguidas sale.</string>
+    <string name="settings_user_agent">User-Agent por defecto</string>
+    <string name="settings_user_agent_desc">Algunos proveedores bloquean agentes desconocidos.</string>
+
+    <string name="settings_guide_content">Guía y contenido</string>
+    <string name="settings_epg_days">Días de guía a descargar</string>
+    <string name="settings_epg_days_desc">Cuantos más días, más tarda la sincronización y más ocupa.</string>
+    <string name="settings_auto_sync">Sincronización automática</string>
+    <string name="settings_auto_sync_desc">Cada cuánto se refresca el catálogo al abrir la aplicación.</string>
+    <string name="settings_never">Nunca</string>
+    <string name="settings_hours">%d h</string>
+    <string name="settings_hide_adult">Ocultar contenido para adultos</string>
+    <string name="settings_hide_adult_desc">Filtra las categorías marcadas como XXX o +18.</string>
+
+    <!-- Apagado y ahorro -->
+    <string name="settings_saving">Apagado y ahorro</string>
+    <string name="settings_sleep_timer">Temporizador de apagado</string>
+    <string name="settings_sleep_timer_desc">Kanal se cierra cuando termine la cuenta. Pensado para quedarse dormido delante de una película.</string>
+    <string name="settings_sleep_minutes">%d min</string>
+    <string name="settings_sleep_custom">Minutos a medida</string>
+    <string name="settings_sleep_custom_hint">Entre 1 y 720 minutos.</string>
+    <string name="settings_sleep_start">Activar</string>
+    <string name="settings_sleep_cancel">Cancelar temporizador</string>
+    <string name="settings_sleep_running">Se apaga en %s</string>
+    <string name="settings_still_watching">Preguntar si sigues ahí</string>
+    <string name="settings_still_watching_desc">Tras una hora sin tocar el mando, Kanal pregunta si sigues ahí y se cierra si no respondes. Ahorra datos y consumo cuando la tele se queda sola.</string>
+
+    <string name="sleep_closing_in">Kanal se cierra en %d s</string>
+    <string name="sleep_keep_watching">Seguir viendo</string>
+    <string name="still_watching_title">¿Sigues ahí?</string>
+    <string name="still_watching_body">Llevas una hora sin tocar el mando. Kanal se cierra en %d s para ahorrar datos y consumo.</string>
+    <string name="still_watching_yes">Sí, sigo aquí</string>
+
+    <!-- Aplicación -->
+    <string name="settings_app">Aplicación</string>
+    <string name="settings_auto_update">Buscar actualizaciones automáticamente</string>
+    <string name="settings_auto_update_desc">Comprueba las versiones de GitHub al abrir la aplicación.</string>
+    <string name="settings_verbose_http">Registro detallado de red</string>
+    <string name="settings_verbose_http_desc">Anota cada petición HTTP. Útil para diagnosticar, ruidoso para el día a día.</string>
+    <string name="settings_version">Versión instalada: %s</string>
+    <string name="settings_version_available">disponible %s</string>
+    <string name="settings_check_updates">Buscar actualizaciones</string>
+    <string name="settings_checking">Comprobando…</string>
+    <string name="settings_download_install">Descargar e instalar</string>
+    <string name="settings_downloading">Descargando… %d%%</string>
+    <string name="settings_view_log">Ver registro</string>
+    <string name="settings_clear_history">Borrar historial</string>
+    <string name="settings_clear_cache">Vaciar caché de contenido</string>
+
+    <!-- Mensajes -->
+    <string name="msg_source_deleted">Fuente «%s» eliminada.</string>
+    <string name="msg_guide_updated">Guía actualizada: %s.</string>
+    <string name="msg_guide_failed">No se pudo actualizar la guía.</string>
+    <string name="msg_sync_done">Listo: %1$s, %2$s, %3$s, %4$s.</string>
+    <string name="msg_cache_cleared">Caché vaciada. Sincroniza para volver a descargar el contenido.</string>
+    <string name="msg_history_cleared">Historial borrado.</string>
+
+    <!-- Actualizaciones -->
+    <string name="update_available">Kanal %s disponible</string>
+    <string name="update_apk_size">APK de %s</string>
+    <string name="update_now">Actualizar</string>
+    <string name="update_later">Ahora no</string>
+    <string name="update_downloading">Descargando…</string>
+    <string name="update_downloading_pct">Descargando… %d%%</string>
+    <string name="update_installing">Instalando…</string>
+    <string name="update_failed">No se pudo descargar la actualización.</string>
+    <string name="update_permission">Autoriza a Kanal a instalar aplicaciones y vuelve a intentarlo.</string>
+    <string name="update_up_to_date">Ya tienes la última versión (%s).</string>
+
+    <!-- Registro -->
+    <string name="logs_title">Registro</string>
+    <string name="logs_all">Todo</string>
+    <string name="logs_info">Info</string>
+    <string name="logs_warnings">Avisos</string>
+    <string name="logs_errors">Errores</string>
+    <string name="logs_reload">Recargar</string>
+    <string name="logs_share">Compartir</string>
+    <string name="logs_share_title">Registro de Kanal</string>
+    <string name="logs_export">Exportar a fichero</string>
+    <string name="logs_exporting">Exportando…</string>
+    <string name="logs_clear">Borrar</string>
+    <string name="logs_empty">No hay nada registrado todavía.</string>
+    <string name="logs_cleared">Registro borrado.</string>
+    <string name="logs_saved">Guardado en %s</string>
+    <string name="logs_export_failed">No se pudo exportar el registro.</string>
+    <string name="logs_size">El fichero ocupa %d caracteres.</string>
+
+    <string name="update_error_http">GitHub respondió %s</string>
+    <string name="update_error_empty">Respuesta vacía de GitHub</string>
+    <string name="update_error_no_apk">La versión publicada no trae APK</string>
+    <string name="update_error_generic">No se pudieron comprobar las actualizaciones: %s</string>
+
+    <!-- Sincronización -->
+    <string name="sync_checking_account">Comprobando la cuenta…</string>
+    <string name="sync_categories">Descargando categorías…</string>
+    <string name="sync_channels">Descargando canales…</string>
+    <string name="sync_movies">Descargando películas…</string>
+    <string name="sync_series">Descargando series…</string>
+    <string name="sync_list">Descargando la lista…</string>
+    <string name="sync_reading_list">Leyendo la lista… (%d entradas)</string>
+    <string name="sync_saving_channels">Guardando canales…</string>
+    <string name="sync_guide">Descargando la guía…</string>
+    <string name="sync_failed">No se pudo sincronizar: %s</string>
+    <string name="sync_failed_unknown">No se pudo sincronizar.</string>
+
+    <!-- Orden del catálogo -->
+    <string name="sort_default">Orden del proveedor</string>
+    <string name="sort_name">Nombre (A-Z)</string>
+    <string name="sort_recent">Añadido recientemente</string>
+    <string name="sort_rating">Valoración</string>
+
+    <string name="setup_connected_full">Conectado como %1$s. Estado: %2$s · %3$d/%4$d conexiones</string>
+    <string name="setup_connect_failed_detail">No se pudo conectar: %s</string>
+</resources>

@@ -2,6 +2,8 @@ package com.mateof.kanal.ui.screens.detail
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.mateof.kanal.R
+import com.mateof.kanal.core.UiText
 import com.mateof.kanal.core.asObject
 import com.mateof.kanal.core.double
 import com.mateof.kanal.core.firstStr
@@ -38,7 +40,7 @@ data class MovieDetailState(
     val isFavorite: Boolean = false,
     val resumeMs: Long = 0L,
     val loading: Boolean = true,
-    val error: String = ""
+    val error: UiText? = null
 )
 
 @HiltViewModel
@@ -60,12 +62,12 @@ class MovieDetailViewModel @Inject constructor(
         viewModelScope.launch {
             val source = prefs.activeSource.first()
             if (source == null) {
-                _state.value = MovieDetailState(loading = false, error = "No hay ninguna fuente activa.")
+                _state.value = MovieDetailState(loading = false, error = UiText(R.string.error_no_source))
                 return@launch
             }
             val movie = content.movie(source.id, movieId)
             if (movie == null) {
-                _state.value = MovieDetailState(loading = false, error = "No se encontró la película.")
+                _state.value = MovieDetailState(loading = false, error = UiText(R.string.detail_movie_not_found))
                 return@launch
             }
             val favorites = prefs.favorites.first()
@@ -115,7 +117,7 @@ data class SeriesDetailState(
     val episodes: List<EpisodeEntity> = emptyList(),
     val isFavorite: Boolean = false,
     val loading: Boolean = true,
-    val error: String = ""
+    val error: UiText? = null
 )
 
 @HiltViewModel
@@ -136,12 +138,12 @@ class SeriesDetailViewModel @Inject constructor(
         viewModelScope.launch {
             val source = prefs.activeSource.first()
             if (source == null) {
-                _state.value = SeriesDetailState(loading = false, error = "No hay ninguna fuente activa.")
+                _state.value = SeriesDetailState(loading = false, error = UiText(R.string.error_no_source))
                 return@launch
             }
             val series = content.seriesById(source.id, seriesId)
             if (series == null) {
-                _state.value = SeriesDetailState(loading = false, error = "No se encontró la serie.")
+                _state.value = SeriesDetailState(loading = false, error = UiText(R.string.detail_series_not_found))
                 return@launch
             }
             val favorites = prefs.favorites.first()
@@ -163,7 +165,7 @@ class SeriesDetailViewModel @Inject constructor(
                 seasons = seasons,
                 selectedSeason = seasons.firstOrNull() ?: 1,
                 loading = false,
-                error = if (episodes.isEmpty()) "Esta serie no tiene episodios disponibles." else ""
+                error = if (episodes.isEmpty()) UiText(R.string.detail_no_episodes) else null
             )
         }
     }

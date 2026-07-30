@@ -3,6 +3,8 @@ package com.mateof.kanal.data.repo
 import androidx.paging.Pager
 import androidx.paging.PagingConfig
 import androidx.paging.PagingData
+import androidx.annotation.StringRes
+import com.mateof.kanal.R
 import com.mateof.kanal.core.normalizedForSearch
 import com.mateof.kanal.data.db.CategoryEntity
 import com.mateof.kanal.data.db.ChannelEntity
@@ -21,11 +23,11 @@ import kotlinx.coroutines.flow.map
 import javax.inject.Inject
 import javax.inject.Singleton
 
-enum class CatalogSort(val key: String, val label: String) {
-    DEFAULT("default", "Orden del proveedor"),
-    NAME("name", "Nombre (A-Z)"),
-    RECENT("recent", "Añadido recientemente"),
-    RATING("rating", "Valoración")
+enum class CatalogSort(val key: String, @StringRes val labelRes: Int) {
+    DEFAULT("default", R.string.sort_default),
+    NAME("name", R.string.sort_name),
+    RECENT("recent", R.string.sort_recent),
+    RATING("rating", R.string.sort_rating)
 }
 
 data class SearchResults(

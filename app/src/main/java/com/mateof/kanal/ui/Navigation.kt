@@ -23,6 +23,7 @@ import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
 import androidx.navigation.navArgument
+import com.mateof.kanal.R
 import com.mateof.kanal.ui.components.BottomNav
 import com.mateof.kanal.ui.components.NavItem
 import com.mateof.kanal.ui.components.NavRail
@@ -66,14 +67,14 @@ object Routes {
 private const val RESUMED_CHANNEL = "resumed_channel"
 
 private val RAIL_ITEMS = listOf(
-    NavItem(Routes.HOME, "Inicio", Icons.Outlined.Home),
-    NavItem(Routes.LIVE, "TV en directo", Icons.Outlined.LiveTv),
-    NavItem(Routes.GUIDE, "Guía", Icons.Outlined.CalendarMonth),
-    NavItem(Routes.MOVIES, "Películas", Icons.Outlined.Movie),
-    NavItem(Routes.SERIES, "Series", Icons.Outlined.Tv),
-    NavItem(Routes.FAVORITES, "Favoritos", Icons.Outlined.Star),
-    NavItem(Routes.SEARCH, "Buscar", Icons.Outlined.Search),
-    NavItem(Routes.SETTINGS, "Ajustes", Icons.Outlined.Settings)
+    NavItem(Routes.HOME, R.string.nav_home, Icons.Outlined.Home),
+    NavItem(Routes.LIVE, R.string.nav_live, Icons.Outlined.LiveTv),
+    NavItem(Routes.GUIDE, R.string.nav_guide, Icons.Outlined.CalendarMonth),
+    NavItem(Routes.MOVIES, R.string.nav_movies, Icons.Outlined.Movie),
+    NavItem(Routes.SERIES, R.string.nav_series, Icons.Outlined.Tv),
+    NavItem(Routes.FAVORITES, R.string.nav_favorites, Icons.Outlined.Star),
+    NavItem(Routes.SEARCH, R.string.nav_search, Icons.Outlined.Search),
+    NavItem(Routes.SETTINGS, R.string.nav_settings, Icons.Outlined.Settings)
 )
 
 @Composable

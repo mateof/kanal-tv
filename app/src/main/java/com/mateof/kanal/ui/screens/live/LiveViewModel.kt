@@ -7,6 +7,8 @@ import androidx.media3.common.Player
 import androidx.media3.exoplayer.ExoPlayer
 import androidx.paging.PagingData
 import androidx.paging.cachedIn
+import com.mateof.kanal.R
+import com.mateof.kanal.core.UiText
 import com.mateof.kanal.core.log.FileLogger
 import com.mateof.kanal.data.db.CategoryEntity
 import com.mateof.kanal.data.db.ChannelEntity
@@ -78,8 +80,8 @@ class LiveViewModel @Inject constructor(
     private val _previewActive = MutableStateFlow(false)
     val previewActive: StateFlow<Boolean> = _previewActive.asStateFlow()
 
-    private val _previewError = MutableStateFlow("")
-    val previewError: StateFlow<String> = _previewError.asStateFlow()
+    private val _previewError = MutableStateFlow<UiText?>(null)
+    val previewError: StateFlow<UiText?> = _previewError.asStateFlow()
 
     private var previewJob: Job? = null
     private var player: ExoPlayer? = null
@@ -195,7 +197,7 @@ class LiveViewModel @Inject constructor(
      */
     private fun schedulePreview(channel: ChannelEntity, immediate: Boolean = false) {
         previewJob?.cancel()
-        _previewError.value = ""
+        _previewError.value = null
         player?.stop()
         _previewActive.value = false
 
@@ -226,7 +228,7 @@ class LiveViewModel @Inject constructor(
             override fun onPlayerError(error: PlaybackException) {
                 logger.w("Preview", "Vista previa fallida: ${error.errorCodeName}")
                 if (advancePreview()) return
-                _previewError.value = "No se pudo cargar la vista previa"
+                _previewError.value = UiText(R.string.live_preview_failed)
                 _previewActive.value = false
             }
         })

@@ -8,6 +8,8 @@ import androidx.media3.common.Player
 import androidx.media3.common.TrackSelectionOverride
 import androidx.media3.common.Tracks
 import androidx.media3.exoplayer.ExoPlayer
+import com.mateof.kanal.R
+import com.mateof.kanal.core.UiText
 import com.mateof.kanal.core.log.FileLogger
 import com.mateof.kanal.data.db.EpgEntity
 import com.mateof.kanal.data.model.Source
@@ -33,7 +35,12 @@ private const val MAX_RECONNECTS = 6
 
 data class TrackOption(
     val id: String,
-    val label: String,
+    /** What the provider called the track, or null when it did not name it. */
+    val name: String?,
+    /** Codec and channel count, already formatted; may be empty. */
+    val details: String,
+    /** 1-based position, used to name a track the provider left unnamed. */
+    val number: Int,
     val selected: Boolean,
     val groupIndex: Int,
     val trackIndex: Int
@@ -42,7 +49,7 @@ data class TrackOption(
 data class PlayerUiState(
     val playable: Playable? = null,
     val loading: Boolean = true,
-    val error: String = "",
+    val error: UiText? = null,
     val buffering: Boolean = false,
     val playing: Boolean = false,
     val positionMs: Long = 0L,
@@ -97,14 +104,14 @@ class PlayerViewModel @Inject constructor(
         viewModelScope.launch {
             val current = prefs.activeSource.first()
             if (current == null) {
-                _state.value = _state.value.copy(loading = false, error = "No hay ninguna fuente activa.")
+                _state.value = _state.value.copy(loading = false, error = UiText(R.string.error_no_source))
                 return@launch
             }
             source = current
 
             val playable = resolve(current, kind, itemId, startMillis)
             if (playable == null) {
-                _state.value = _state.value.copy(loading = false, error = "No se encontró el contenido.")
+                _state.value = _state.value.copy(loading = false, error = UiText(R.string.error_not_found))
                 return@launch
             }
 
@@ -174,7 +181,7 @@ class PlayerViewModel @Inject constructor(
         _state.value = _state.value.copy(
             playable = playable,
             loading = false,
-            error = "",
+            error = null,
             channelIndex = index,
             channelCount = channelIds.size,
             reconnectAttempt = 0
@@ -305,7 +312,7 @@ class PlayerViewModel @Inject constructor(
         val title = _state.value.playable?.title.orEmpty()
         logger.i("Player", "Reintentando '$title' con ${redactUrl(url)}")
 
-        _state.value = _state.value.copy(error = "", buffering = true)
+        _state.value = _state.value.copy(error = null, buffering = true)
         exo.setMediaItem(playerFactory.mediaItem(url, title))
         exo.prepare()
         exo.playWhenReady = true
@@ -342,7 +349,7 @@ class PlayerViewModel @Inject constructor(
         logger.i("Player", "Reconectando en ${delayMs}ms (intento $reconnects/$MAX_RECONNECTS)")
         _state.value = _state.value.copy(
             reconnectAttempt = reconnects,
-            error = "",
+            error = null,
             buffering = true
         )
 
@@ -383,9 +390,10 @@ class PlayerViewModel @Inject constructor(
             for (trackIndex in 0 until group.length) {
                 val format = group.getTrackFormat(trackIndex)
                 val language = format.language?.takeIf { it.isNotBlank() && it != "und" }
-                val label = buildString {
-                    append(format.label ?: language ?: "Pista ${options.size + 1}")
-                    if (language != null && format.label != null) append(" ($language)")
+                val name = (format.label ?: language)?.let { base ->
+                    if (language != null && format.label != null) "$base ($language)" else base
+                }
+                val details = buildString {
                     format.codecs?.let { append(" · $it") }
                     if (type == C.TRACK_TYPE_AUDIO && format.channelCount > 0) {
                         append(" · ${format.channelCount}ch")
@@ -393,7 +401,9 @@ class PlayerViewModel @Inject constructor(
                 }
                 options += TrackOption(
                     id = "$groupIndex:$trackIndex",
-                    label = label,
+                    name = name,
+                    details = details,
+                    number = options.size + 1,
                     selected = group.isTrackSelected(trackIndex),
                     groupIndex = groupIndex,
                     trackIndex = trackIndex
@@ -439,7 +449,7 @@ class PlayerViewModel @Inject constructor(
         viewModelScope.launch {
             val channel = content.channel(current.id, channelIds[target]) ?: return@launch
             val playable = playback.forChannel(current, channel)
-            _state.value = _state.value.copy(channelIndex = target, error = "")
+            _state.value = _state.value.copy(channelIndex = target, error = null)
             start(playable)
         }
         return true
@@ -448,7 +458,7 @@ class PlayerViewModel @Inject constructor(
     fun retry() {
         val exo = player ?: return
         reconnects = 0
-        _state.value = _state.value.copy(error = "", buffering = true, reconnectAttempt = 0)
+        _state.value = _state.value.copy(error = null, buffering = true, reconnectAttempt = 0)
         // Start the candidate walk over: the channel may simply have been down.
         candidateIndex = 0
         candidates.firstOrNull()?.let { url ->
@@ -466,29 +476,28 @@ class PlayerViewModel @Inject constructor(
         viewModelScope.launch { playback.record(playable, position, duration) }
     }
 
-    private fun friendlyError(error: PlaybackException): String = when (error.errorCode) {
+    private fun friendlyError(error: PlaybackException): UiText = when (error.errorCode) {
         PlaybackException.ERROR_CODE_IO_NETWORK_CONNECTION_FAILED,
         PlaybackException.ERROR_CODE_IO_NETWORK_CONNECTION_TIMEOUT ->
-            "No se pudo conectar con el servidor."
+            UiText(R.string.error_no_connection)
 
         PlaybackException.ERROR_CODE_IO_BAD_HTTP_STATUS ->
-            "El servidor rechazó la emisión. ¿Demasiadas conexiones abiertas?"
+            UiText(R.string.error_rejected)
 
         PlaybackException.ERROR_CODE_IO_FILE_NOT_FOUND ->
-            "La emisión ya no existe en el servidor."
+            UiText(R.string.error_gone)
 
         PlaybackException.ERROR_CODE_PARSING_CONTAINER_UNSUPPORTED,
         PlaybackException.ERROR_CODE_PARSING_CONTAINER_MALFORMED,
         PlaybackException.ERROR_CODE_PARSING_MANIFEST_UNSUPPORTED,
         PlaybackException.ERROR_CODE_PARSING_MANIFEST_MALFORMED ->
-            "El servidor no envía vídeo en ningún formato reconocible. Suele ser un " +
-                "canal caído o el límite de conexiones alcanzado."
+            UiText(R.string.error_container)
 
         PlaybackException.ERROR_CODE_DECODING_FAILED,
         PlaybackException.ERROR_CODE_DECODER_INIT_FAILED ->
-            "El dispositivo no puede decodificar esta emisión."
+            UiText(R.string.error_decode)
 
-        else -> "No se pudo reproducir (${error.errorCodeName})."
+        else -> UiText(R.string.error_generic, error.errorCodeName)
     }
 
     override fun onCleared() {

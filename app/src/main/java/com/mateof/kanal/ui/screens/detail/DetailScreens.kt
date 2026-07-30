@@ -42,6 +42,9 @@ import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import coil.compose.AsyncImage
+import androidx.compose.ui.res.stringResource
+import com.mateof.kanal.R
+import com.mateof.kanal.core.resolve
 import com.mateof.kanal.core.formatDuration
 import com.mateof.kanal.data.db.EpisodeEntity
 import com.mateof.kanal.ui.components.ArtworkImage
@@ -68,8 +71,8 @@ fun MovieDetailScreen(
     BackHandler { onBack() }
 
     when {
-        state.loading -> LoadingState("Cargando ficha…")
-        state.movie == null -> ErrorState(state.error) { KanalButton("Volver", onBack) }
+        state.loading -> LoadingState(stringResource(R.string.detail_loading))
+        state.movie == null -> ErrorState(state.error?.resolve().orEmpty()) { KanalButton(stringResource(R.string.common_back), onBack) }
         else -> {
             val movie = state.movie!!
 
@@ -123,7 +126,7 @@ fun MovieDetailScreen(
                     if (state.cast.isNotBlank()) {
                         Spacer(Modifier.height(16.dp))
                         Text(
-                            "Reparto: ${state.cast}",
+                            stringResource(R.string.detail_cast, state.cast),
                             style = MaterialTheme.typography.bodySmall,
                             color = KanalColors.OnSurfaceFaint,
                             maxLines = 2,
@@ -132,7 +135,7 @@ fun MovieDetailScreen(
                     }
                     if (state.director.isNotBlank()) {
                         Text(
-                            "Dirección: ${state.director}",
+                            stringResource(R.string.detail_director, state.director),
                             style = MaterialTheme.typography.bodySmall,
                             color = KanalColors.OnSurfaceFaint
                         )
@@ -142,9 +145,9 @@ fun MovieDetailScreen(
                     DetailActions(
                         compact = compact,
                         playLabel = if (state.resumeMs > 0) {
-                            "Continuar desde ${formatDuration(state.resumeMs)}"
+                            stringResource(R.string.detail_resume, formatDuration(state.resumeMs))
                         } else {
-                            "Reproducir"
+                            stringResource(R.string.detail_play)
                         },
                         onPlay = { onPlay(movie.streamId) },
                         isFavorite = state.isFavorite,
@@ -226,8 +229,8 @@ fun SeriesDetailScreen(
     BackHandler { onBack() }
 
     when {
-        state.loading -> LoadingState("Cargando episodios…")
-        state.series == null -> ErrorState(state.error) { KanalButton("Volver", onBack) }
+        state.loading -> LoadingState(stringResource(R.string.detail_loading_episodes))
+        state.series == null -> ErrorState(state.error?.resolve().orEmpty()) { KanalButton(stringResource(R.string.common_back), onBack) }
         else -> {
             val series = state.series!!
             val episodes = state.episodes.filter { it.season == state.selectedSeason }
@@ -282,7 +285,7 @@ fun SeriesDetailScreen(
                             LazyRow(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
                                 items(state.seasons) { season ->
                                     KanalChip(
-                                        label = "Temporada $season",
+                                        label = stringResource(R.string.detail_season, season),
                                         selected = season == state.selectedSeason,
                                         onClick = { vm.selectSeason(season) }
                                     )
@@ -290,10 +293,10 @@ fun SeriesDetailScreen(
                             }
                         }
                     }
-                    if (state.error.isNotBlank()) {
+                    state.error?.let { errorText ->
                         item {
                             Text(
-                                state.error,
+                                errorText.resolve(),
                                 style = MaterialTheme.typography.bodyMedium,
                                 color = KanalColors.Warning
                             )
@@ -323,13 +326,13 @@ fun SeriesDetailScreen(
                     }
                     Spacer(Modifier.height(18.dp))
                     KanalButton(
-                        text = if (state.isFavorite) "En favoritos" else "Añadir a favoritos",
+                        text = if (state.isFavorite) stringResource(R.string.detail_in_favorites) else stringResource(R.string.detail_add_favorite),
                         onClick = vm::toggleFavorite,
                         icon = Icons.Filled.Star,
                         modifier = Modifier.fillMaxWidth()
                     )
                     Spacer(Modifier.height(10.dp))
-                    KanalButton(text = "Volver", onClick = onBack, modifier = Modifier.fillMaxWidth())
+                    KanalButton(text = stringResource(R.string.common_back), onClick = onBack, modifier = Modifier.fillMaxWidth())
                 }
 
                 Spacer(Modifier.width(40.dp))
@@ -352,7 +355,7 @@ fun SeriesDetailScreen(
                         LazyRow(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
                             items(state.seasons) { season ->
                                 KanalChip(
-                                    label = "Temporada $season",
+                                    label = stringResource(R.string.detail_season, season),
                                     selected = season == state.selectedSeason,
                                     onClick = { vm.selectSeason(season) }
                                 )
@@ -361,8 +364,9 @@ fun SeriesDetailScreen(
                     }
 
                     Spacer(Modifier.height(18.dp))
-                    if (state.error.isNotBlank()) {
-                        Text(state.error, style = MaterialTheme.typography.bodyMedium, color = KanalColors.Warning)
+                    val errorText = state.error
+                    if (errorText != null) {
+                        Text(errorText.resolve(), style = MaterialTheme.typography.bodyMedium, color = KanalColors.Warning)
                     } else {
                         LazyColumn(
                             contentPadding = PaddingValues(bottom = 40.dp),
@@ -426,7 +430,7 @@ private fun DetailActions(
     onToggleFavorite: () -> Unit,
     onBack: () -> Unit
 ) {
-    val favoriteLabel = if (isFavorite) "En favoritos" else "Añadir a favoritos"
+    val favoriteLabel = if (isFavorite) stringResource(R.string.detail_in_favorites) else stringResource(R.string.detail_add_favorite)
     if (compact) {
         Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
             if (playLabel != null) {
@@ -444,7 +448,7 @@ private fun DetailActions(
                 icon = Icons.Filled.Star,
                 modifier = Modifier.fillMaxWidth()
             )
-            KanalButton(text = "Volver", onClick = onBack, modifier = Modifier.fillMaxWidth())
+            KanalButton(text = stringResource(R.string.common_back), onClick = onBack, modifier = Modifier.fillMaxWidth())
         }
     } else {
         Row(horizontalArrangement = Arrangement.spacedBy(14.dp)) {
@@ -457,7 +461,7 @@ private fun DetailActions(
                 )
             }
             KanalButton(text = favoriteLabel, onClick = onToggleFavorite, icon = Icons.Filled.Star)
-            KanalButton(text = "Volver", onClick = onBack)
+            KanalButton(text = stringResource(R.string.common_back), onClick = onBack)
         }
     }
 }

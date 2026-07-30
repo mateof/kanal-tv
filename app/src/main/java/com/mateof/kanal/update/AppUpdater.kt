@@ -6,6 +6,8 @@ import android.net.Uri
 import android.os.Build
 import android.provider.Settings
 import androidx.core.content.FileProvider
+import com.mateof.kanal.R
+import com.mateof.kanal.core.UiText
 import com.mateof.kanal.BuildConfig
 import com.mateof.kanal.core.log.FileLogger
 import com.mateof.kanal.data.net.HttpProvider
@@ -45,7 +47,7 @@ data class UpdateInfo(
 sealed interface UpdateCheck {
     data object UpToDate : UpdateCheck
     data class Available(val info: UpdateInfo) : UpdateCheck
-    data class Error(val message: String) : UpdateCheck
+    data class Error(val message: UiText) : UpdateCheck
 }
 
 /**
@@ -71,17 +73,17 @@ class AppUpdater @Inject constructor(
                 .build()
             http.client.newCall(request).execute().use { response ->
                 if (!response.isSuccessful) {
-                    return@withContext UpdateCheck.Error("GitHub respondió ${response.code}")
+                    return@withContext UpdateCheck.Error(UiText(R.string.update_error_http, response.code))
                 }
                 val body = response.body?.string()
-                    ?: return@withContext UpdateCheck.Error("Respuesta vacía")
+                    ?: return@withContext UpdateCheck.Error(UiText(R.string.update_error_empty))
                 val release = json.decodeFromString<GhRelease>(body)
                 val tag = release.tag_name?.removePrefix("v")?.trim().orEmpty()
                 val apk = release.assets.firstOrNull {
                     it.name?.endsWith(".apk", ignoreCase = true) == true
                 }
                 if (tag.isBlank() || apk?.browser_download_url == null) {
-                    return@withContext UpdateCheck.Error("La release no trae APK")
+                    return@withContext UpdateCheck.Error(UiText(R.string.update_error_no_apk))
                 }
                 if (!isNewer(tag, currentVersion)) {
                     logger.d("Update", "Ya estás en la última versión ($currentVersion)")
@@ -99,7 +101,7 @@ class AppUpdater @Inject constructor(
             }
         } catch (e: Exception) {
             logger.w("Update", "No se pudo comprobar si hay actualizaciones", e)
-            UpdateCheck.Error(e.message ?: "Error comprobando actualizaciones")
+            UpdateCheck.Error(UiText(R.string.update_error_generic, e.message.orEmpty()))
         }
     }
 

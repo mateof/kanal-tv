@@ -40,6 +40,8 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import androidx.compose.ui.res.stringResource
+import com.mateof.kanal.R
 import com.mateof.kanal.core.formatClock
 import com.mateof.kanal.data.db.ChannelEntity
 import com.mateof.kanal.data.db.EpgEntity
@@ -89,7 +91,7 @@ fun GuideScreen(onPlay: (String) -> Unit) {
             verticalAlignment = Alignment.CenterVertically
         ) {
             Column(Modifier.weight(1f)) {
-                Text("Guía", style = MaterialTheme.typography.headlineSmall, color = KanalColors.OnBackground)
+                Text(stringResource(R.string.nav_guide), style = MaterialTheme.typography.headlineSmall, color = KanalColors.OnBackground)
                 Text(
                     when {
                         state.rows.isEmpty() -> ""
@@ -105,7 +107,7 @@ fun GuideScreen(onPlay: (String) -> Unit) {
             }
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 KanalButton("−2 h", { vm.shiftWindow(-2) }, icon = Icons.Outlined.ChevronLeft)
-                KanalButton("Ahora", vm::resetToNow)
+                KanalButton(stringResource(R.string.common_now), vm::resetToNow)
                 KanalButton("+2 h", { vm.shiftWindow(2) }, icon = Icons.Outlined.ChevronRight)
             }
         }
@@ -115,7 +117,7 @@ fun GuideScreen(onPlay: (String) -> Unit) {
             horizontalArrangement = Arrangement.spacedBy(8.dp)
         ) {
             item {
-                KanalChip(label = "Todos", selected = category.isEmpty(), onClick = { vm.selectCategory("") })
+                KanalChip(label = stringResource(R.string.common_all_m), selected = category.isEmpty(), onClick = { vm.selectCategory("") })
             }
             items(categories, key = { it.categoryId }) { item ->
                 KanalChip(
@@ -128,18 +130,18 @@ fun GuideScreen(onPlay: (String) -> Unit) {
         Spacer(Modifier.height(12.dp))
 
         when {
-            state.loading -> LoadingState("Montando la guía…")
+            state.loading -> LoadingState(stringResource(R.string.guide_building))
 
             state.rows.isEmpty() -> MessageState(
-                title = "No hay canales",
-                description = "Sincroniza la fuente desde Ajustes.",
+                title = stringResource(R.string.guide_no_channels),
+                description = stringResource(R.string.live_sync_hint),
                 icon = Icons.Outlined.LiveTv
             )
 
             !state.hasGuide -> MessageState(
-                title = "Sin guía en esta franja",
-                description = "El proveedor no ha enviado programación para estos canales. " +
-                    "Prueba a actualizar la guía desde Ajustes.",
+                title = stringResource(R.string.guide_no_guide_slot),
+                description = stringResource(R.string.guide_no_guide_body) + " " +
+                    stringResource(R.string.guide_no_guide_hint),
                 icon = Icons.Outlined.LiveTv
             )
 

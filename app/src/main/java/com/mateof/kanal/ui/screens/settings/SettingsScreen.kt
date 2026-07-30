@@ -2,6 +2,7 @@ package com.mateof.kanal.ui.screens.settings
 
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -15,6 +16,7 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.Add
 import androidx.compose.material.icons.outlined.Article
+import androidx.compose.material.icons.outlined.Bedtime
 import androidx.compose.material.icons.outlined.Delete
 import androidx.compose.material.icons.outlined.Edit
 import androidx.compose.material.icons.outlined.Refresh
@@ -28,11 +30,18 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.mateof.kanal.R
+import com.mateof.kanal.core.AppLanguage
+import com.mateof.kanal.core.SleepTimer
 import com.mateof.kanal.core.formatDayAndClock
+import com.mateof.kanal.core.formatDuration
+import com.mateof.kanal.core.resolve
 import com.mateof.kanal.data.model.Source
 import com.mateof.kanal.data.prefs.BufferProfile
 import com.mateof.kanal.data.prefs.StreamFormat
@@ -65,8 +74,12 @@ fun SettingsScreen(
     val busy by vm.busy.collectAsStateWithLifecycle()
     val message by vm.message.collectAsStateWithLifecycle()
     val updateState by updateVm.state.collectAsStateWithLifecycle()
+    val sleepRemaining by vm.sleepRemaining.collectAsStateWithLifecycle()
 
     var userAgentDraft by remember(settings.userAgent) { mutableStateOf(settings.userAgent) }
+    var sleepDraft by remember(settings.sleepTimerMinutes) {
+        mutableStateOf(settings.sleepTimerMinutes.toString())
+    }
 
     LazyColumn(
         modifier = Modifier.fillMaxSize(),
@@ -79,25 +92,47 @@ fun SettingsScreen(
         verticalArrangement = Arrangement.spacedBy(14.dp)
     ) {
         item {
-            Text("Ajustes", style = MaterialTheme.typography.headlineMedium, color = KanalColors.OnBackground)
+            Text(
+                stringResource(R.string.settings_title),
+                style = MaterialTheme.typography.headlineMedium,
+                color = KanalColors.OnBackground
+            )
             Spacer(Modifier.height(4.dp))
         }
 
         if (busy) {
             item {
-                val label = (syncState as? SyncState.Running)?.step ?: "Trabajando…"
-                val progress = (syncState as? SyncState.Running)?.progress ?: -1f
-                StepProgress(label, progress)
+                val running = syncState as? SyncState.Running
+                val label = running?.step?.resolve() ?: stringResource(R.string.common_working)
+                StepProgress(label, running?.progress ?: -1f)
             }
         }
-        if (message.isNotBlank()) {
+        message?.let { text ->
             item {
-                Text(message, style = MaterialTheme.typography.bodyMedium, color = KanalColors.Accent)
+                Text(
+                    text.resolve(),
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = KanalColors.Accent
+                )
             }
         }
 
+        // --- Language -------------------------------------------------------
+        // First on the list on purpose: somebody who opened Kanal in a language
+        // they cannot read has to find this without reading anything else.
+        item { SectionHeader(stringResource(R.string.language)) }
+        item {
+            OptionRow(
+                title = stringResource(R.string.language),
+                description = stringResource(R.string.language_description),
+                options = AppLanguage.entries.map { stringResource(it.labelRes) },
+                selectedIndex = AppLanguage.entries.indexOf(settings.language),
+                onSelect = { vm.setLanguage(AppLanguage.entries[it]) }
+            )
+        }
+
         // --- Sources --------------------------------------------------------
-        item { SectionHeader("Fuentes") }
+        item { Spacer(Modifier.height(10.dp)); SectionHeader(stringResource(R.string.settings_sources)) }
         items(sources, key = { it.id }) { source ->
             SourceRow(
                 source = source,
@@ -108,122 +143,201 @@ fun SettingsScreen(
             )
         }
         item {
-            Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                KanalButton("Añadir fuente", onAddSource, icon = Icons.Outlined.Add, tone = ButtonTone.Primary)
+            FlowRow(
+                horizontalArrangement = Arrangement.spacedBy(12.dp),
+                verticalArrangement = Arrangement.spacedBy(10.dp)
+            ) {
                 KanalButton(
-                    "Sincronizar todo",
+                    stringResource(R.string.settings_add_source),
+                    onAddSource,
+                    icon = Icons.Outlined.Add,
+                    tone = ButtonTone.Primary
+                )
+                KanalButton(
+                    stringResource(R.string.settings_sync_all),
                     { vm.syncNow(epgOnly = false) },
                     icon = Icons.Outlined.Refresh,
                     enabled = !busy
                 )
-                KanalButton("Actualizar sólo la guía", { vm.syncNow(epgOnly = true) }, enabled = !busy)
+                KanalButton(
+                    stringResource(R.string.settings_sync_guide_only),
+                    { vm.syncNow(epgOnly = true) },
+                    enabled = !busy
+                )
             }
         }
 
         // --- Playback -------------------------------------------------------
-        item { Spacer(Modifier.height(10.dp)); SectionHeader("Reproducción") }
+        item { Spacer(Modifier.height(10.dp)); SectionHeader(stringResource(R.string.settings_playback)) }
         item {
             OptionRow(
-                title = "Formato de emisión",
-                description = "MPEG-TS va mejor en la mayoría de paneles; HLS es más tolerante con redes lentas.",
-                options = StreamFormat.entries.map { it.label },
+                title = stringResource(R.string.settings_stream_format),
+                description = stringResource(R.string.settings_stream_format_desc),
+                options = StreamFormat.entries.map { stringResource(it.labelRes) },
                 selectedIndex = StreamFormat.entries.indexOf(settings.streamFormat),
                 onSelect = { vm.setStreamFormat(StreamFormat.entries[it]) }
             )
         }
         item {
             OptionRow(
-                title = "Búfer",
-                description = "Un búfer bajo cambia de canal antes; uno alto aguanta mejor los cortes.",
-                options = BufferProfile.entries.map { it.label },
+                title = stringResource(R.string.settings_buffer),
+                description = stringResource(R.string.settings_buffer_desc),
+                options = BufferProfile.entries.map { stringResource(it.labelRes) },
                 selectedIndex = BufferProfile.entries.indexOf(settings.bufferProfile),
                 onSelect = { vm.setBufferProfile(BufferProfile.entries[it]) }
             )
         }
         item {
             SettingSwitchRow(
-                title = "Vista previa en la lista de canales",
-                description = "Reproduce el canal enfocado en el panel de la derecha tras un momento.",
+                title = stringResource(R.string.settings_preview),
+                description = stringResource(R.string.settings_preview_desc),
                 checked = settings.previewEnabled,
                 onCheckedChange = vm::setPreview
             )
         }
         item {
             SettingSwitchRow(
-                title = "Aguantar cortes del servidor",
-                description = "Si la emisión se corta, reconecta sola varias veces en lugar de dar error, " +
-                    "insiste más ante fallos de red y decodifica el audio por software, que tolera mejor " +
-                    "los paquetes dañados. Súbelo con el búfer al máximo si tu proveedor va justo.",
+                title = stringResource(R.string.settings_resilient),
+                description = stringResource(R.string.settings_resilient_desc),
                 checked = settings.resilientPlayback,
                 onCheckedChange = vm::setResilient
             )
         }
         item {
             SettingSwitchRow(
-                title = "Recordar el último canal",
-                description = "Al salir de un canal con ATRÁS sigue sonando en la vista previa. " +
-                    "Desde la lista, ATRÁS vuelve a ponerlo a pantalla completa; dos veces seguidas sale.",
+                title = stringResource(R.string.settings_keep_channel),
+                description = stringResource(R.string.settings_keep_channel_desc),
                 checked = settings.keepLastChannel,
                 onCheckedChange = vm::setKeepLastChannel
             )
         }
         item {
-            Row(verticalAlignment = Alignment.CenterVertically) {
+            FlowRow(
+                horizontalArrangement = Arrangement.spacedBy(16.dp),
+                verticalArrangement = Arrangement.spacedBy(10.dp)
+            ) {
                 KanalTextField(
                     value = userAgentDraft,
                     onValueChange = { userAgentDraft = it },
-                    label = "User-Agent por defecto",
-                    supportingText = "Algunos proveedores bloquean agentes desconocidos.",
+                    label = stringResource(R.string.settings_user_agent),
+                    supportingText = stringResource(R.string.settings_user_agent_desc),
                     modifier = if (isCompact) Modifier.fillMaxWidth() else Modifier.width(560.dp)
                 )
-                Spacer(Modifier.width(16.dp))
-                KanalButton("Guardar", { vm.setUserAgent(userAgentDraft) })
+                KanalButton(stringResource(R.string.common_save), { vm.setUserAgent(userAgentDraft) })
             }
         }
 
         // --- Guide and content ----------------------------------------------
-        item { Spacer(Modifier.height(10.dp)); SectionHeader("Guía y contenido") }
+        item { Spacer(Modifier.height(10.dp)); SectionHeader(stringResource(R.string.settings_guide_content)) }
         item {
             OptionRow(
-                title = "Días de guía a descargar",
-                description = "Cuantos más días, más tarda la sincronización y más ocupa.",
-                options = listOf("1", "2", "3", "5", "7"),
-                selectedIndex = listOf(1, 2, 3, 5, 7).indexOf(settings.epgDaysAhead).coerceAtLeast(0),
-                onSelect = { vm.setEpgDays(listOf(1, 2, 3, 5, 7)[it]) }
+                title = stringResource(R.string.settings_epg_days),
+                description = stringResource(R.string.settings_epg_days_desc),
+                options = EPG_DAYS.map { it.toString() },
+                selectedIndex = EPG_DAYS.indexOf(settings.epgDaysAhead).coerceAtLeast(0),
+                onSelect = { vm.setEpgDays(EPG_DAYS[it]) }
             )
         }
         item {
+            val never = stringResource(R.string.settings_never)
             OptionRow(
-                title = "Sincronización automática",
-                description = "Cada cuánto se refresca el catálogo al abrir la aplicación.",
-                options = listOf("Nunca", "6 h", "12 h", "24 h", "48 h"),
-                selectedIndex = listOf(0, 6, 12, 24, 48).indexOf(settings.autoSyncHours).coerceAtLeast(0),
-                onSelect = { vm.setAutoSyncHours(listOf(0, 6, 12, 24, 48)[it]) }
+                title = stringResource(R.string.settings_auto_sync),
+                description = stringResource(R.string.settings_auto_sync_desc),
+                options = SYNC_HOURS.map { hours ->
+                    if (hours == 0) never else stringResource(R.string.settings_hours, hours)
+                },
+                selectedIndex = SYNC_HOURS.indexOf(settings.autoSyncHours).coerceAtLeast(0),
+                onSelect = { vm.setAutoSyncHours(SYNC_HOURS[it]) }
             )
         }
         item {
             SettingSwitchRow(
-                title = "Ocultar contenido para adultos",
-                description = "Filtra las categorías marcadas como XXX o +18.",
+                title = stringResource(R.string.settings_hide_adult),
+                description = stringResource(R.string.settings_hide_adult_desc),
                 checked = settings.hideAdult,
                 onCheckedChange = vm::setHideAdult
             )
         }
 
-        // --- App ------------------------------------------------------------
-        item { Spacer(Modifier.height(10.dp)); SectionHeader("Aplicación") }
+        // --- Shutdown and saving --------------------------------------------
+        item { Spacer(Modifier.height(10.dp)); SectionHeader(stringResource(R.string.settings_saving)) }
+        item {
+            Column {
+                OptionRow(
+                    title = stringResource(R.string.settings_sleep_timer),
+                    description = stringResource(R.string.settings_sleep_timer_desc),
+                    options = SleepTimer.PRESETS.map { stringResource(R.string.settings_sleep_minutes, it) },
+                    selectedIndex = SleepTimer.PRESETS.indexOf(settings.sleepTimerMinutes),
+                    onSelect = {
+                        val minutes = SleepTimer.PRESETS[it]
+                        sleepDraft = minutes.toString()
+                        vm.setSleepMinutes(minutes)
+                    }
+                )
+                Spacer(Modifier.height(6.dp))
+                FlowRow(
+                    horizontalArrangement = Arrangement.spacedBy(16.dp),
+                    verticalArrangement = Arrangement.spacedBy(10.dp)
+                ) {
+                    KanalTextField(
+                        value = sleepDraft,
+                        onValueChange = { typed ->
+                            sleepDraft = typed.filter { it.isDigit() }.take(3)
+                            sleepDraft.toIntOrNull()?.let(vm::setSleepMinutes)
+                        },
+                        label = stringResource(R.string.settings_sleep_custom),
+                        supportingText = stringResource(R.string.settings_sleep_custom_hint),
+                        keyboardType = KeyboardType.Number,
+                        modifier = if (isCompact) Modifier.fillMaxWidth() else Modifier.width(280.dp)
+                    )
+                    if (sleepRemaining == null) {
+                        KanalButton(
+                            text = stringResource(R.string.settings_sleep_start),
+                            onClick = vm::startSleepTimer,
+                            icon = Icons.Outlined.Bedtime,
+                            tone = ButtonTone.Primary
+                        )
+                    } else {
+                        KanalButton(
+                            text = stringResource(R.string.settings_sleep_cancel),
+                            onClick = vm::cancelSleepTimer,
+                            tone = ButtonTone.Danger
+                        )
+                    }
+                }
+                sleepRemaining?.let { left ->
+                    Spacer(Modifier.height(8.dp))
+                    Text(
+                        stringResource(R.string.settings_sleep_running, formatDuration(left)),
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = KanalColors.Accent
+                    )
+                }
+            }
+        }
         item {
             SettingSwitchRow(
-                title = "Buscar actualizaciones automáticamente",
-                description = "Comprueba las releases de GitHub al abrir la aplicación.",
+                title = stringResource(R.string.settings_still_watching),
+                description = stringResource(R.string.settings_still_watching_desc),
+                checked = settings.stillWatching,
+                onCheckedChange = vm::setStillWatching
+            )
+        }
+
+        // --- App ------------------------------------------------------------
+        item { Spacer(Modifier.height(10.dp)); SectionHeader(stringResource(R.string.settings_app)) }
+        item {
+            SettingSwitchRow(
+                title = stringResource(R.string.settings_auto_update),
+                description = stringResource(R.string.settings_auto_update_desc),
                 checked = settings.autoUpdate,
                 onCheckedChange = vm::setAutoUpdate
             )
         }
         item {
             SettingSwitchRow(
-                title = "Registro detallado de red",
-                description = "Anota cada petición HTTP. Útil para diagnosticar, ruidoso para el día a día.",
+                title = stringResource(R.string.settings_verbose_http),
+                description = stringResource(R.string.settings_verbose_http_desc),
                 checked = settings.verboseHttpLog,
                 onCheckedChange = vm::setVerboseHttp
             )
@@ -231,51 +345,74 @@ fun SettingsScreen(
         item {
             Column {
                 Text(
-                    "Versión instalada: ${updateVm.currentVersion}" +
-                        updateState.available?.let { " · disponible ${it.versionName}" }.orEmpty(),
+                    stringResource(R.string.settings_version, updateVm.currentVersion) +
+                        updateState.available
+                            ?.let { " · " + stringResource(R.string.settings_version_available, it.versionName) }
+                            .orEmpty(),
                     style = MaterialTheme.typography.bodyMedium,
                     color = KanalColors.OnSurfaceMuted
                 )
-                if (updateState.message.isNotBlank()) {
+                updateState.message?.let { text ->
                     Spacer(Modifier.height(6.dp))
                     Text(
-                        updateState.message,
+                        text.resolve(),
                         style = MaterialTheme.typography.bodySmall,
                         color = KanalColors.OnSurfaceFaint
                     )
                 }
                 if (updateState.downloading) {
                     Spacer(Modifier.height(10.dp))
-                    StepProgress("Descargando… ${updateState.progress}%", updateState.progress / 100f)
+                    StepProgress(
+                        stringResource(R.string.settings_downloading, updateState.progress),
+                        updateState.progress / 100f
+                    )
                 }
                 Spacer(Modifier.height(14.dp))
-                Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                FlowRow(
+                    horizontalArrangement = Arrangement.spacedBy(12.dp),
+                    verticalArrangement = Arrangement.spacedBy(10.dp)
+                ) {
                     KanalButton(
-                        text = if (updateState.checking) "Comprobando…" else "Buscar actualizaciones",
+                        text = if (updateState.checking) {
+                            stringResource(R.string.settings_checking)
+                        } else {
+                            stringResource(R.string.settings_check_updates)
+                        },
                         onClick = updateVm::check,
                         icon = Icons.Outlined.SystemUpdateAlt,
                         enabled = !updateState.checking && !updateState.downloading
                     )
                     if (updateState.available != null) {
                         KanalButton(
-                            text = "Descargar e instalar",
+                            text = stringResource(R.string.settings_download_install),
                             onClick = updateVm::downloadAndInstall,
                             tone = ButtonTone.Primary,
                             enabled = !updateState.downloading
                         )
                     }
-                    KanalButton("Ver registro", onOpenLogs, icon = Icons.Outlined.Article)
+                    KanalButton(stringResource(R.string.settings_view_log), onOpenLogs, icon = Icons.Outlined.Article)
                 }
             }
         }
         item {
-            Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                KanalButton("Borrar historial", vm::clearHistory)
-                KanalButton("Vaciar caché de contenido", vm::clearCache, tone = ButtonTone.Danger, enabled = !busy)
+            FlowRow(
+                horizontalArrangement = Arrangement.spacedBy(12.dp),
+                verticalArrangement = Arrangement.spacedBy(10.dp)
+            ) {
+                KanalButton(stringResource(R.string.settings_clear_history), vm::clearHistory)
+                KanalButton(
+                    stringResource(R.string.settings_clear_cache),
+                    vm::clearCache,
+                    tone = ButtonTone.Danger,
+                    enabled = !busy
+                )
             }
         }
     }
 }
+
+private val EPG_DAYS = listOf(1, 2, 3, 5, 7)
+private val SYNC_HOURS = listOf(0, 6, 12, 24, 48)
 
 @Composable
 private fun SourceRow(
@@ -286,6 +423,12 @@ private fun SourceRow(
     onDelete: () -> Unit
 ) {
     var confirmDelete by remember { mutableStateOf(false) }
+    val activeSuffix = stringResource(R.string.settings_active)
+    val syncedLabel = if (source.lastSyncAt > 0) {
+        stringResource(R.string.settings_last_sync, formatDayAndClock(source.lastSyncAt))
+    } else {
+        stringResource(R.string.settings_never_synced)
+    }
 
     Row(
         modifier = Modifier
@@ -295,38 +438,32 @@ private fun SourceRow(
     ) {
         Column(Modifier.weight(1f)) {
             Text(
-                buildString {
-                    append(source.name)
-                    if (isActive) append("  ·  activa")
-                },
+                if (isActive) "${source.name}  ·  $activeSuffix" else source.name,
                 style = MaterialTheme.typography.titleSmall,
                 color = if (isActive) KanalColors.Accent else KanalColors.OnBackground,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis
             )
             Text(
-                buildString {
-                    append(source.type.name)
-                    append(" · ")
-                    append(
-                        if (source.lastSyncAt > 0) {
-                            "última sincronización ${formatDayAndClock(source.lastSyncAt)}"
-                        } else {
-                            "sin sincronizar"
-                        }
-                    )
-                },
+                "${source.type.name} · $syncedLabel",
                 style = MaterialTheme.typography.labelSmall,
                 color = KanalColors.OnSurfaceFaint,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis
             )
         }
-        Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-            if (!isActive) KanalButton("Usar", onActivate)
-            KanalButton("Editar", onEdit, icon = Icons.Outlined.Edit)
+        FlowRow(
+            horizontalArrangement = Arrangement.spacedBy(10.dp),
+            verticalArrangement = Arrangement.spacedBy(8.dp)
+        ) {
+            if (!isActive) KanalButton(stringResource(R.string.settings_use), onActivate)
+            KanalButton(stringResource(R.string.settings_edit), onEdit, icon = Icons.Outlined.Edit)
             KanalButton(
-                text = if (confirmDelete) "¿Seguro?" else "Eliminar",
+                text = if (confirmDelete) {
+                    stringResource(R.string.common_sure)
+                } else {
+                    stringResource(R.string.settings_delete)
+                },
                 onClick = { if (confirmDelete) onDelete() else confirmDelete = true },
                 icon = Icons.Outlined.Delete,
                 tone = ButtonTone.Danger
@@ -349,7 +486,12 @@ private fun OptionRow(
             Text(description, style = MaterialTheme.typography.bodySmall, color = KanalColors.OnSurfaceFaint)
         }
         Spacer(Modifier.height(10.dp))
-        Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+        // Wrapping, not a plain Row: six sleep-timer presets do not fit across a
+        // phone and the ones past the edge cannot be reached at all.
+        FlowRow(
+            horizontalArrangement = Arrangement.spacedBy(10.dp),
+            verticalArrangement = Arrangement.spacedBy(10.dp)
+        ) {
             options.forEachIndexed { index, label ->
                 KanalChip(label = label, selected = index == selectedIndex, onClick = { onSelect(index) })
             }

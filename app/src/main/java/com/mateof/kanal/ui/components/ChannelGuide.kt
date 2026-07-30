@@ -28,6 +28,8 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.res.stringResource
+import com.mateof.kanal.R
 import com.mateof.kanal.core.formatClock
 import com.mateof.kanal.core.formatDayShort
 import com.mateof.kanal.data.db.EpgEntity
@@ -50,7 +52,7 @@ fun ChannelGuide(
     programmes: List<EpgEntity>,
     modifier: Modifier = Modifier,
     archiveAvailable: Boolean = false,
-    emptyMessage: String = "No hay guía para este canal.",
+    emptyMessage: String = stringResource(R.string.guide_channel_empty),
     onSelectDay: (Long) -> Unit,
     /** Opening the sheet is the default action; replaying lives inside it. */
     onProgrammeClick: (EpgEntity) -> Unit = {}
@@ -149,7 +151,7 @@ private fun GuideEntry(
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     if (isLive) {
                         Text(
-                            "AHORA  ",
+                            stringResource(R.string.guide_now) + "  ",
                             style = MaterialTheme.typography.labelSmall,
                             color = if (focused) contentColor else KanalColors.Live
                         )
@@ -177,7 +179,7 @@ private fun GuideEntry(
                 Spacer(Modifier.width(8.dp))
                 Icon(
                     Icons.Outlined.Replay,
-                    contentDescription = "Ver repetición",
+                    contentDescription = stringResource(R.string.guide_replay),
                     tint = contentColor,
                     modifier = Modifier.size(16.dp)
                 )
@@ -186,15 +188,16 @@ private fun GuideEntry(
     }
 }
 
-/** "Hoy" / "Mañana" / "jueves 31 de julio". */
+/** "Hoxe" / "Mañá" / "xoves 31 de xullo". */
+@Composable
 fun dayLabel(dayStart: Long): String {
     val today = Calendar.getInstance().apply {
         set(Calendar.HOUR_OF_DAY, 0); set(Calendar.MINUTE, 0)
         set(Calendar.SECOND, 0); set(Calendar.MILLISECOND, 0)
     }.timeInMillis
     return when (dayStart) {
-        today -> "Hoy"
-        today + 86_400_000L -> "Mañana"
+        today -> stringResource(R.string.common_today)
+        today + 86_400_000L -> stringResource(R.string.common_tomorrow)
         else -> formatDayShort(dayStart)
     }
 }

@@ -1,0 +1,352 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Languages -->
+    <string name="language">Language</string>
+    <string name="language_description">Kanal follows the television\'s language. Anything it has no translation for shows in Galician.</string>
+    <string name="language_auto">Automatic</string>
+    <string name="language_galego">Galego</string>
+    <string name="language_castelan">Español</string>
+    <string name="language_english">English</string>
+
+    <!-- Navigation -->
+    <string name="nav_home">Home</string>
+    <string name="nav_live">Live TV</string>
+    <string name="nav_guide">Guide</string>
+    <string name="nav_movies">Films</string>
+    <string name="nav_series">Series</string>
+    <string name="nav_favorites">Favourites</string>
+    <string name="nav_search">Search</string>
+    <string name="nav_settings">Settings</string>
+
+    <!-- Common -->
+    <string name="common_back">Back</string>
+    <string name="common_close">Close</string>
+    <string name="common_cancel">Cancel</string>
+    <string name="common_save">Save</string>
+    <string name="common_retry">Try again</string>
+    <string name="common_loading">Loading…</string>
+    <string name="common_failed">Something went wrong</string>
+    <string name="common_all_f">All</string>
+    <string name="common_all_m">All</string>
+    <string name="common_now">Now</string>
+    <string name="common_today">Today</string>
+    <string name="common_tomorrow">Tomorrow</string>
+    <string name="common_live_badge">LIVE</string>
+    <string name="common_no_guide">No guide</string>
+    <string name="common_favorite">Favourite</string>
+    <string name="common_channels">Channels</string>
+    <string name="common_movies">Films</string>
+    <string name="common_series">Series</string>
+    <string name="common_search_hint">Search…</string>
+    <string name="common_sure">Sure?</string>
+    <string name="common_working">Working…</string>
+
+    <plurals name="count_channels">
+        <item quantity="one">%d channel</item>
+        <item quantity="other">%d channels</item>
+    </plurals>
+    <plurals name="count_movies">
+        <item quantity="one">%d film</item>
+        <item quantity="other">%d films</item>
+    </plurals>
+    <plurals name="count_series">
+        <item quantity="one">%d series</item>
+        <item quantity="other">%d series</item>
+    </plurals>
+    <plurals name="count_programmes">
+        <item quantity="one">%d programme</item>
+        <item quantity="other">%d programmes</item>
+    </plurals>
+
+    <!-- Home -->
+    <string name="home_morning">Good morning</string>
+    <string name="home_afternoon">Good afternoon</string>
+    <string name="home_evening">Good evening</string>
+    <string name="home_preparing">Getting your television ready…</string>
+    <string name="home_go_live">Go to live TV</string>
+    <string name="home_refresh">Refresh</string>
+    <string name="home_syncing">Syncing…</string>
+    <string name="home_sync_now">Sync now</string>
+    <string name="home_empty_title">Nothing here yet</string>
+    <string name="home_empty_body">Sync the source to download channels, films and series.</string>
+    <string name="home_continue">Carry on watching</string>
+    <string name="home_recent">Watched recently</string>
+    <string name="home_favorite_channels">Favourite channels</string>
+    <string name="home_new_movies">Films added</string>
+    <string name="home_new_series">Series added</string>
+    <string name="home_see_all">See all</string>
+    <string name="home_kind_live">Live</string>
+    <string name="home_kind_movie">Film</string>
+    <string name="home_kind_series">Series</string>
+    <string name="home_continue_watching">carry on watching</string>
+
+    <!-- Live TV -->
+    <string name="live_all_channels">All channels</string>
+    <string name="live_no_channels">No channels</string>
+    <string name="live_sync_hint">Sync the source from Settings.</string>
+    <string name="live_pick_channel">Pick a channel</string>
+    <string name="live_pick_channel_body">Move through the list to see the preview and the guide.</string>
+    <string name="live_no_favorites">No favourites</string>
+    <string name="live_no_favorites_body">Star a channel to keep it here.</string>
+    <string name="live_watch_now">Watch now</string>
+    <string name="live_schedule">Schedule</string>
+    <string name="live_add_favorite">Add to favourites</string>
+    <string name="live_remove_favorite">Remove from favourites</string>
+    <string name="live_channel_number">Channel %s</string>
+    <string name="live_next_up">Next · %1$s %2$s</string>
+    <string name="live_preview_failed">Could not load the preview</string>
+
+    <!-- Guide -->
+    <string name="guide_building">Building the guide…</string>
+    <string name="guide_no_channels">No channels</string>
+    <string name="guide_no_guide_body">The provider sent no schedule for these channels.</string>
+    <string name="guide_no_guide_hint">Try refreshing the guide from Settings.</string>
+    <string name="guide_no_guide_slot">No guide for this slot</string>
+    <string name="guide_now">NOW</string>
+    <string name="guide_channel_empty">There is no guide for this channel.</string>
+    <string name="guide_replay">Watch again</string>
+
+    <!-- Programme sheet -->
+    <string name="programme_no_description">The provider sent no description for this programme.</string>
+    <string name="programme_watch_channel">Watch channel</string>
+    <string name="programme_starts_in">starts in %s</string>
+    <string name="programme_remaining">%s left</string>
+    <string name="programme_finished">already aired</string>
+
+    <!-- Player -->
+    <string name="player_guide">Guide</string>
+    <string name="player_adjust">Fit</string>
+    <string name="player_audio_subtitles">Audio and subtitles</string>
+    <string name="player_audio">Audio</string>
+    <string name="player_subtitles">Subtitles</string>
+    <string name="player_no_subtitles">No subtitles</string>
+    <string name="player_details">Details</string>
+    <string name="player_play">Play</string>
+    <string name="player_pause">Pause</string>
+    <string name="player_zoom">Zoom</string>
+    <string name="player_stretch">Stretch</string>
+    <string name="player_next_label">NEXT</string>
+    <string name="player_no_guide">The provider sends no guide for this channel.</string>
+    <string name="player_no_audio_tracks">No other audio tracks.</string>
+    <string name="player_no_subtitle_tracks">This stream carries no subtitles.</string>
+    <string name="player_track_number">Track %d</string>
+    <string name="player_reconnecting">Reconnecting… (%d)</string>
+    <string name="player_hint_live">Up and down change channel · OK opens the controls and the guide · BACK exits</string>
+    <string name="player_hint_vod">Left and right ±10 s · OK opens the controls · BACK exits</string>
+    <string name="player_hint_controls">Left and right move between buttons · BACK returns to the video</string>
+
+    <!-- Playback errors -->
+    <string name="error_no_source">No source is active.</string>
+    <string name="error_not_found">Content not found.</string>
+    <string name="error_no_connection">Could not reach the server.</string>
+    <string name="error_gone">The stream no longer exists on the server.</string>
+    <string name="error_rejected">The server refused the stream. Too many open connections?</string>
+    <string name="error_decode">This device cannot decode this stream.</string>
+    <string name="error_container">The server sends no video in any recognisable format. Usually a dead channel or the connection limit being reached.</string>
+    <string name="error_generic">Could not play it (%s).</string>
+
+    <!-- Favourites -->
+    <string name="favorites_empty_title">Nothing starred yet</string>
+    <string name="favorites_empty_body">Use the star on a channel, film or series to keep it within reach.</string>
+
+    <!-- Search -->
+    <string name="search_hint">Channel, film or series…</string>
+    <string name="search_searching">Searching…</string>
+    <string name="search_min_letters">Type at least two letters</string>
+    <string name="search_help">Kanal searches the channels, films and series of the active source.</string>
+    <string name="search_no_results">No results</string>
+    <string name="search_try_other">Try another word.</string>
+
+    <!-- Catalogue -->
+    <string name="catalog_categories">Categories</string>
+    <string name="catalog_empty_title">Nothing here</string>
+    <string name="catalog_empty_body">Sync the source or try another category.</string>
+
+    <!-- Details -->
+    <string name="detail_loading">Loading details…</string>
+    <string name="detail_loading_episodes">Loading episodes…</string>
+    <string name="detail_play">Play</string>
+    <string name="detail_resume">Carry on from %s</string>
+    <string name="detail_add_favorite">Add to favourites</string>
+    <string name="detail_in_favorites">In favourites</string>
+    <string name="detail_season">Season %d</string>
+    <string name="detail_director">Director: %s</string>
+    <string name="detail_cast">Cast: %s</string>
+    <string name="detail_no_episodes">This series has no episodes available.</string>
+    <string name="detail_movie_not_found">Film not found.</string>
+    <string name="detail_series_not_found">Series not found.</string>
+
+    <!-- Adding a source -->
+    <string name="setup_title_new">Add your first source</string>
+    <string name="setup_title_edit">Edit source</string>
+    <string name="setup_intro">Kanal connects to an Xtream Codes panel (Dispatcharr included) or to an M3U list. The schedule is downloaded in XMLTV format.</string>
+    <string name="setup_xtream">Xtream Codes</string>
+    <string name="setup_m3u">M3U list</string>
+    <string name="setup_name">Name</string>
+    <string name="setup_name_placeholder">My provider</string>
+    <string name="setup_server_url">Server URL</string>
+    <string name="setup_server_url_hint">Paste it as it is; a trailing /player_api.php is trimmed for you.</string>
+    <string name="setup_server_placeholder">http://mydomain.com:8080</string>
+    <string name="setup_m3u_url">M3U list URL</string>
+    <string name="setup_m3u_placeholder">http://…/list.m3u</string>
+    <string name="setup_user">Username</string>
+    <string name="setup_password">Password</string>
+    <string name="setup_epg_url">Guide URL (optional)</string>
+    <string name="setup_epg_url_hint">Left empty, the server\'s own xmltv.php is used.</string>
+    <string name="setup_epg_url_m3u">XMLTV guide URL (optional)</string>
+    <string name="setup_epg_url_m3u_hint">If the list advertises url-tvg, Kanal takes it from there.</string>
+    <string name="setup_user_agent">User-Agent (optional)</string>
+    <string name="setup_user_agent_hint">Some providers only answer a particular agent.</string>
+    <string name="setup_save_start">Save and start</string>
+    <string name="setup_save_sync">Save and sync</string>
+    <string name="setup_test">Test connection</string>
+    <string name="setup_tip">Tip: paste the server URL as it is (http://host:port). A trailing /player_api.php or query parameters get trimmed for you.</string>
+    <string name="setup_connecting">Connecting…</string>
+    <string name="setup_saving">Saving…</string>
+    <string name="setup_connected">Connected as %1$s. Status: %2$s</string>
+    <string name="setup_list_ok">The list answers correctly.</string>
+    <string name="setup_connect_failed">Could not connect.</string>
+
+    <!-- Settings -->
+    <string name="settings_title">Settings</string>
+    <string name="settings_sources">Sources</string>
+    <string name="settings_add_source">Add source</string>
+    <string name="settings_sync_all">Sync everything</string>
+    <string name="settings_sync_guide_only">Refresh the guide only</string>
+    <string name="settings_use">Use</string>
+    <string name="settings_edit">Edit</string>
+    <string name="settings_delete">Delete</string>
+    <string name="settings_active">active</string>
+    <string name="settings_last_sync">last synced %s</string>
+    <string name="settings_never_synced">never synced</string>
+
+    <string name="settings_playback">Playback</string>
+    <string name="settings_stream_format">Stream format</string>
+    <string name="settings_stream_format_desc">MPEG-TS suits most panels; HLS copes better with slow networks.</string>
+    <string name="stream_format_ts">MPEG-TS (.ts)</string>
+    <string name="stream_format_hls">HLS (.m3u8)</string>
+    <string name="settings_buffer">Buffer</string>
+    <string name="settings_buffer_desc">A small buffer zaps faster; a large one rides out dropouts better.</string>
+    <string name="buffer_low">Small (fast zapping)</string>
+    <string name="buffer_normal">Normal</string>
+    <string name="buffer_high">Large (unstable connection)</string>
+    <string name="buffer_maximum">Largest (server with dropouts)</string>
+    <string name="settings_preview">Preview in the channel list</string>
+    <string name="settings_preview_desc">Plays the focused channel in the right-hand panel after a moment.</string>
+    <string name="settings_resilient">Ride out server dropouts</string>
+    <string name="settings_resilient_desc">If the stream breaks, reconnects on its own several times instead of erroring, and insists longer on network failures. Pair it with the largest buffer if your provider is marginal.</string>
+    <string name="settings_keep_channel">Remember the last channel</string>
+    <string name="settings_keep_channel_desc">Leaving a channel with BACK keeps it playing in the preview. From the list, BACK puts it back to full screen; twice in a row exits.</string>
+    <string name="settings_user_agent">Default User-Agent</string>
+    <string name="settings_user_agent_desc">Some providers block agents they do not know.</string>
+
+    <string name="settings_guide_content">Guide and content</string>
+    <string name="settings_epg_days">Days of guide to download</string>
+    <string name="settings_epg_days_desc">More days means a slower sync and more space used.</string>
+    <string name="settings_auto_sync">Automatic sync</string>
+    <string name="settings_auto_sync_desc">How often the catalogue is refreshed when the app opens.</string>
+    <string name="settings_never">Never</string>
+    <string name="settings_hours">%d h</string>
+    <string name="settings_hide_adult">Hide adult content</string>
+    <string name="settings_hide_adult_desc">Filters out categories marked XXX or 18+.</string>
+
+    <!-- Shutdown and saving -->
+    <string name="settings_saving">Shutdown and saving</string>
+    <string name="settings_sleep_timer">Sleep timer</string>
+    <string name="settings_sleep_timer_desc">Kanal closes when the countdown ends. Meant for falling asleep in front of a film.</string>
+    <string name="settings_sleep_minutes">%d min</string>
+    <string name="settings_sleep_custom">Custom minutes</string>
+    <string name="settings_sleep_custom_hint">Between 1 and 720 minutes.</string>
+    <string name="settings_sleep_start">Start</string>
+    <string name="settings_sleep_cancel">Cancel timer</string>
+    <string name="settings_sleep_running">Closing in %s</string>
+    <string name="settings_still_watching">Ask whether you are still there</string>
+    <string name="settings_still_watching_desc">After an hour without touching the remote, Kanal asks whether you are still there and closes if you do not answer. Saves data and power when the television is left alone.</string>
+
+    <string name="sleep_closing_in">Kanal closes in %d s</string>
+    <string name="sleep_keep_watching">Keep watching</string>
+    <string name="still_watching_title">Still there?</string>
+    <string name="still_watching_body">Nobody has touched the remote for an hour. Kanal closes in %d s to save data and power.</string>
+    <string name="still_watching_yes">Yes, still here</string>
+
+    <!-- App -->
+    <string name="settings_app">App</string>
+    <string name="settings_auto_update">Check for updates automatically</string>
+    <string name="settings_auto_update_desc">Checks the GitHub releases when the app opens.</string>
+    <string name="settings_verbose_http">Detailed network log</string>
+    <string name="settings_verbose_http_desc">Records every HTTP request. Useful for diagnosis, noisy day to day.</string>
+    <string name="settings_version">Installed version: %s</string>
+    <string name="settings_version_available">%s available</string>
+    <string name="settings_check_updates">Check for updates</string>
+    <string name="settings_checking">Checking…</string>
+    <string name="settings_download_install">Download and install</string>
+    <string name="settings_downloading">Downloading… %d%%</string>
+    <string name="settings_view_log">View log</string>
+    <string name="settings_clear_history">Clear history</string>
+    <string name="settings_clear_cache">Empty the content cache</string>
+
+    <!-- Messages -->
+    <string name="msg_source_deleted">Source “%s” deleted.</string>
+    <string name="msg_guide_updated">Guide refreshed: %s.</string>
+    <string name="msg_guide_failed">Could not refresh the guide.</string>
+    <string name="msg_sync_done">Done: %1$s, %2$s, %3$s, %4$s.</string>
+    <string name="msg_cache_cleared">Cache emptied. Sync to download the content again.</string>
+    <string name="msg_history_cleared">History cleared.</string>
+
+    <!-- Updates -->
+    <string name="update_available">Kanal %s available</string>
+    <string name="update_apk_size">%s APK</string>
+    <string name="update_now">Update</string>
+    <string name="update_later">Not now</string>
+    <string name="update_downloading">Downloading…</string>
+    <string name="update_downloading_pct">Downloading… %d%%</string>
+    <string name="update_installing">Installing…</string>
+    <string name="update_failed">Could not download the update.</string>
+    <string name="update_permission">Allow Kanal to install apps and try again.</string>
+    <string name="update_up_to_date">You already have the latest version (%s).</string>
+
+    <!-- Log -->
+    <string name="logs_title">Log</string>
+    <string name="logs_all">Everything</string>
+    <string name="logs_info">Info</string>
+    <string name="logs_warnings">Warnings</string>
+    <string name="logs_errors">Errors</string>
+    <string name="logs_reload">Reload</string>
+    <string name="logs_share">Share</string>
+    <string name="logs_share_title">Kanal log</string>
+    <string name="logs_export">Export to a file</string>
+    <string name="logs_exporting">Exporting…</string>
+    <string name="logs_clear">Clear</string>
+    <string name="logs_empty">Nothing logged yet.</string>
+    <string name="logs_cleared">Log cleared.</string>
+    <string name="logs_saved">Saved to %s</string>
+    <string name="logs_export_failed">Could not export the log.</string>
+    <string name="logs_size">The file is %d characters long.</string>
+
+    <string name="update_error_http">GitHub answered %s</string>
+    <string name="update_error_empty">Empty response from GitHub</string>
+    <string name="update_error_no_apk">The published release has no APK</string>
+    <string name="update_error_generic">Could not check for updates: %s</string>
+
+    <!-- Syncing -->
+    <string name="sync_checking_account">Checking the account…</string>
+    <string name="sync_categories">Downloading categories…</string>
+    <string name="sync_channels">Downloading channels…</string>
+    <string name="sync_movies">Downloading films…</string>
+    <string name="sync_series">Downloading series…</string>
+    <string name="sync_list">Downloading the list…</string>
+    <string name="sync_reading_list">Reading the list… (%d entries)</string>
+    <string name="sync_saving_channels">Saving channels…</string>
+    <string name="sync_guide">Downloading the guide…</string>
+    <string name="sync_failed">Could not sync: %s</string>
+    <string name="sync_failed_unknown">Could not sync.</string>
+
+    <!-- Catalogue order -->
+    <string name="sort_default">Provider order</string>
+    <string name="sort_name">Name (A-Z)</string>
+    <string name="sort_recent">Recently added</string>
+    <string name="sort_rating">Rating</string>
+
+    <string name="setup_connected_full">Connected as %1$s. Status: %2$s · %3$d/%4$d connections</string>
+    <string name="setup_connect_failed_detail">Could not connect: %s</string>
+</resources>

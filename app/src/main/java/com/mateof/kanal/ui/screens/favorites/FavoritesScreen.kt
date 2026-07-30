@@ -21,6 +21,8 @@ import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewModelScope
+import androidx.compose.ui.res.stringResource
+import com.mateof.kanal.R
 import com.mateof.kanal.data.db.ChannelEntity
 import com.mateof.kanal.data.db.MovieEntity
 import com.mateof.kanal.data.db.SeriesEntity
@@ -91,7 +93,7 @@ fun FavoritesScreen(
     ) {
         item {
             Column(Modifier.padding(start = contentInset)) {
-                Text("Favoritos", style = MaterialTheme.typography.headlineMedium, color = KanalColors.OnBackground)
+                Text(stringResource(R.string.nav_favorites), style = MaterialTheme.typography.headlineMedium, color = KanalColors.OnBackground)
                 Spacer(Modifier.height(6.dp))
                 Text(
                     "${channels.size} canales · ${movies.size} películas · ${series.size} series",
@@ -104,8 +106,8 @@ fun FavoritesScreen(
         if (empty) {
             item {
                 MessageState(
-                    title = "Aún no has marcado nada",
-                    description = "Usa el botón de estrella en un canal, película o serie para tenerlo siempre a mano.",
+                    title = stringResource(R.string.favorites_empty_title),
+                    description = stringResource(R.string.favorites_empty_body),
                     icon = Icons.Filled.Star,
                     modifier = Modifier.height(380.dp)
                 )
@@ -114,7 +116,7 @@ fun FavoritesScreen(
 
         if (channels.isNotEmpty()) {
             item {
-                CardRow(title = "Canales") {
+                CardRow(title = stringResource(R.string.common_channels)) {
                     items(channels, key = { it.streamId }) { channel ->
                         ChannelCard(
                             name = channel.name,
@@ -130,7 +132,7 @@ fun FavoritesScreen(
         }
         if (movies.isNotEmpty()) {
             item {
-                CardRow(title = "Películas") {
+                CardRow(title = stringResource(R.string.common_movies)) {
                     items(movies, key = { it.streamId }) { movie ->
                         PosterCard(
                             title = movie.name,
@@ -145,7 +147,7 @@ fun FavoritesScreen(
         }
         if (series.isNotEmpty()) {
             item {
-                CardRow(title = "Series") {
+                CardRow(title = stringResource(R.string.common_series)) {
                     items(series, key = { it.seriesId }) { serie ->
                         PosterCard(
                             title = serie.name,

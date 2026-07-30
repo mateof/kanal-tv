@@ -41,6 +41,8 @@ import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.res.stringResource
+import com.mateof.kanal.R
 import com.mateof.kanal.core.formatClock
 import com.mateof.kanal.core.formatDay
 import com.mateof.kanal.core.formatDuration
@@ -148,7 +150,7 @@ fun ProgrammeDialog(
                             .padding(horizontal = 10.dp, vertical = 3.dp)
                     ) {
                         Text(
-                            "EN DIRECTO",
+                            stringResource(R.string.common_live_badge),
                             style = MaterialTheme.typography.labelSmall,
                             color = Color.White
                         )
@@ -189,7 +191,7 @@ fun ProgrammeDialog(
             ) {
                 Text(
                     programme.description.ifBlank {
-                        "El proveedor no ha enviado descripción para este programa."
+                        stringResource(R.string.programme_no_description)
                     },
                     style = MaterialTheme.typography.bodyLarge,
                     color = if (programme.description.isBlank()) {
@@ -204,22 +206,23 @@ fun ProgrammeDialog(
             Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                 if (onGoToChannel != null) {
                     KanalButton(
-                        text = "Ver canal",
+                        text = stringResource(R.string.programme_watch_channel),
                         onClick = onGoToChannel,
                         icon = Icons.Outlined.PlayArrow,
                         tone = ButtonTone.Primary
                     )
                 }
                 if (detail.canReplay && onReplay != null) {
-                    KanalButton("Ver repetición", onReplay, icon = Icons.Outlined.Replay)
+                    KanalButton(stringResource(R.string.guide_replay), onReplay, icon = Icons.Outlined.Replay)
                 }
-                KanalButton("Cerrar", onDismiss, modifier = Modifier.focusRequester(focus))
+                KanalButton(stringResource(R.string.common_close), onDismiss, modifier = Modifier.focusRequester(focus))
             }
         }
     }
 }
 
-/** "Hoy · 23:00 – 00:00 · 1 h · quedan 24 min · Cine". */
+/** "Hoxe · 23:00 – 00:00 · 1 h · quedan 24 min · Cine". */
+@Composable
 private fun buildDetails(programme: EpgEntity, nowMillis: Long): String {
     val parts = mutableListOf<String>()
     parts += formatDay(programme.start)
@@ -230,12 +233,12 @@ private fun buildDetails(programme: EpgEntity, nowMillis: Long): String {
 
     when {
         programme.start > nowMillis ->
-            parts += "empieza en ${formatDuration(programme.start - nowMillis)}"
+            parts += stringResource(R.string.programme_starts_in, formatDuration(programme.start - nowMillis))
 
         programme.stop > nowMillis ->
-            parts += "quedan ${formatDuration(programme.stop - nowMillis)}"
+            parts += stringResource(R.string.programme_remaining, formatDuration(programme.stop - nowMillis))
 
-        else -> parts += "ya emitido"
+        else -> parts += stringResource(R.string.programme_finished)
     }
 
     if (programme.category.isNotBlank()) parts += programme.category

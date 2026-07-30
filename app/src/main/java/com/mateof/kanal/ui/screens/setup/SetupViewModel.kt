@@ -2,6 +2,8 @@ package com.mateof.kanal.ui.screens.setup
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.mateof.kanal.R
+import com.mateof.kanal.core.UiText
 import com.mateof.kanal.core.log.FileLogger
 import com.mateof.kanal.data.model.Source
 import com.mateof.kanal.data.model.SourceType
@@ -30,9 +32,9 @@ data class SetupState(
     val epgUrl: String = "",
     val userAgent: String = "",
     val busy: Boolean = false,
-    val busyLabel: String = "",
+    val busyLabel: UiText? = null,
     val progress: Float = -1f,
-    val message: String = "",
+    val message: UiText? = null,
     val messageIsError: Boolean = false,
     val finished: Boolean = false
 ) {
@@ -74,9 +76,9 @@ class SetupViewModel @Inject constructor(
         }
     }
 
-    fun setType(value: SourceType) = update { it.copy(type = value, message = "") }
+    fun setType(value: SourceType) = update { it.copy(type = value, message = null) }
     fun setName(value: String) = update { it.copy(name = value) }
-    fun setUrl(value: String) = update { it.copy(url = value, message = "") }
+    fun setUrl(value: String) = update { it.copy(url = value, message = null) }
     fun setUsername(value: String) = update { it.copy(username = value) }
     fun setPassword(value: String) = update { it.copy(password = value) }
     fun setEpgUrl(value: String) = update { it.copy(epgUrl = value) }
@@ -85,24 +87,32 @@ class SetupViewModel @Inject constructor(
     fun test() {
         val current = _state.value
         viewModelScope.launch {
-            _state.value = current.copy(busy = true, busyLabel = "Conectando…", message = "")
+            _state.value = current.copy(busy = true, busyLabel = UiText(R.string.setup_connecting), message = null)
             val source = current.toSource()
             val result = runCatching {
                 if (source.type == SourceType.XTREAM) {
                     val account = xtream.authenticate(source)
-                    buildString {
-                        append("Conectado como ${account.username}. Estado: ${account.status}")
-                        if (account.maxConnections > 0) {
-                            append(" · ${account.activeConnections}/${account.maxConnections} conexiones")
-                        }
+                    if (account.maxConnections > 0) {
+                        UiText(
+                            R.string.setup_connected_full,
+                            account.username,
+                            account.status,
+                            account.activeConnections,
+                            account.maxConnections
+                        )
+                    } else {
+                        UiText(R.string.setup_connected, account.username, account.status)
                     }
                 } else {
-                    "La lista responde correctamente."
+                    UiText(R.string.setup_list_ok)
                 }
             }
             _state.value = _state.value.copy(
                 busy = false,
-                message = result.getOrElse { it.message ?: "No se pudo conectar." },
+                message = result.getOrElse { failure ->
+                    failure.message?.let { UiText(R.string.setup_connect_failed_detail, it) }
+                        ?: UiText(R.string.setup_connect_failed)
+                },
                 messageIsError = result.isFailure
             )
         }
@@ -111,7 +121,7 @@ class SetupViewModel @Inject constructor(
     fun save() {
         val current = _state.value
         viewModelScope.launch {
-            _state.value = current.copy(busy = true, busyLabel = "Guardando…", message = "")
+            _state.value = current.copy(busy = true, busyLabel = UiText(R.string.setup_saving), message = null)
             val source = current.toSource()
             prefs.upsertSource(source)
             prefs.setActiveSource(source.id)

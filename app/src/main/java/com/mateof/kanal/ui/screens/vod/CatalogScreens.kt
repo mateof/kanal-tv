@@ -34,6 +34,8 @@ import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.paging.compose.collectAsLazyPagingItems
+import androidx.compose.ui.res.stringResource
+import com.mateof.kanal.R
 import com.mateof.kanal.data.db.CategoryEntity
 import com.mateof.kanal.data.repo.CatalogSort
 import com.mateof.kanal.ui.components.FocusableSurface
@@ -53,7 +55,7 @@ fun MoviesScreen(onOpen: (String) -> Unit) {
     val items = vm.movies.collectAsLazyPagingItems()
 
     CatalogLayout(
-        title = "Películas",
+        title = stringResource(R.string.nav_movies),
         icon = Icons.Outlined.Movie,
         categories = categories,
         selectedCategory = selected,
@@ -85,7 +87,7 @@ fun SeriesScreen(onOpen: (String) -> Unit) {
     val items = vm.series.collectAsLazyPagingItems()
 
     CatalogLayout(
-        title = "Series",
+        title = stringResource(R.string.nav_series),
         icon = Icons.Outlined.Tv,
         categories = categories,
         selectedCategory = selected,
@@ -145,14 +147,14 @@ private fun CatalogLayout(
         ) {
             item {
                 Text(
-                    "Categorías",
+                    stringResource(R.string.catalog_categories),
                     style = MaterialTheme.typography.labelMedium,
                     color = KanalColors.OnSurfaceFaint,
                     modifier = Modifier.padding(start = 12.dp, bottom = 10.dp)
                 )
             }
             item {
-                CategoryRow("Todas", selectedCategory.isEmpty()) { onSelectCategory("") }
+                CategoryRow(stringResource(R.string.common_all_f), selectedCategory.isEmpty()) { onSelectCategory("") }
             }
             items(categories, key = { it.categoryId }) { category ->
                 CategoryRow(category.name, category.categoryId == selectedCategory) {
@@ -180,13 +182,13 @@ private fun CatalogLayout(
                         color = KanalColors.OnSurfaceFaint
                     )
                 }
-                KanalButton(text = sort.label, onClick = onCycleSort, icon = Icons.Outlined.Sort)
+                KanalButton(text = stringResource(sort.labelRes), onClick = onCycleSort, icon = Icons.Outlined.Sort)
             }
 
             if (itemCount == 0) {
                 MessageState(
-                    title = "Nada por aquí",
-                    description = "Sincroniza la fuente o prueba con otra categoría.",
+                    title = stringResource(R.string.catalog_empty_title),
+                    description = stringResource(R.string.catalog_empty_body),
                     icon = icon
                 )
             } else {
@@ -230,7 +232,7 @@ private fun CompactCatalog(
                     color = KanalColors.OnSurfaceFaint
                 )
             }
-            KanalButton(text = sort.label, onClick = onCycleSort, icon = Icons.Outlined.Sort)
+            KanalButton(text = stringResource(sort.labelRes), onClick = onCycleSort, icon = Icons.Outlined.Sort)
         }
 
         LazyRow(
@@ -239,7 +241,7 @@ private fun CompactCatalog(
         ) {
             item {
                 KanalChip(
-                    label = "Todas",
+                    label = stringResource(R.string.common_all_f),
                     selected = selectedCategory.isEmpty(),
                     onClick = { onSelectCategory("") }
                 )
@@ -256,8 +258,8 @@ private fun CompactCatalog(
 
         if (itemCount == 0) {
             MessageState(
-                title = "Nada por aquí",
-                description = "Sincroniza la fuente o prueba con otra categoría.",
+                title = stringResource(R.string.catalog_empty_title),
+                description = stringResource(R.string.catalog_empty_body),
                 icon = icon
             )
         } else {

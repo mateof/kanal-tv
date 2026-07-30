@@ -28,6 +28,8 @@ import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.res.stringResource
+import com.mateof.kanal.R
 import com.mateof.kanal.ui.theme.KanalColors
 
 /**
@@ -96,7 +98,7 @@ fun SearchField(
     value: String,
     onValueChange: (String) -> Unit,
     modifier: Modifier = Modifier,
-    placeholder: String = "Buscar…"
+    placeholder: String = stringResource(R.string.common_search_hint)
 ) {
     val focusManager = LocalFocusManager.current
     OutlinedTextField(

@@ -1,5 +1,7 @@
 package com.mateof.kanal.data.repo
 
+import com.mateof.kanal.R
+import com.mateof.kanal.core.UiText
 import com.mateof.kanal.core.asArrayOrEmpty
 import com.mateof.kanal.core.asObject
 import com.mateof.kanal.core.bool
@@ -55,9 +57,9 @@ data class SyncSummary(
 
 sealed interface SyncState {
     data object Idle : SyncState
-    data class Running(val step: String, val progress: Float = -1f) : SyncState
+    data class Running(val step: UiText, val progress: Float = -1f) : SyncState
     data class Done(val at: Long, val summary: SyncSummary) : SyncState
-    data class Failed(val message: String) : SyncState
+    data class Failed(val message: UiText) : SyncState
 }
 
 /**
@@ -109,14 +111,17 @@ class SyncRepository @Inject constructor(
                 SyncState.Done(System.currentTimeMillis(), summary).also { _state.value = it }
             } catch (e: Exception) {
                 logger.e("Sync", "Sincronización fallida", e)
-                SyncState.Failed(e.message ?: "Error desconocido").also { _state.value = it }
+                SyncState.Failed(
+                    e.message?.let { UiText(R.string.sync_failed, it) }
+                        ?: UiText(R.string.sync_failed_unknown)
+                ).also { _state.value = it }
             }
         }
 
     // --- Xtream --------------------------------------------------------------
 
     private suspend fun syncXtream(source: Source): SyncSummary {
-        step("Comprobando la cuenta…")
+        step(UiText(R.string.sync_checking_account))
         val account = xtream.authenticate(source)
         logger.i(
             "Sync",
@@ -124,12 +129,12 @@ class SyncRepository @Inject constructor(
                 "${account.activeConnections}/${account.maxConnections} conexiones"
         )
 
-        step("Descargando categorías…", 0.05f)
+        step(UiText(R.string.sync_categories), 0.05f)
         val liveNames = storeCategories(source.id, "LIVE", xtream.categories(source, XtreamCatalog.LIVE))
         val vodNames = storeCategories(source.id, "MOVIE", xtream.categories(source, XtreamCatalog.VOD))
         val seriesNames = storeCategories(source.id, "SERIES", xtream.categories(source, XtreamCatalog.SERIES))
 
-        step("Descargando canales…", 0.15f)
+        step(UiText(R.string.sync_channels), 0.15f)
         val channels = xtream.items(source, XtreamCatalog.LIVE, liveNames.keys.toList())
             .mapIndexedNotNull { index, item ->
                 val streamId = item.firstStr("stream_id", "id")
@@ -154,7 +159,7 @@ class SyncRepository @Inject constructor(
             }
         replaceChannels(source.id, channels)
 
-        step("Descargando películas…", 0.45f)
+        step(UiText(R.string.sync_movies), 0.45f)
         val movies = xtream.items(source, XtreamCatalog.VOD, vodNames.keys.toList())
             .mapIndexedNotNull { index, item ->
                 val streamId = item.firstStr("stream_id", "id")
@@ -179,7 +184,7 @@ class SyncRepository @Inject constructor(
             }
         replaceMovies(source.id, movies)
 
-        step("Descargando series…", 0.75f)
+        step(UiText(R.string.sync_series), 0.75f)
         val series = xtream.items(source, XtreamCatalog.SERIES, seriesNames.keys.toList())
             .mapIndexedNotNull { index, item ->
                 val seriesId = item.firstStr("series_id", "id")
@@ -275,7 +280,7 @@ class SyncRepository @Inject constructor(
     // --- M3U -----------------------------------------------------------------
 
     private suspend fun syncM3u(source: Source): SyncSummary {
-        step("Descargando la lista…")
+        step(UiText(R.string.sync_list))
         val request = Request.Builder()
             .url(source.url)
             .header("User-Agent", source.userAgent.ifBlank { "Kanal/1.0" })
@@ -309,12 +314,12 @@ class SyncRepository @Inject constructor(
                         }
                     }
                     index++
-                    if (index % 5_000 == 0) step("Leyendo la lista… ($index entradas)")
+                    if (index % 5_000 == 0) step(UiText(R.string.sync_reading_list, index))
                 }
             }
         }
 
-        step("Guardando canales…", 0.6f)
+        step(UiText(R.string.sync_saving_channels), 0.6f)
         db.categories().replace(
             source.id, "LIVE", categoriesOf(source.id, "LIVE", channels.map { it.categoryName })
         )
@@ -429,7 +434,7 @@ class SyncRepository @Inject constructor(
             return@withContext 0
         }
 
-        step("Descargando la guía…", 0.85f)
+        step(UiText(R.string.sync_guide), 0.85f)
         val settings = prefs.settings.first()
         val now = System.currentTimeMillis()
         val from = now - 12 * HOUR
@@ -526,7 +531,7 @@ class SyncRepository @Inject constructor(
         items.chunked(BATCH).forEach { db.series().insertAll(it) }
     }
 
-    private fun step(text: String, progress: Float = -1f) {
+    private fun step(text: UiText, progress: Float = -1f) {
         _state.value = SyncState.Running(text, progress)
     }
 

@@ -30,7 +30,9 @@ import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import androidx.compose.ui.res.stringResource
 import com.mateof.kanal.R
+import com.mateof.kanal.core.resolve
 import com.mateof.kanal.data.model.SourceType
 import com.mateof.kanal.ui.components.ButtonTone
 import com.mateof.kanal.ui.components.KanalButton
@@ -100,7 +102,7 @@ private fun SetupIntro(isEditing: Boolean, compact: Boolean) {
     )
     Spacer(Modifier.height(if (compact) 12.dp else 20.dp))
     Text(
-        if (isEditing) "Editar fuente" else "Añade tu primera fuente",
+        if (isEditing) stringResource(R.string.setup_title_edit) else stringResource(R.string.setup_title_new),
         style = if (compact) {
             MaterialTheme.typography.headlineSmall
         } else {
@@ -110,16 +112,14 @@ private fun SetupIntro(isEditing: Boolean, compact: Boolean) {
     )
     Spacer(Modifier.height(12.dp))
     Text(
-        "Kanal se conecta a un panel Xtream Codes (incluido Dispatcharr) o a una lista " +
-            "M3U. La guía de programación se descarga en formato XMLTV.",
+        stringResource(R.string.setup_intro),
         style = MaterialTheme.typography.bodyMedium,
         color = KanalColors.OnSurfaceMuted
     )
     if (!compact) {
         Spacer(Modifier.height(24.dp))
         Text(
-            "Consejo: pega la URL del servidor tal cual (http://host:puerto). Si trae " +
-                "/player_api.php o parámetros, Kanal los recorta solo.",
+            stringResource(R.string.setup_tip),
             style = MaterialTheme.typography.bodySmall,
             color = KanalColors.OnSurfaceFaint
         )
@@ -135,12 +135,12 @@ private fun SetupForm(
 ) {
     Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
         KanalChip(
-            label = "Xtream Codes",
+            label = stringResource(R.string.setup_xtream),
             selected = state.type == SourceType.XTREAM,
             onClick = { vm.setType(SourceType.XTREAM) }
         )
         KanalChip(
-            label = "Lista M3U",
+            label = stringResource(R.string.setup_m3u),
             selected = state.type == SourceType.M3U,
             onClick = { vm.setType(SourceType.M3U) }
         )
@@ -149,58 +149,58 @@ private fun SetupForm(
     KanalTextField(
         value = state.name,
         onValueChange = vm::setName,
-        label = "Nombre",
-        placeholder = "Mi proveedor"
+        label = stringResource(R.string.setup_name),
+        placeholder = stringResource(R.string.setup_name_placeholder)
     )
 
     if (state.type == SourceType.XTREAM) {
         KanalTextField(
             value = state.url,
             onValueChange = vm::setUrl,
-            label = "URL del servidor",
-            placeholder = "http://midominio.com:8080",
+            label = stringResource(R.string.setup_server_url),
+            placeholder = stringResource(R.string.setup_server_placeholder),
             supportingText = if (compact) {
-                "Pégala tal cual; si trae /player_api.php se recorta sola."
+                stringResource(R.string.setup_server_url_hint)
             } else {
                 ""
             }
         )
-        KanalTextField(value = state.username, onValueChange = vm::setUsername, label = "Usuario")
+        KanalTextField(value = state.username, onValueChange = vm::setUsername, label = stringResource(R.string.setup_user))
         KanalTextField(
             value = state.password,
             onValueChange = vm::setPassword,
-            label = "Contraseña",
+            label = stringResource(R.string.setup_password),
             isPassword = true
         )
         KanalTextField(
             value = state.epgUrl,
             onValueChange = vm::setEpgUrl,
-            label = "URL de la guía (opcional)",
-            supportingText = "Si se deja vacía se usa xmltv.php del propio servidor."
+            label = stringResource(R.string.setup_epg_url),
+            supportingText = stringResource(R.string.setup_epg_url_hint)
         )
     } else {
         KanalTextField(
             value = state.url,
             onValueChange = vm::setUrl,
-            label = "URL de la lista M3U",
-            placeholder = "http://…/lista.m3u"
+            label = stringResource(R.string.setup_m3u_url),
+            placeholder = stringResource(R.string.setup_m3u_placeholder)
         )
         KanalTextField(
             value = state.epgUrl,
             onValueChange = vm::setEpgUrl,
-            label = "URL de la guía XMLTV (opcional)",
-            supportingText = "Si la lista anuncia url-tvg, Kanal la coge de ahí."
+            label = stringResource(R.string.setup_epg_url_m3u),
+            supportingText = stringResource(R.string.setup_epg_url_m3u_hint)
         )
     }
 
     KanalTextField(
         value = state.userAgent,
         onValueChange = vm::setUserAgent,
-        label = "User-Agent (opcional)",
-        supportingText = "Algunos proveedores sólo responden a un agente concreto."
+        label = stringResource(R.string.setup_user_agent),
+        supportingText = stringResource(R.string.setup_user_agent_hint)
     )
 
-    if (state.message.isNotBlank()) {
+    state.message?.let { messageText ->
         Row(verticalAlignment = Alignment.CenterVertically) {
             Icon(
                 if (state.messageIsError) Icons.Outlined.ErrorOutline else Icons.Outlined.CheckCircle,
@@ -210,7 +210,7 @@ private fun SetupForm(
             )
             Spacer(Modifier.width(10.dp))
             Text(
-                state.message,
+                messageText.resolve(),
                 style = MaterialTheme.typography.bodyMedium,
                 color = if (state.messageIsError) KanalColors.Error else KanalColors.Accent
             )
@@ -218,10 +218,10 @@ private fun SetupForm(
     }
 
     if (state.busy) {
-        StepProgress(state.busyLabel, state.progress)
+        StepProgress(state.busyLabel?.resolve().orEmpty(), state.progress)
     }
 
-    val saveLabel = if (state.isEditing) "Guardar y sincronizar" else "Guardar y empezar"
+    val saveLabel = if (state.isEditing) stringResource(R.string.setup_save_sync) else stringResource(R.string.setup_save_start)
     if (compact) {
         Column(verticalArrangement = Arrangement.spacedBy(10.dp), modifier = Modifier.fillMaxWidth()) {
             KanalButton(
@@ -233,13 +233,13 @@ private fun SetupForm(
                 modifier = Modifier.fillMaxWidth()
             )
             KanalButton(
-                text = "Probar conexión",
+                text = stringResource(R.string.setup_test),
                 onClick = vm::test,
                 enabled = !state.busy && state.canSave,
                 modifier = Modifier.fillMaxWidth()
             )
             KanalButton(
-                text = "Cancelar",
+                text = stringResource(R.string.common_cancel),
                 onClick = onCancel,
                 enabled = !state.busy,
                 modifier = Modifier.fillMaxWidth()
@@ -248,7 +248,7 @@ private fun SetupForm(
     } else {
         Row(horizontalArrangement = Arrangement.spacedBy(14.dp)) {
             KanalButton(
-                text = "Probar conexión",
+                text = stringResource(R.string.setup_test),
                 onClick = vm::test,
                 enabled = !state.busy && state.canSave
             )
@@ -259,7 +259,7 @@ private fun SetupForm(
                 tone = ButtonTone.Primary,
                 enabled = !state.busy && state.canSave
             )
-            KanalButton(text = "Cancelar", onClick = onCancel, enabled = !state.busy)
+            KanalButton(text = stringResource(R.string.common_cancel), onClick = onCancel, enabled = !state.busy)
         }
     }
 }

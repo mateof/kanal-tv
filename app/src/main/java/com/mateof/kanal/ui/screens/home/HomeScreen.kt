@@ -26,6 +26,10 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import androidx.compose.ui.res.pluralStringResource
+import androidx.compose.ui.res.stringResource
+import com.mateof.kanal.R
+import com.mateof.kanal.core.resolve
 import com.mateof.kanal.core.formatClock
 import com.mateof.kanal.data.model.ContentKind
 import com.mateof.kanal.data.repo.SyncState
@@ -68,7 +72,7 @@ fun HomeScreen(
     }
 
     if (state.loading) {
-        LoadingState("Preparando tu tele…")
+        LoadingState(stringResource(R.string.home_preparing))
         return
     }
 
@@ -105,7 +109,7 @@ fun HomeScreen(
 
         if (refreshing) {
             item {
-                val label = (syncState as? SyncState.Running)?.step ?: "Sincronizando…"
+                val label = (syncState as? SyncState.Running)?.step?.resolve() ?: stringResource(R.string.home_syncing)
                 val progress = (syncState as? SyncState.Running)?.progress ?: -1f
                 StepProgress(
                     label,
@@ -118,26 +122,26 @@ fun HomeScreen(
         if (state.isEmpty && !refreshing) {
             item {
                 MessageState(
-                    title = "Todavía no hay contenido",
-                    description = "Sincroniza la fuente para descargar canales, películas y series.",
+                    title = stringResource(R.string.home_empty_title),
+                    description = stringResource(R.string.home_empty_body),
                     icon = Icons.Outlined.LiveTv,
                     modifier = Modifier.height(360.dp)
                 ) {
-                    KanalButton("Sincronizar ahora", vm::refresh, tone = ButtonTone.Primary)
+                    KanalButton(stringResource(R.string.home_sync_now), vm::refresh, tone = ButtonTone.Primary)
                 }
             }
         }
 
         if (state.continueWatching.isNotEmpty()) {
             item {
-                CardRow(title = "Continuar viendo") {
+                CardRow(title = stringResource(R.string.home_continue)) {
                     items(state.continueWatching, key = { it.key }) { entry ->
                         ContinueCard(
                             title = entry.name,
                             subtitle = when (entry.kind) {
-                                ContentKind.SERIES -> "Serie"
-                                ContentKind.MOVIE -> "Película"
-                                ContentKind.LIVE -> "Directo"
+                                ContentKind.SERIES -> stringResource(R.string.home_kind_series)
+                                ContentKind.MOVIE -> stringResource(R.string.home_kind_movie)
+                                ContentKind.LIVE -> stringResource(R.string.home_kind_live)
                             },
                             imageUrl = entry.logo,
                             progress = entry.progress,
@@ -150,7 +154,7 @@ fun HomeScreen(
 
         if (state.favoriteChannels.isNotEmpty()) {
             item {
-                CardRow(title = "Canales favoritos", trailing = "${state.favoriteChannels.size}") {
+                CardRow(title = stringResource(R.string.home_favorite_channels), trailing = "${state.favoriteChannels.size}") {
                     items(state.favoriteChannels, key = { it.streamId }) { channel ->
                         ChannelCard(
                             name = channel.name,
@@ -167,7 +171,7 @@ fun HomeScreen(
 
         if (recentChannels.isNotEmpty()) {
             item {
-                CardRow(title = "Vistos hace poco") {
+                CardRow(title = stringResource(R.string.home_recent)) {
                     items(recentChannels, key = { it.streamId }) { channel ->
                         ChannelCard(
                             name = channel.name,
@@ -183,7 +187,7 @@ fun HomeScreen(
 
         if (state.newMovies.isNotEmpty()) {
             item {
-                CardRow(title = "Películas añadidas", trailing = "Ver todas") {
+                CardRow(title = stringResource(R.string.home_new_movies), trailing = stringResource(R.string.home_see_all)) {
                     items(state.newMovies, key = { it.streamId }) { movie ->
                         PosterCard(
                             title = movie.name,
@@ -199,7 +203,7 @@ fun HomeScreen(
 
         if (state.newSeries.isNotEmpty()) {
             item {
-                CardRow(title = "Series añadidas", trailing = "Ver todas") {
+                CardRow(title = stringResource(R.string.home_new_series), trailing = stringResource(R.string.home_see_all)) {
                     items(state.newSeries, key = { it.seriesId }) { series ->
                         PosterCard(
                             title = series.name,
@@ -219,9 +223,9 @@ fun HomeScreen(
                     modifier = Modifier.padding(start = contentInset, top = 8.dp),
                     horizontalArrangement = Arrangement.spacedBy(14.dp)
                 ) {
-                    KanalButton("Ir a TV en directo", { onNavigate(Routes.LIVE) }, tone = ButtonTone.Primary)
-                    KanalButton("Buscar", { onNavigate(Routes.SEARCH) })
-                    KanalButton("Ajustes", { onNavigate(Routes.SETTINGS) })
+                    KanalButton(stringResource(R.string.home_go_live), { onNavigate(Routes.LIVE) }, tone = ButtonTone.Primary)
+                    KanalButton(stringResource(R.string.nav_search), { onNavigate(Routes.SEARCH) })
+                    KanalButton(stringResource(R.string.nav_settings), { onNavigate(Routes.SETTINGS) })
                 }
             }
         }
@@ -237,13 +241,15 @@ private fun HomeHeader(
     refreshing: Boolean,
     onRefresh: () -> Unit
 ) {
-    val counts = buildString {
-        if (sourceName.isNotBlank()) append(sourceName).append(" · ")
-        append("$channels canales · $movies películas · $series series")
-    }
+    val tally = listOf(
+        pluralStringResource(R.plurals.count_channels, channels, channels),
+        pluralStringResource(R.plurals.count_movies, movies, movies),
+        pluralStringResource(R.plurals.count_series, series, series)
+    ).joinToString(" · ")
+    val counts = if (sourceName.isNotBlank()) "$sourceName · $tally" else tally
     val refreshButton: @Composable () -> Unit = {
         KanalButton(
-            text = if (refreshing) "Sincronizando…" else "Actualizar",
+            text = if (refreshing) stringResource(R.string.home_syncing) else stringResource(R.string.home_refresh),
             onClick = onRefresh,
             icon = Icons.Outlined.Refresh,
             enabled = !refreshing
@@ -301,13 +307,14 @@ private fun HomeHeader(
     }
 }
 
+@Composable
 private fun greeting(): String {
     val hour = java.util.Calendar.getInstance().get(java.util.Calendar.HOUR_OF_DAY)
     return when {
-        hour < 6 -> "Buenas noches"
-        hour < 13 -> "Buenos días"
-        hour < 21 -> "Buenas tardes"
-        else -> "Buenas noches"
+        hour < 6 -> stringResource(R.string.home_evening)
+        hour < 13 -> stringResource(R.string.home_morning)
+        hour < 21 -> stringResource(R.string.home_afternoon)
+        else -> stringResource(R.string.home_evening)
     }
 }
 

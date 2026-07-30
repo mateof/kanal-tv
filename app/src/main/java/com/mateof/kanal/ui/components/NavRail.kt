@@ -35,12 +35,13 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.res.stringResource
 import com.mateof.kanal.R
 import com.mateof.kanal.ui.theme.KanalColors
 
 data class NavItem(
     val route: String,
-    val label: String,
+    @androidx.annotation.StringRes val labelRes: Int,
     val icon: androidx.compose.ui.graphics.vector.ImageVector
 )
 
@@ -155,11 +156,12 @@ private fun NavRailItem(
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.Start
             ) {
-                Icon(item.icon, contentDescription = item.label, tint = tint, modifier = Modifier.size(26.dp))
+                val label = stringResource(item.labelRes)
+                Icon(item.icon, contentDescription = label, tint = tint, modifier = Modifier.size(26.dp))
                 if (expanded) {
                     Spacer(Modifier.width(16.dp))
                     Text(
-                        item.label,
+                        label,
                         style = MaterialTheme.typography.titleSmall,
                         color = tint,
                         maxLines = 1,
@@ -214,7 +216,7 @@ fun BottomNav(
                 ) {
                     Icon(
                         item.icon,
-                        contentDescription = item.label,
+                        contentDescription = stringResource(item.labelRes),
                         tint = tint,
                         modifier = Modifier.size(22.dp)
                     )

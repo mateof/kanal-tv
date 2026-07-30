@@ -27,10 +27,12 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.res.stringResource
+import com.mateof.kanal.R
 import com.mateof.kanal.ui.theme.KanalColors
 
 @Composable
-fun LoadingState(message: String = "Cargando…", modifier: Modifier = Modifier) {
+fun LoadingState(message: String = stringResource(R.string.common_loading), modifier: Modifier = Modifier) {
     Column(
         modifier = modifier.fillMaxSize(),
         horizontalAlignment = Alignment.CenterHorizontally,
@@ -88,7 +90,7 @@ fun ErrorState(
     modifier: Modifier = Modifier,
     action: @Composable (() -> Unit)? = null
 ) = MessageState(
-    title = "Algo ha fallado",
+    title = stringResource(R.string.common_failed),
     description = message,
     icon = Icons.Outlined.ErrorOutline,
     tint = KanalColors.Error,

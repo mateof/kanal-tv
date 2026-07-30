@@ -49,6 +49,10 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.media3.ui.AspectRatioFrameLayout
 import androidx.media3.ui.PlayerView
 import androidx.paging.compose.collectAsLazyPagingItems
+import androidx.compose.ui.res.stringResource
+import com.mateof.kanal.R
+import com.mateof.kanal.core.UiText
+import com.mateof.kanal.core.resolve
 import com.mateof.kanal.core.formatClock
 import com.mateof.kanal.data.db.ChannelEntity
 import com.mateof.kanal.data.db.EpgEntity
@@ -155,14 +159,14 @@ fun LiveScreen(
         ) {
             item {
                 KanalChip(
-                    label = "Todos los canales",
+                    label = stringResource(R.string.live_all_channels),
                     selected = selectedCategory == CATEGORY_ALL,
                     onClick = { vm.selectCategory(CATEGORY_ALL) }
                 )
             }
             item {
                 KanalChip(
-                    label = "Favoritos",
+                    label = stringResource(R.string.nav_favorites),
                     selected = showingFavorites,
                     onClick = { vm.selectCategory(CATEGORY_FAVORITES) }
                 )
@@ -187,8 +191,8 @@ fun LiveScreen(
             if (showingFavorites) {
                 if (favoriteChannels.isEmpty()) {
                     MessageState(
-                        title = "Sin favoritos",
-                        description = "Marca un canal con el botón de estrella para tenerlo aquí.",
+                        title = stringResource(R.string.live_no_favorites),
+                        description = stringResource(R.string.live_no_favorites_body),
                         icon = Icons.Filled.Star
                     )
                 } else {
@@ -225,8 +229,8 @@ fun LiveScreen(
                     if (paged.itemCount == 0) {
                         item {
                             MessageState(
-                                title = "No hay canales",
-                                description = "Sincroniza la fuente desde Ajustes.",
+                                title = stringResource(R.string.live_no_channels),
+                                description = stringResource(R.string.live_sync_hint),
                                 icon = Icons.Outlined.LiveTv,
                                 modifier = Modifier.height(320.dp)
                             )
@@ -304,7 +308,7 @@ private fun CompactLive(
 ) {
     Column(Modifier.fillMaxSize()) {
         Text(
-            "TV en directo",
+            stringResource(R.string.nav_live),
             style = MaterialTheme.typography.headlineSmall,
             color = KanalColors.OnBackground,
             modifier = Modifier.padding(start = 16.dp, end = 16.dp, top = 20.dp, bottom = 12.dp)
@@ -315,14 +319,14 @@ private fun CompactLive(
         ) {
             item {
                 KanalChip(
-                    label = "Todos",
+                    label = stringResource(R.string.common_all_m),
                     selected = selectedCategory == CATEGORY_ALL,
                     onClick = { onSelectCategory(CATEGORY_ALL) }
                 )
             }
             item {
                 KanalChip(
-                    label = "Favoritos",
+                    label = stringResource(R.string.nav_favorites),
                     selected = selectedCategory == CATEGORY_FAVORITES,
                     onClick = { onSelectCategory(CATEGORY_FAVORITES) }
                 )
@@ -340,8 +344,8 @@ private fun CompactLive(
         if (channels != null) {
             if (channels.isEmpty()) {
                 MessageState(
-                    title = "Sin favoritos",
-                    description = "Marca un canal con la estrella para tenerlo aquí.",
+                    title = stringResource(R.string.live_no_favorites),
+                    description = stringResource(R.string.live_no_favorites_body),
                     icon = Icons.Filled.Star
                 )
             } else {
@@ -378,8 +382,8 @@ private fun CompactLive(
                 if (paged.itemCount == 0) {
                     item {
                         MessageState(
-                            title = "No hay canales",
-                            description = "Sincroniza la fuente desde Ajustes.",
+                            title = stringResource(R.string.live_no_channels),
+                            description = stringResource(R.string.live_sync_hint),
                             icon = Icons.Outlined.LiveTv,
                             modifier = Modifier.height(320.dp)
                         )
@@ -462,7 +466,7 @@ private fun ChannelListRow(
                     overflow = TextOverflow.Ellipsis
                 )
                 Text(
-                    text = now?.title ?: "Sin guía",
+                    text = now?.title ?: stringResource(R.string.common_no_guide),
                     style = MaterialTheme.typography.labelSmall,
                     color = KanalColors.OnSurfaceFaint,
                     maxLines = 1,
@@ -477,7 +481,7 @@ private fun ChannelListRow(
                 Spacer(Modifier.width(8.dp))
                 Icon(
                     Icons.Filled.Star,
-                    contentDescription = "Favorito",
+                    contentDescription = stringResource(R.string.common_favorite),
                     tint = KanalColors.Warning,
                     modifier = Modifier.size(16.dp)
                 )
@@ -496,7 +500,7 @@ private fun DetailPane(
     selectedDay: Long,
     onSelectDay: (Long) -> Unit,
     previewActive: Boolean,
-    previewError: String,
+    previewError: UiText?,
     player: androidx.media3.exoplayer.ExoPlayer?,
     isFavorite: Boolean,
     onToggleFavorite: () -> Unit,
@@ -506,8 +510,8 @@ private fun DetailPane(
 ) {
     if (channel == null) {
         MessageState(
-            title = "Elige un canal",
-            description = "Muévete por la lista para ver la vista previa y la guía.",
+            title = stringResource(R.string.live_pick_channel),
+            description = stringResource(R.string.live_pick_channel_body),
             icon = Icons.Outlined.LiveTv,
             modifier = modifier
         )
@@ -553,10 +557,10 @@ private fun DetailPane(
                             contentScale = ContentScale.Fit
                         )
                     }
-                    if (previewError.isNotBlank()) {
+                    previewError?.let { previewErrorText ->
                         Spacer(Modifier.height(12.dp))
                         Text(
-                            previewError,
+                            previewErrorText.resolve(),
                             style = MaterialTheme.typography.labelMedium,
                             color = KanalColors.Error
                         )
@@ -575,7 +579,7 @@ private fun DetailPane(
         )
         Text(
             buildString {
-                if (channel.number > 0) append("Canal ${channel.number}")
+                if (channel.number > 0) append(stringResource(R.string.live_channel_number, channel.number))
                 if (channel.categoryName.isNotBlank()) {
                     if (isNotEmpty()) append(" · ")
                     append(channel.categoryName)
@@ -612,7 +616,7 @@ private fun DetailPane(
         if (next != null) {
             Spacer(Modifier.height(10.dp))
             Text(
-                "Después · ${formatClock(next.start)} ${next.title}",
+                stringResource(R.string.live_next_up, formatClock(next.start), next.title),
                 style = MaterialTheme.typography.bodySmall,
                 color = KanalColors.OnSurfaceFaint,
                 maxLines = 1,
@@ -623,12 +627,12 @@ private fun DetailPane(
         Spacer(Modifier.height(20.dp))
         Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
             KanalButton(
-                text = "Ver ahora",
+                text = stringResource(R.string.live_watch_now),
                 onClick = onPlay,
                 tone = com.mateof.kanal.ui.components.ButtonTone.Primary
             )
             KanalButton(
-                text = if (isFavorite) "Quitar de favoritos" else "Añadir a favoritos",
+                text = if (isFavorite) stringResource(R.string.live_remove_favorite) else stringResource(R.string.live_add_favorite),
                 onClick = onToggleFavorite,
                 icon = Icons.Filled.Star
             )
@@ -637,7 +641,7 @@ private fun DetailPane(
         if (schedule.isNotEmpty() || guideDays.isNotEmpty()) {
             Spacer(Modifier.height(22.dp))
             Text(
-                "Programación",
+                stringResource(R.string.live_schedule),
                 style = MaterialTheme.typography.titleSmall,
                 color = KanalColors.OnSurfaceMuted
             )

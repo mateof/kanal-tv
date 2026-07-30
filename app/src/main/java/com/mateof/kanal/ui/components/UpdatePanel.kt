@@ -24,6 +24,9 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import androidx.compose.ui.res.stringResource
+import com.mateof.kanal.R
+import com.mateof.kanal.core.UiText
 import com.mateof.kanal.core.formatBytes
 import com.mateof.kanal.data.prefs.AppPreferences
 import com.mateof.kanal.update.AppUpdater
@@ -45,7 +48,7 @@ data class UpdateUiState(
     val checking: Boolean = false,
     val downloading: Boolean = false,
     val progress: Int = 0,
-    val message: String = "",
+    val message: UiText? = null,
     val needsPermission: Boolean = false
 )
 
@@ -74,15 +77,15 @@ class UpdateViewModel @Inject constructor(
     fun check() = viewModelScope.launch { runCheck(silent = false) }
 
     private suspend fun runCheck(silent: Boolean) {
-        _state.value = _state.value.copy(checking = true, message = "")
+        _state.value = _state.value.copy(checking = true, message = null)
         when (val result = updater.check()) {
             is UpdateCheck.Available -> _state.value = UpdateUiState(available = result.info)
             UpdateCheck.UpToDate -> _state.value = UpdateUiState(
-                message = if (silent) "" else "Ya tienes la última versión (${updater.currentVersion})."
+                message = if (silent) null else UiText(R.string.update_up_to_date, updater.currentVersion)
             )
 
             is UpdateCheck.Error -> _state.value = UpdateUiState(
-                message = if (silent) "" else result.message
+                message = if (silent) null else result.message
             )
         }
     }
@@ -93,29 +96,29 @@ class UpdateViewModel @Inject constructor(
             if (!updater.canInstall()) {
                 _state.value = _state.value.copy(
                     needsPermission = true,
-                    message = "Autoriza a Kanal a instalar aplicaciones y vuelve a intentarlo."
+                    message = UiText(R.string.update_permission)
                 )
                 updater.requestInstallPermission()
                 return@launch
             }
-            _state.value = _state.value.copy(downloading = true, progress = 0, message = "")
+            _state.value = _state.value.copy(downloading = true, progress = 0, message = null)
             val file = updater.download(info) { percent ->
                 _state.value = _state.value.copy(progress = percent.coerceAtLeast(0))
             }
             if (file == null) {
                 _state.value = _state.value.copy(
                     downloading = false,
-                    message = "No se pudo descargar la actualización."
+                    message = UiText(R.string.update_failed)
                 )
             } else {
-                _state.value = _state.value.copy(downloading = false, message = "Instalando…")
+                _state.value = _state.value.copy(downloading = false, message = UiText(R.string.update_installing))
                 updater.install(file)
             }
         }
     }
 
     fun dismiss() {
-        _state.value = _state.value.copy(available = null, message = "")
+        _state.value = _state.value.copy(available = null, message = null)
     }
 }
 
@@ -145,13 +148,13 @@ fun UpdateBanner(
         Spacer(Modifier.width(16.dp))
         Column(Modifier.weight(1f)) {
             Text(
-                "Kanal ${info.versionName} disponible",
+                stringResource(R.string.update_available, info.versionName),
                 style = MaterialTheme.typography.titleSmall,
                 color = KanalColors.OnBackground
             )
             Text(
-                if (state.downloading) "Descargando… ${state.progress}%"
-                else "APK de ${formatBytes(info.apkSize)}",
+                if (state.downloading) stringResource(R.string.update_downloading_pct, state.progress)
+                else stringResource(R.string.update_apk_size, formatBytes(info.apkSize)),
                 style = MaterialTheme.typography.bodySmall,
                 color = KanalColors.OnSurfaceMuted,
                 maxLines = 1,
@@ -161,12 +164,12 @@ fun UpdateBanner(
         Spacer(Modifier.width(16.dp))
         Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
             KanalButton(
-                text = if (state.downloading) "Descargando…" else "Actualizar",
+                text = if (state.downloading) stringResource(R.string.update_downloading) else stringResource(R.string.update_now),
                 onClick = onUpdate,
                 tone = ButtonTone.Primary,
                 enabled = !state.downloading
             )
-            KanalButton(text = "Ahora no", onClick = onDismiss, enabled = !state.downloading)
+            KanalButton(text = stringResource(R.string.update_later), onClick = onDismiss, enabled = !state.downloading)
         }
     }
     Spacer(Modifier.height(20.dp))

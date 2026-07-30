@@ -66,6 +66,9 @@ import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.media3.ui.AspectRatioFrameLayout
 import androidx.media3.ui.PlayerView
+import androidx.compose.ui.res.stringResource
+import com.mateof.kanal.R
+import com.mateof.kanal.core.resolve
 import com.mateof.kanal.core.formatClock
 import com.mateof.kanal.core.formatDuration
 import com.mateof.kanal.ui.components.ArtworkImage
@@ -296,7 +299,7 @@ fun PlayerScreen(
             )
         }
 
-        if (state.loading || (state.buffering && state.error.isBlank())) {
+        if (state.loading || (state.buffering && state.error == null)) {
             Column(
                 modifier = Modifier.align(Alignment.Center),
                 horizontalAlignment = Alignment.CenterHorizontally
@@ -311,7 +314,7 @@ fun PlayerScreen(
                 if (state.reconnectAttempt > 0) {
                     Spacer(Modifier.height(16.dp))
                     Text(
-                        "Reconectando… (${state.reconnectAttempt})",
+                        stringResource(R.string.player_reconnecting, state.reconnectAttempt),
                         style = MaterialTheme.typography.labelLarge,
                         color = KanalColors.OnSurfaceMuted
                     )
@@ -319,7 +322,7 @@ fun PlayerScreen(
             }
         }
 
-        if (state.error.isNotBlank()) {
+        state.error?.let { errorText ->
             Column(
                 modifier = Modifier
                     .align(Alignment.Center)
@@ -328,20 +331,20 @@ fun PlayerScreen(
                 horizontalAlignment = Alignment.CenterHorizontally
             ) {
                 Text(
-                    state.error,
+                    errorText.resolve(),
                     style = MaterialTheme.typography.titleLarge,
                     color = KanalColors.Error
                 )
                 Spacer(Modifier.height(20.dp))
                 Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                    KanalButton("Reintentar", vm::retry, tone = ButtonTone.Primary)
-                    KanalButton("Volver", { onBack(liveChannelId()) })
+                    KanalButton(stringResource(R.string.common_retry), vm::retry, tone = ButtonTone.Primary)
+                    KanalButton(stringResource(R.string.common_back), { onBack(liveChannelId()) })
                 }
             }
         }
 
         AnimatedVisibility(
-            visible = osdVisible && state.error.isBlank(),
+            visible = osdVisible && state.error == null,
             enter = fadeIn(),
             exit = fadeOut(),
             modifier = Modifier.align(Alignment.BottomStart)
@@ -438,7 +441,7 @@ private fun GuidePanel(
             overflow = TextOverflow.Ellipsis
         )
         Text(
-            "Programación",
+            stringResource(R.string.live_schedule),
             style = MaterialTheme.typography.labelMedium,
             color = KanalColors.OnSurfaceFaint
         )
@@ -449,13 +452,13 @@ private fun GuidePanel(
             selectedDay = state.selectedDay,
             programmes = state.dayProgrammes,
             modifier = Modifier.weight(1f),
-            emptyMessage = "El proveedor no envía guía para este canal.",
+            emptyMessage = stringResource(R.string.player_no_guide),
             onSelectDay = onSelectDay,
             onProgrammeClick = onProgrammeClick
         )
 
         Spacer(Modifier.height(14.dp))
-        KanalButton("Cerrar", onClose, tone = ButtonTone.Primary)
+        KanalButton(stringResource(R.string.common_close), onClose, tone = ButtonTone.Primary)
     }
 }
 
@@ -569,7 +572,7 @@ private fun Osd(
                 Spacer(Modifier.height(8.dp))
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Text(
-                        "DESPUÉS  ",
+                        stringResource(R.string.player_next_label) + "  ",
                         style = MaterialTheme.typography.labelSmall,
                         color = KanalColors.Secondary
                     )
@@ -608,7 +611,7 @@ private fun Osd(
             if (!playable.isLive) {
                 add(
                     ControlAction(
-                        label = if (state.playing) "Pausa" else "Reproducir",
+                        label = if (state.playing) stringResource(R.string.player_pause) else stringResource(R.string.player_play),
                         icon = if (state.playing) Icons.Outlined.Pause else Icons.Outlined.PlayArrow,
                         tone = ButtonTone.Primary,
                         onClick = onTogglePlay
@@ -618,13 +621,13 @@ private fun Osd(
                 add(ControlAction("10 s", Icons.Outlined.Forward10, ButtonTone.Neutral, onSeekForward))
             }
             if (playable.isLive && state.now != null) {
-                add(ControlAction("Ficha", Icons.Outlined.Info, ButtonTone.Primary, onOpenDetail))
+                add(ControlAction(stringResource(R.string.player_details), Icons.Outlined.Info, ButtonTone.Primary, onOpenDetail))
             }
             if (playable.isLive && state.guideDays.isNotEmpty()) {
-                add(ControlAction("Guía", Icons.Outlined.CalendarMonth, ButtonTone.Neutral, onOpenGuide))
+                add(ControlAction(stringResource(R.string.player_guide), Icons.Outlined.CalendarMonth, ButtonTone.Neutral, onOpenGuide))
             }
             add(ControlAction(resizeLabel, Icons.Outlined.AspectRatio, ButtonTone.Neutral, onCycleResize))
-            add(ControlAction("Audio y subtítulos", Icons.Outlined.Tune, ButtonTone.Neutral, onOpenTracks))
+            add(ControlAction(stringResource(R.string.player_audio_subtitles), Icons.Outlined.Tune, ButtonTone.Neutral, onOpenTracks))
         }
 
         // FlowRow, not Row: on a phone the five controls do not fit across one
@@ -648,9 +651,9 @@ private fun Osd(
         Spacer(Modifier.height(14.dp))
         Text(
             text = when {
-                controlsActive -> "Izquierda y derecha para moverte por los botones · ATRÁS vuelve al vídeo"
-                playable.isLive -> "Arriba y abajo cambian de canal · OK abre los controles y la guía · ATRÁS sale"
-                else -> "Izquierda y derecha ±10 s · OK abre los controles · ATRÁS sale"
+                controlsActive -> stringResource(R.string.player_hint_controls)
+                playable.isLive -> stringResource(R.string.player_hint_live)
+                else -> stringResource(R.string.player_hint_vod)
             },
             style = MaterialTheme.typography.labelSmall,
             color = KanalColors.OnSurfaceFaint
@@ -678,7 +681,7 @@ private fun TrackPanel(
             .focusRequester(focusRequester)
             .focusGroup()
     ) {
-        Text("Audio y subtítulos", style = MaterialTheme.typography.titleLarge, color = KanalColors.OnBackground)
+        Text(stringResource(R.string.player_audio_subtitles), style = MaterialTheme.typography.titleLarge, color = KanalColors.OnBackground)
         Spacer(Modifier.height(16.dp))
 
         LazyColumn(
@@ -686,12 +689,12 @@ private fun TrackPanel(
             verticalArrangement = Arrangement.spacedBy(8.dp)
         ) {
             item {
-                Text("Audio", style = MaterialTheme.typography.labelMedium, color = KanalColors.OnSurfaceFaint)
+                Text(stringResource(R.string.player_audio), style = MaterialTheme.typography.labelMedium, color = KanalColors.OnSurfaceFaint)
             }
             if (state.audioTracks.isEmpty()) {
                 item {
                     Text(
-                        "Sin pistas de audio alternativas.",
+                        stringResource(R.string.player_no_audio_tracks),
                         style = MaterialTheme.typography.bodySmall,
                         color = KanalColors.OnSurfaceFaint
                     )
@@ -703,12 +706,12 @@ private fun TrackPanel(
 
             item {
                 Spacer(Modifier.height(12.dp))
-                Text("Subtítulos", style = MaterialTheme.typography.labelMedium, color = KanalColors.OnSurfaceFaint)
+                Text(stringResource(R.string.player_subtitles), style = MaterialTheme.typography.labelMedium, color = KanalColors.OnSurfaceFaint)
             }
             if (state.subtitleTracks.isEmpty()) {
                 item {
                     Text(
-                        "Esta emisión no trae subtítulos.",
+                        stringResource(R.string.player_no_subtitle_tracks),
                         style = MaterialTheme.typography.bodySmall,
                         color = KanalColors.OnSurfaceFaint
                     )
@@ -721,8 +724,8 @@ private fun TrackPanel(
 
         Spacer(Modifier.height(16.dp))
         Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-            KanalButton("Sin subtítulos", onDisableSubtitles)
-            KanalButton("Cerrar", onClose, tone = ButtonTone.Primary)
+            KanalButton(stringResource(R.string.player_no_subtitles), onDisableSubtitles)
+            KanalButton(stringResource(R.string.common_close), onClose, tone = ButtonTone.Primary)
         }
     }
 }
@@ -738,7 +741,9 @@ private fun TrackRow(option: TrackOption, onClick: () -> Unit) {
         focusedScale = 1.0f
     ) { focused ->
         Text(
-            text = (if (option.selected) "● " else "○ ") + option.label,
+            text = (if (option.selected) "● " else "○ ") +
+                (option.name ?: stringResource(R.string.player_track_number, option.number)) +
+                option.details,
             style = MaterialTheme.typography.bodySmall,
             color = when {
                 focused -> Color(0xFF06231F)
@@ -758,8 +763,9 @@ private fun nextResizeMode(current: Int): Int = when (current) {
     else -> AspectRatioFrameLayout.RESIZE_MODE_FIT
 }
 
+@Composable
 private fun resizeLabel(mode: Int): String = when (mode) {
-    AspectRatioFrameLayout.RESIZE_MODE_ZOOM -> "Zoom"
-    AspectRatioFrameLayout.RESIZE_MODE_FILL -> "Estirar"
-    else -> "Ajustar"
+    AspectRatioFrameLayout.RESIZE_MODE_ZOOM -> stringResource(R.string.player_zoom)
+    AspectRatioFrameLayout.RESIZE_MODE_FILL -> stringResource(R.string.player_stretch)
+    else -> stringResource(R.string.player_adjust)
 }

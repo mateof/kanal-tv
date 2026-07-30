@@ -1,6 +1,7 @@
 package com.mateof.kanal.data.prefs
 
 import android.content.Context
+import androidx.annotation.StringRes
 import androidx.datastore.core.DataStore
 import androidx.datastore.preferences.core.Preferences
 import androidx.datastore.preferences.core.booleanPreferencesKey
@@ -9,6 +10,9 @@ import androidx.datastore.preferences.core.intPreferencesKey
 import androidx.datastore.preferences.core.longPreferencesKey
 import androidx.datastore.preferences.core.stringPreferencesKey
 import androidx.datastore.preferences.preferencesDataStore
+import com.mateof.kanal.R
+import com.mateof.kanal.core.AppLanguage
+import com.mateof.kanal.core.SleepTimer
 import com.mateof.kanal.core.log.Klog
 import com.mateof.kanal.data.model.ContentKind
 import com.mateof.kanal.data.model.HistoryItem
@@ -26,19 +30,25 @@ import javax.inject.Singleton
 
 private val Context.dataStore: DataStore<Preferences> by preferencesDataStore(name = "kanal")
 
-enum class StreamFormat(val label: String, val extension: String) {
-    TS("MPEG-TS (.ts)", "ts"),
-    HLS("HLS (.m3u8)", "m3u8")
+enum class StreamFormat(@StringRes val labelRes: Int, val extension: String) {
+    TS(R.string.stream_format_ts, "ts"),
+    HLS(R.string.stream_format_hls, "m3u8")
 }
 
-enum class BufferProfile(val label: String, val minBufferMs: Int, val maxBufferMs: Int, val startMs: Int) {
-    LOW("Bajo (zapping rápido)", 1_500, 15_000, 800),
-    NORMAL("Normal", 5_000, 30_000, 1_500),
-    HIGH("Alto (conexión inestable)", 15_000, 60_000, 3_000),
-    MAXIMUM("Máximo (servidor con cortes)", 45_000, 180_000, 5_000)
+enum class BufferProfile(
+    @StringRes val labelRes: Int,
+    val minBufferMs: Int,
+    val maxBufferMs: Int,
+    val startMs: Int
+) {
+    LOW(R.string.buffer_low, 1_500, 15_000, 800),
+    NORMAL(R.string.buffer_normal, 5_000, 30_000, 1_500),
+    HIGH(R.string.buffer_high, 15_000, 60_000, 3_000),
+    MAXIMUM(R.string.buffer_maximum, 45_000, 180_000, 5_000)
 }
 
 data class Settings(
+    val language: AppLanguage = AppLanguage.AUTO,
     val streamFormat: StreamFormat = StreamFormat.TS,
     val previewEnabled: Boolean = true,
     val keepLastChannel: Boolean = true,
@@ -51,7 +61,9 @@ data class Settings(
     val hideAdult: Boolean = false,
     val externalPlayer: String = "",
     val verboseHttpLog: Boolean = false,
-    val autoSyncHours: Int = 12
+    val autoSyncHours: Int = 12,
+    val sleepTimerMinutes: Int = SleepTimer.DEFAULT_MINUTES,
+    val stillWatching: Boolean = true
 )
 
 const val DEFAULT_USER_AGENT = "VLC/3.0.20 LibVLC/3.0.20"
@@ -82,6 +94,9 @@ class AppPreferences @Inject constructor(
         val VERBOSE_HTTP = booleanPreferencesKey("verbose_http")
         val AUTO_SYNC_HOURS = intPreferencesKey("auto_sync_hours")
         val LAST_UPDATE_CHECK = longPreferencesKey("last_update_check")
+        val LANGUAGE = stringPreferencesKey("language")
+        val SLEEP_MINUTES = intPreferencesKey("sleep_minutes")
+        val STILL_WATCHING = booleanPreferencesKey("still_watching")
     }
 
     // --- Sources -------------------------------------------------------------
@@ -182,6 +197,7 @@ class AppPreferences @Inject constructor(
 
     val settings: Flow<Settings> = context.dataStore.data.map { prefs ->
         Settings(
+            language = AppLanguage.of(prefs[Keys.LANGUAGE]),
             streamFormat = prefs[Keys.STREAM_FORMAT]?.let { name ->
                 StreamFormat.entries.firstOrNull { it.name == name }
             } ?: StreamFormat.TS,
@@ -198,9 +214,17 @@ class AppPreferences @Inject constructor(
             hideAdult = prefs[Keys.HIDE_ADULT] ?: false,
             externalPlayer = prefs[Keys.EXTERNAL_PLAYER] ?: "",
             verboseHttpLog = prefs[Keys.VERBOSE_HTTP] ?: false,
-            autoSyncHours = prefs[Keys.AUTO_SYNC_HOURS] ?: 12
+            autoSyncHours = prefs[Keys.AUTO_SYNC_HOURS] ?: 12,
+            sleepTimerMinutes = prefs[Keys.SLEEP_MINUTES] ?: SleepTimer.DEFAULT_MINUTES,
+            stillWatching = prefs[Keys.STILL_WATCHING] ?: true
         )
     }
+
+    /**
+     * Read on its own so the interface can pick a language up before the rest of
+     * the settings are needed, and re-render the moment it changes.
+     */
+    val language: Flow<AppLanguage> = context.dataStore.data.map { AppLanguage.of(it[Keys.LANGUAGE]) }
 
     suspend fun setStreamFormat(value: StreamFormat) = edit { it[Keys.STREAM_FORMAT] = value.name }
     suspend fun setPreviewEnabled(value: Boolean) = edit { it[Keys.PREVIEW_ENABLED] = value }
@@ -214,6 +238,9 @@ class AppPreferences @Inject constructor(
     suspend fun setExternalPlayer(value: String) = edit { it[Keys.EXTERNAL_PLAYER] = value }
     suspend fun setVerboseHttpLog(value: Boolean) = edit { it[Keys.VERBOSE_HTTP] = value }
     suspend fun setAutoSyncHours(value: Int) = edit { it[Keys.AUTO_SYNC_HOURS] = value }
+    suspend fun setLanguage(value: AppLanguage) = edit { it[Keys.LANGUAGE] = value.name }
+    suspend fun setSleepTimerMinutes(value: Int) = edit { it[Keys.SLEEP_MINUTES] = value }
+    suspend fun setStillWatching(value: Boolean) = edit { it[Keys.STILL_WATCHING] = value }
 
     val lastUpdateCheck: Flow<Long> = context.dataStore.data.map { it[Keys.LAST_UPDATE_CHECK] ?: 0L }
     suspend fun setLastUpdateCheck(value: Long) = edit { it[Keys.LAST_UPDATE_CHECK] = value }
