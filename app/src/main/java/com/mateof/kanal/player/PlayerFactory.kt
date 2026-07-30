@@ -58,12 +58,19 @@ class PlayerFactory @Inject constructor(
         val extractors = DefaultExtractorsFactory()
             .setConstantBitrateSeekingEnabled(true)
 
+        // Waiting twice as long after a rebuffer as on a cold start avoids
+        // stuttering straight back into another stall, but it cannot exceed the
+        // minimum buffer: DefaultLoadControl rejects that and throws while the
+        // player is being built. The low profile asked for 1.5 s minimum against
+        // a 1.6 s threshold and took the app down as soon as a stream opened.
+        val afterRebufferMs = (profile.startMs * 2).coerceAtMost(profile.minBufferMs)
+
         val loadControl = DefaultLoadControl.Builder()
             .setBufferDurationsMs(
                 profile.minBufferMs,
                 profile.maxBufferMs,
                 profile.startMs,
-                profile.startMs * 2
+                afterRebufferMs
             )
             .setPrioritizeTimeOverSizeThresholds(true)
             .build()
