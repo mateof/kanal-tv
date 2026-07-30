@@ -7,18 +7,51 @@ guía de programación **XMLTV**.
 
 > Todos tus canales.
 
+![TV en directo](docs/img/tv-en-directo.png)
+
+<table>
+  <tr>
+    <td><img src="docs/img/guia.png" alt="Guía"></td>
+    <td><img src="docs/img/reproductor.png" alt="Reproductor"></td>
+  </tr>
+  <tr>
+    <td><img src="docs/img/inicio.png" alt="Inicio"></td>
+    <td><img src="docs/img/peliculas.png" alt="Películas"></td>
+  </tr>
+</table>
+
+*Capturas hechas con una fuente de demostración inventada, no con un proveedor real.*
+
 ## Qué hace
 
 - **TV en directo** con lista por categorías, favoritos, guía *ahora / después* y
   **vista previa** del canal enfocado sin salir de la lista.
+- **Guía XMLTV** en muro de todos los canales a la vez, con los bloques a escala de
+  duración, y por canal con selector de día. Emparejada por `tvg-id` o, si el proveedor
+  no lo manda, por nombre de canal.
 - **Películas y series** con fichas, temporadas, episodios y *continuar viendo*.
-- **Guía XMLTV** descargada y emparejada por `tvg-id` o, si el proveedor no lo manda,
-  por nombre de canal.
 - **Repeticiones (catch-up)** en los paneles Xtream que exponen `tv_archive`.
-- **Buscador** sobre canales, películas y series.
+- **Buscador** sobre canales, películas y series, insensible a acentos.
+- **Galego, castellano e inglés**. Por defecto sigue el idioma de la televisión; si no está
+  traducido, se muestra en galego.
+- **Aguanta cortes**: si la emisión se corta, reconecta sola sin echarte del canal, y prueba
+  otros contenedores cuando un canal no arranca.
+- **Temporizador de apagado** y aviso de **«¿sigues ahí?»** tras una hora sin tocar el mando,
+  para no dejar un canal corriendo toda la noche.
+- **Táctil y vertical** en móvil y tablet, como capa añadida: la tele manda.
 - **Registro descargable** con todo lo que hace la app, para diagnosticar fallos.
 - **Actualización automática**: comprueba las releases de este repo y descarga e
   instala el APK desde la propia aplicación.
+
+## Documentación
+
+En [`docs/`](docs/README.md), con capturas:
+
+- [Primeros pasos](docs/primeros-pasos.md) — instalar, añadir la fuente y sincronizar
+- [Televisión en directo](docs/television.md) — lista, guía, reproductor y mando
+- [Películas y series](docs/peliculas-y-series.md) — catálogos, fichas y continuar viendo
+- [Ajustes](docs/ajustes.md) — todos los ajustes, uno a uno
+- [Diagnóstico](docs/diagnostico.md) — registro, actualizaciones y qué hacer si falla
 
 ## Compatibilidad
 

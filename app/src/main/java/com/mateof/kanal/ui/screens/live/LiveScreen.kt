@@ -1,5 +1,7 @@
 package com.mateof.kanal.ui.screens.live
 
+import androidx.compose.foundation.verticalScroll
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -518,8 +520,14 @@ private fun DetailPane(
         return
     }
 
+    // Scrolls, and the guide below is height-capped rather than weighted. A plain
+    // Column here silently crushed whatever did not fit: with a two-line
+    // description the action buttons were laid out one pixel tall — present to
+    // the remote and to a screen reader, invisible on screen.
     Column(
-        modifier = modifier.padding(start = 24.dp, end = 44.dp, top = 4.dp, bottom = 28.dp)
+        modifier = modifier
+            .verticalScroll(rememberScrollState())
+            .padding(start = 24.dp, end = 44.dp, top = 4.dp, bottom = 28.dp)
     ) {
         // Capped on purpose: at 16:9 the preview eats the whole pane on a short
         // panel and leaves the guide underneath with no room at all.
@@ -650,7 +658,9 @@ private fun DetailPane(
                 days = guideDays,
                 selectedDay = selectedDay,
                 programmes = schedule,
-                modifier = Modifier.weight(1f, fill = false),
+                // Capped, not weighted: weight means nothing inside a scrolling
+                // column, and the lazy list needs a bounded height to measure.
+                modifier = Modifier.heightIn(max = 340.dp),
                 archiveAvailable = channel.archiveDays > 0,
                 onSelectDay = onSelectDay,
                 onProgrammeClick = onProgrammeClick
