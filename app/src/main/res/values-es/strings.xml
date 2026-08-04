@@ -349,4 +349,5 @@
 
     <string name="setup_connected_full">Conectado como %1$s. Estado: %2$s · %3$d/%4$d conexiones</string>
     <string name="setup_connect_failed_detail">No se pudo conectar: %s</string>
+    <string name="player_paused">en pausa</string>
 </resources>

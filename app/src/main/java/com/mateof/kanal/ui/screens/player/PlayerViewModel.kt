@@ -33,6 +33,9 @@ import javax.inject.Inject
 /** How many silent reconnections before the user is told something is wrong. */
 private const val MAX_RECONNECTS = 6
 
+/** Ticks of half a second between progress writes. */
+private const val SAVE_EVERY_TICKS = 30
+
 data class TrackOption(
     val id: String,
     /** What the provider called the track, or null when it did not name it. */
@@ -253,9 +256,17 @@ class PlayerViewModel @Inject constructor(
     private fun startTicker() {
         ticker?.cancel()
         ticker = viewModelScope.launch {
+            // Progress is written every so often as well as on pause and on the
+            // way out: a film left running when the app is killed from the
+            // launcher would otherwise resume from where it last paused.
+            var sinceSave = 0
             while (true) {
                 val exo = player
                 if (exo != null) {
+                    if (++sinceSave >= SAVE_EVERY_TICKS && exo.isPlaying) {
+                        sinceSave = 0
+                        recordProgress()
+                    }
                     _state.value = _state.value.copy(
                         positionMs = exo.currentPosition.coerceAtLeast(0),
                         durationMs = exo.duration.takeIf { it > 0 } ?: 0L,
@@ -451,6 +462,16 @@ class PlayerViewModel @Inject constructor(
     fun togglePlayPause() {
         val exo = player ?: return
         if (exo.isPlaying) exo.pause() else exo.play()
+    }
+
+    /** Absolute seek, used by the progress bar. */
+    fun seekTo(positionMs: Long) {
+        val exo = player ?: return
+        if (_state.value.playable?.isLive == true) return
+        val duration = exo.duration.takeIf { it > 0 } ?: return
+        exo.seekTo(positionMs.coerceIn(0L, duration))
+        _state.value = _state.value.copy(positionMs = exo.currentPosition.coerceAtLeast(0))
+        recordProgress()
     }
 
     fun seekBy(deltaMs: Long) {

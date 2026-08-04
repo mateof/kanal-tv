@@ -78,6 +78,7 @@ import com.mateof.kanal.ui.components.FocusableSurface
 import com.mateof.kanal.ui.components.KanalButton
 import com.mateof.kanal.ui.components.ProgrammeDetail
 import com.mateof.kanal.ui.components.ProgrammeDialog
+import com.mateof.kanal.ui.components.SeekBar
 import com.mateof.kanal.ui.components.ThinProgress
 import com.mateof.kanal.ui.components.scrollingTitle
 import com.mateof.kanal.ui.isCompact
@@ -361,6 +362,7 @@ fun PlayerScreen(
                 onTogglePlay = { vm.togglePlayPause(); poke() },
                 onSeekBack = { vm.seekBy(-10_000); poke() },
                 onSeekForward = { vm.seekBy(10_000); poke() },
+                onSeekTo = { target -> vm.seekTo(target); poke() },
                 onOpenTracks = { mode = Mode.Tracks; poke() },
                 onOpenGuide = { mode = Mode.Guide; poke() },
                 onOpenDetail = {
@@ -472,6 +474,7 @@ private fun Osd(
     onTogglePlay: () -> Unit,
     onSeekBack: () -> Unit,
     onSeekForward: () -> Unit,
+    onSeekTo: (Long) -> Unit,
     onOpenTracks: () -> Unit,
     onOpenGuide: () -> Unit,
     onOpenDetail: () -> Unit
@@ -589,16 +592,36 @@ private fun Osd(
                 }
             }
         } else if (state.durationMs > 0) {
-            ThinProgress(
-                state.positionMs.toFloat() / state.durationMs.toFloat(),
-                Modifier.fillMaxWidth()
+            var scrubbing by remember { mutableStateOf<Long?>(null) }
+            SeekBar(
+                positionMs = state.positionMs,
+                durationMs = state.durationMs,
+                onSeek = { target -> onSeekTo(target) },
+                onScrub = { scrubbing = it },
+                modifier = Modifier.fillMaxWidth()
             )
-            Spacer(Modifier.height(8.dp))
+            Spacer(Modifier.height(4.dp))
+            val shown = scrubbing ?: state.positionMs
             Text(
-                "${formatDuration(state.positionMs)} / ${formatDuration(state.durationMs)}" +
-                    if (!state.playing) "   ·   en pausa" else "",
+                buildString {
+                    append(formatDuration(shown))
+                    append(" / ")
+                    append(formatDuration(state.durationMs))
+                    scrubbing?.let { target ->
+                        val delta = target - state.positionMs
+                        val sign = if (delta >= 0) "+" else "−"
+                        append("   ·   $sign${formatDuration(kotlin.math.abs(delta))}")
+                    } ?: run {
+                        // Not while buffering: after a seek the player is stopped
+                        // but on its way, and calling that "paused" reads as if
+                        // the jump had failed.
+                        if (!state.playing && !state.buffering) {
+                            append("   ·   ").append(stringResource(R.string.player_paused))
+                        }
+                    }
+                },
                 style = MaterialTheme.typography.labelMedium,
-                color = KanalColors.OnSurfaceMuted
+                color = if (scrubbing != null) KanalColors.Accent else KanalColors.OnSurfaceMuted
             )
         }
 
