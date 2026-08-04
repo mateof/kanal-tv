@@ -49,6 +49,21 @@ Con los controles abiertos, **izquierda** y **derecha** desplazan el foco entre 
 **ATRÁS** regresa al vídeo. La línea inferior recuerda esta correspondencia, ya que muchos
 mandos de televisión carecen de tecla de menú.
 
+### Desplazarse por la reproducción
+
+En películas y series la barra de progreso permite ir a cualquier punto:
+
+- **Con el mando**: cuando la barra tiene el foco, izquierda y derecha la mueven. El paso
+  parte de 10 segundos y aumenta mientras se mantiene pulsada la tecla, hasta un máximo de
+  2 minutos.
+- **Táctil**: una pulsación sobre un punto salta a él; el arrastre recorre la reproducción.
+
+Mientras la barra se mueve se muestra el punto de destino y su diferencia respecto a la
+posición actual. El salto se aplica al soltar, al pulsar OK o tras un instante sin
+movimiento, de modo que recorrer una película no provoca una recarga por cada pulsación.
+
+Los botones **10 s** siguen disponibles para ajustes finos sin necesidad de enfocar la barra.
+
 ### Controles
 
 - **Ficha** — descripción completa del programa.
