@@ -79,6 +79,25 @@ Los subtítulos permanecen **desactivados** hasta que se seleccionan de forma ex
 la emisión los incluya. La elección se conserva entre reproducciones y entre sesiones: una vez
 activados siguen activos hasta que se elija **Sin subtítulos**.
 
+### Enviar a otro aparato
+
+El control **Enviar a…** busca reproductores **DLNA/UPnP** en la red local y ofrece la lista.
+Al elegir uno, la emisión pasa a ese aparato y la reproducción local se detiene; **Traer de
+vuelta** la recupera.
+
+Consideraciones:
+
+- El aparato debe estar encendido, en la misma red y admitir DLNA. En muchos televisores esta
+  función aparece como «renderizador multimedia» y viene desactivada de fábrica.
+- Es el aparato de destino quien descarga la emisión, no Kanal. Cuenta por tanto como una
+  conexión adicional frente al proveedor, y le aplican sus restricciones de agente y de
+  número de conexiones simultáneas.
+- Si el televisor no aparece en la lista, puede añadirse indicando su dirección IP o la URL
+  de su descripción UPnP.
+
+No requiere Chromecast ni servicios de Google, por lo que funciona también en aparatos sin
+ellos.
+
 ### Errores de reproducción
 
 Si una emisión no se inicia, Kanal prueba otros contenedores para el mismo canal antes de

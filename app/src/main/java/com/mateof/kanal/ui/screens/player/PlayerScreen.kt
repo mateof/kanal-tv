@@ -26,6 +26,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.AspectRatio
 import androidx.compose.material.icons.outlined.CalendarMonth
+import androidx.compose.material.icons.outlined.Cast
 import androidx.compose.material.icons.outlined.ClosedCaption
 import androidx.compose.material.icons.outlined.Forward10
 import androidx.compose.material.icons.outlined.Info
@@ -68,6 +69,7 @@ import androidx.media3.ui.AspectRatioFrameLayout
 import androidx.media3.ui.PlayerView
 import androidx.compose.ui.res.stringResource
 import com.mateof.kanal.R
+import com.mateof.kanal.cast.CastDevice
 import com.mateof.kanal.core.resolve
 import com.mateof.kanal.core.formatClock
 import com.mateof.kanal.core.formatDuration
@@ -76,6 +78,7 @@ import com.mateof.kanal.ui.components.ChannelGuide
 import com.mateof.kanal.ui.components.ButtonTone
 import com.mateof.kanal.ui.components.FocusableSurface
 import com.mateof.kanal.ui.components.KanalButton
+import com.mateof.kanal.ui.components.KanalTextField
 import com.mateof.kanal.ui.components.ProgrammeDetail
 import com.mateof.kanal.ui.components.ProgrammeDialog
 import com.mateof.kanal.ui.components.SeekBar
@@ -96,7 +99,7 @@ private const val OSD_TIMEOUT_MS = 6_000L
  * never moves and, on a remote with no MENU key, there is no way in at all.
  * So the modes are explicit and only [Mode.Watching] consumes the arrows.
  */
-private enum class Mode { Watching, Controls, Tracks, Guide }
+private enum class Mode { Watching, Controls, Tracks, Guide, Cast }
 
 /** One button of the control bar, so the first can be given the focus anchor. */
 private data class ControlAction(
@@ -128,6 +131,7 @@ fun PlayerScreen(
     val controlsFocus = remember { FocusRequester() }
     val tracksFocus = remember { FocusRequester() }
     val guideFocus = remember { FocusRequester() }
+    val castFocus = remember { FocusRequester() }
     var detail by remember { mutableStateOf<ProgrammeDetail?>(null) }
 
     val isLive = state.playable?.isLive == true
@@ -158,6 +162,7 @@ fun PlayerScreen(
             Mode.Controls -> controlsFocus
             Mode.Tracks -> tracksFocus
             Mode.Guide -> guideFocus
+            Mode.Cast -> castFocus
         }
         repeat(12) {
             if (runCatching { target.requestFocus() }.isSuccess) return@LaunchedEffect
@@ -174,7 +179,7 @@ fun PlayerScreen(
 
     fun goBack() {
         when (mode) {
-            Mode.Tracks, Mode.Guide -> mode = Mode.Controls
+            Mode.Tracks, Mode.Guide, Mode.Cast -> mode = Mode.Controls
             Mode.Controls -> mode = Mode.Watching
             // The title sitting over the picture has to go the moment BACK is
             // pressed, not on the next auto-hide tick.
@@ -364,6 +369,7 @@ fun PlayerScreen(
                 onSeekForward = { vm.seekBy(10_000); poke() },
                 onSeekTo = { target -> vm.seekTo(target); poke() },
                 onOpenTracks = { mode = Mode.Tracks; poke() },
+                onOpenCast = { mode = Mode.Cast; vm.searchCastDevices(); poke() },
                 onOpenGuide = { mode = Mode.Guide; poke() },
                 onOpenDetail = {
                     val now = state.now ?: return@Osd
@@ -373,6 +379,18 @@ fun PlayerScreen(
                         channelLogo = state.playable?.logo.orEmpty()
                     )
                 }
+            )
+        }
+
+        if (mode == Mode.Cast) {
+            CastSheet(
+                state = state,
+                focusRequester = castFocus,
+                onSearch = vm::searchCastDevices,
+                onPick = { device -> vm.castTo(device); mode = Mode.Watching },
+                onBringBack = { vm.stopCast() },
+                onAdd = { vm.addCastDevice(it) },
+                onClose = { mode = Mode.Controls }
             )
         }
 
@@ -475,6 +493,7 @@ private fun Osd(
     onSeekBack: () -> Unit,
     onSeekForward: () -> Unit,
     onSeekTo: (Long) -> Unit,
+    onOpenCast: () -> Unit,
     onOpenTracks: () -> Unit,
     onOpenGuide: () -> Unit,
     onOpenDetail: () -> Unit
@@ -651,6 +670,7 @@ private fun Osd(
             }
             add(ControlAction(resizeLabel, Icons.Outlined.AspectRatio, ButtonTone.Neutral, onCycleResize))
             add(ControlAction(stringResource(R.string.player_audio_subtitles), Icons.Outlined.Tune, ButtonTone.Neutral, onOpenTracks))
+            add(ControlAction(stringResource(R.string.cast_send), Icons.Outlined.Cast, ButtonTone.Neutral, onOpenCast))
         }
 
         // FlowRow, not Row: on a phone the five controls do not fit across one
@@ -748,6 +768,142 @@ private fun TrackPanel(
         Spacer(Modifier.height(16.dp))
         Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
             KanalButton(stringResource(R.string.player_no_subtitles), onDisableSubtitles)
+            KanalButton(stringResource(R.string.common_close), onClose, tone = ButtonTone.Primary)
+        }
+    }
+}
+
+/**
+ * The devices found on the network, and where the stream currently is.
+ *
+ * Drawn as an overlay inside the screen like the other sheets, so it obeys the
+ * same focus rules as the rest of the player.
+ */
+@Composable
+private fun CastSheet(
+    state: PlayerUiState,
+    focusRequester: FocusRequester,
+    onSearch: () -> Unit,
+    onPick: (CastDevice) -> Unit,
+    onBringBack: () -> Unit,
+    onAdd: (String) -> Unit,
+    onClose: () -> Unit
+) {
+    var address by remember { mutableStateOf("") }
+    Column(
+        modifier = Modifier
+            .fillMaxSize()
+            .padding(24.dp)
+            .clip(RoundedCornerShape(18.dp))
+            .background(Color(0xF20B1120))
+            .padding(24.dp)
+            .focusGroup()
+    ) {
+        Text(
+            stringResource(R.string.cast_title),
+            style = MaterialTheme.typography.titleLarge,
+            color = KanalColors.OnBackground
+        )
+        Spacer(Modifier.height(16.dp))
+
+        state.castingTo?.let { name ->
+            Text(
+                stringResource(R.string.cast_playing_on, name),
+                style = MaterialTheme.typography.titleSmall,
+                color = KanalColors.Accent
+            )
+            Spacer(Modifier.height(12.dp))
+        }
+        if (state.castError) {
+            Text(
+                stringResource(R.string.cast_failed),
+                style = MaterialTheme.typography.bodyMedium,
+                color = KanalColors.Error
+            )
+            Spacer(Modifier.height(12.dp))
+        }
+
+        Box(Modifier.weight(1f)) {
+            when {
+                state.castSearching -> Text(
+                    stringResource(R.string.cast_searching),
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = KanalColors.OnSurfaceMuted
+                )
+
+                state.castDevices.isEmpty() -> Column {
+                    Text(
+                        stringResource(R.string.cast_none),
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = KanalColors.OnSurfaceMuted
+                    )
+                    Spacer(Modifier.height(8.dp))
+                    Text(
+                        stringResource(R.string.cast_none_hint),
+                        style = MaterialTheme.typography.bodySmall,
+                        color = KanalColors.OnSurfaceFaint
+                    )
+                }
+
+                else -> LazyColumn(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    items(state.castDevices, key = { it.id }) { device ->
+                        FocusableSurface(
+                            onClick = { onPick(device) },
+                            modifier = Modifier.fillMaxWidth(),
+                            shape = RoundedCornerShape(12.dp),
+                            color = KanalColors.Surface,
+                            focusedColor = KanalColors.Accent
+                        ) { focused ->
+                            Text(
+                                device.name,
+                                style = MaterialTheme.typography.bodyMedium,
+                                color = if (focused) Color(0xFF06231F) else KanalColors.OnBackground,
+                                modifier = Modifier
+                                    .align(Alignment.CenterStart)
+                                    .padding(horizontal = 16.dp, vertical = 14.dp)
+                            )
+                        }
+                    }
+                }
+            }
+        }
+
+        Spacer(Modifier.height(12.dp))
+        FlowRow(
+            horizontalArrangement = Arrangement.spacedBy(12.dp),
+            verticalArrangement = Arrangement.spacedBy(10.dp)
+        ) {
+            KanalTextField(
+                value = address,
+                onValueChange = { address = it },
+                label = stringResource(R.string.cast_address),
+                supportingText = stringResource(R.string.cast_address_hint),
+                modifier = Modifier.width(if (isCompact) 260.dp else 420.dp)
+            )
+            KanalButton(
+                stringResource(R.string.cast_add),
+                { onAdd(address) },
+                enabled = address.isNotBlank() && !state.castSearching
+            )
+        }
+
+        Spacer(Modifier.height(12.dp))
+        FlowRow(
+            horizontalArrangement = Arrangement.spacedBy(10.dp),
+            verticalArrangement = Arrangement.spacedBy(10.dp)
+        ) {
+            if (state.castingTo != null) {
+                KanalButton(stringResource(R.string.cast_bring_back), onBringBack)
+            }
+            // The anchor is a button, never the address field: landing on a
+            // text field throws the on-screen keyboard up over the sheet before
+            // the user has even seen the list.
+            KanalButton(
+                stringResource(R.string.cast_search_again),
+                onSearch,
+                modifier = Modifier.focusRequester(focusRequester),
+                enabled = !state.castSearching
+            )
             KanalButton(stringResource(R.string.common_close), onClose, tone = ButtonTone.Primary)
         }
     }

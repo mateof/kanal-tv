@@ -82,6 +82,13 @@ fun LiveScreen(
     onBack: () -> Unit = {}
 ) {
     val vm: LiveViewModel = hiltViewModel()
+
+    // Every route into the full-screen player goes through here, so the preview
+    // is always handed over rather than left to be torn down and rebuilt.
+    val play: (String, Long) -> Unit = { id, startAt ->
+        vm.handOffPreview()
+        onPlay(id, startAt)
+    }
     val categories by vm.categories.collectAsStateWithLifecycle()
     val selectedCategory by vm.selectedCategory.collectAsStateWithLifecycle()
     val focused by vm.focused.collectAsStateWithLifecycle()
@@ -124,7 +131,7 @@ fun LiveScreen(
         if (System.currentTimeMillis() - arrivedAt < DOUBLE_BACK_MS || target == null) {
             onBack()
         } else {
-            onPlay(target, 0L)
+            play(target, 0L)
         }
     }
     val showingFavorites = selectedCategory == CATEGORY_FAVORITES
@@ -144,7 +151,7 @@ fun LiveScreen(
             favorites = favorites,
             sourceId = source?.id.orEmpty(),
             onSelectCategory = vm::selectCategory,
-            onPlay = { id -> onPlay(id, 0L) }
+            onPlay = { id -> play(id, 0L) }
         )
         return
     }
@@ -208,7 +215,7 @@ fun LiveScreen(
                                 now = nowPlaying[channel.epgChannelId],
                                 isFavorite = true,
                                 onFocused = { vm.onChannelFocused(channel) },
-                                onClick = { onPlay(channel.streamId, 0L) }
+                                onClick = { play(channel.streamId, 0L) }
                             )
                         }
                     }
@@ -225,7 +232,7 @@ fun LiveScreen(
                             now = nowPlaying[channel.epgChannelId],
                             isFavorite = source?.let { favorites.contains("LIVE:${it.id}:${channel.streamId}") } == true,
                             onFocused = { vm.onChannelFocused(channel) },
-                            onClick = { onPlay(channel.streamId, 0L) }
+                            onClick = { play(channel.streamId, 0L) }
                         )
                     }
                     if (paged.itemCount == 0) {
@@ -258,7 +265,7 @@ fun LiveScreen(
                 source?.let { favorites.contains("LIVE:${it.id}:${channel.streamId}") } == true
             } == true,
             onToggleFavorite = { focused?.let(vm::toggleFavorite) },
-            onPlay = { focused?.let { onPlay(it.streamId, 0L) } },
+            onPlay = { focused?.let { play(it.streamId, 0L) } },
             onProgrammeClick = { programme ->
                 focused?.let { channel ->
                     detail = ProgrammeDetail(
@@ -286,7 +293,7 @@ fun LiveScreen(
                 {
                     val programme = open.programme
                     detail = null
-                    onPlay(open.channelStreamId, programme.start)
+                    play(open.channelStreamId, programme.start)
                 }
             } else {
                 null

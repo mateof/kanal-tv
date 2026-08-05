@@ -26,7 +26,7 @@ numéricos enviados como texto o colecciones vacías representadas mediante `{}`
 Kanal registra la posición de cada película y episodio. Al abrirlos de nuevo, el botón
 principal ofrece continuar desde ese punto, con la alternativa de empezar desde el principio.
 
-La posición se guarda al pausar, al salir de la reproducción y de forma periódica mientras se
+La posición se guarda al pausar, al salir de la reproducción y cada quince segundos mientras se
 reproduce, de modo que no se pierde si la aplicación se cierra de forma inesperada. El
 contenido reproducido más allá del 95 % se considera terminado y deja de ofrecerse para
 continuar.

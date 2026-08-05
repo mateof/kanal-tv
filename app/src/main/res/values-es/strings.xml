@@ -350,4 +350,17 @@
     <string name="setup_connected_full">Conectado como %1$s. Estado: %2$s · %3$d/%4$d conexiones</string>
     <string name="setup_connect_failed_detail">No se pudo conectar: %s</string>
     <string name="player_paused">en pausa</string>
+
+    <string name="cast_send">Enviar a…</string>
+    <string name="cast_title">Enviar a otro aparato</string>
+    <string name="cast_searching">Buscando aparatos en la red…</string>
+    <string name="cast_none">No se encontró ningún aparato compatible.</string>
+    <string name="cast_none_hint">Tiene que estar encendido, en la misma red y admitir DLNA. Muchas teles lo llaman «renderizador multimedia» y hay que activarlo en sus ajustes.</string>
+    <string name="cast_search_again">Buscar de nuevo</string>
+    <string name="cast_playing_on">Reproduciendo en %s</string>
+    <string name="cast_bring_back">Traer de vuelta</string>
+    <string name="cast_failed">No se pudo enviar a ese aparato.</string>
+    <string name="cast_address">Dirección del aparato</string>
+    <string name="cast_address_hint">Si no aparece en la lista: su IP, o la URL de su descripción.</string>
+    <string name="cast_add">Añadir</string>
 </resources>

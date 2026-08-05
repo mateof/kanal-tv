@@ -10,16 +10,20 @@ import androidx.media3.common.Tracks
 import androidx.media3.exoplayer.ExoPlayer
 import com.mateof.kanal.R
 import com.mateof.kanal.core.UiText
+import com.mateof.kanal.cast.CastDevice
+import com.mateof.kanal.cast.UpnpClient
 import com.mateof.kanal.core.log.FileLogger
 import com.mateof.kanal.data.db.EpgEntity
 import com.mateof.kanal.data.model.Source
 import com.mateof.kanal.data.net.redactUrl
 import com.mateof.kanal.data.prefs.AppPreferences
+import com.mateof.kanal.data.prefs.Settings
 import com.mateof.kanal.data.repo.ContentRepository
 import com.mateof.kanal.data.repo.EpgRepository
 import com.mateof.kanal.data.repo.Playable
 import com.mateof.kanal.data.repo.PlaybackRepository
 import com.mateof.kanal.player.PlayerFactory
+import com.mateof.kanal.player.PlayerHandover
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
@@ -65,6 +69,11 @@ data class PlayerUiState(
     val channelCount: Int = 0,
     /** Non-zero while silently reconnecting after a dropout. */
     val reconnectAttempt: Int = 0,
+    val castDevices: List<CastDevice> = emptyList(),
+    val castSearching: Boolean = false,
+    /** Name of the device the stream was handed to, if any. */
+    val castingTo: String? = null,
+    val castError: Boolean = false,
     /** Days the provider sent guide for, for the in-player guide panel. */
     val guideDays: List<Long> = emptyList(),
     val selectedDay: Long = 0L,
@@ -78,6 +87,8 @@ class PlayerViewModel @Inject constructor(
     private val playback: PlaybackRepository,
     private val epg: EpgRepository,
     private val playerFactory: PlayerFactory,
+    private val handover: PlayerHandover,
+    private val upnp: UpnpClient,
     private val logger: FileLogger
 ) : ViewModel() {
 
@@ -100,6 +111,13 @@ class PlayerViewModel @Inject constructor(
 
     /** Stamped when a stream is queued, to time how long the picture takes. */
     private var startedAt = 0L
+
+    /** Identifies what is playing, for the handover to match on. */
+    private var streamKey = ""
+    private var signature = ""
+
+    /** Mirrors "recordar el último canal": without it there is nobody to hand to. */
+    private var keepChannelOnExit = false
     private var resilient = false
 
     fun load(kind: String, itemId: String, startMillis: Long) {
@@ -165,9 +183,21 @@ class PlayerViewModel @Inject constructor(
         startedAt = System.currentTimeMillis()
         val settings = prefs.settings.first()
         resilient = settings.resilientPlayback
+        keepChannelOnExit = settings.keepLastChannel
         reconnectJob?.cancel()
         reconnects = 0
-        val exo = player ?: playerFactory.create(
+        signature = buildSignature(settings, playable.userAgent)
+        streamKey = playable.url
+
+        // The preview may already be playing this very channel. Taking its
+        // player over keeps the connection and the buffer, so opening a channel
+        // from the list is instant instead of reconnecting from scratch.
+        val adopted = player ?: handover.adopt(streamKey, signature)?.also {
+            it.addListener(listener)
+            player = it
+        }
+        val fresh = adopted == null
+        val exo = adopted ?: playerFactory.create(
             playable.userAgent,
             settings.bufferProfile,
             settings.resilientPlayback,
@@ -180,9 +210,11 @@ class PlayerViewModel @Inject constructor(
         candidates = listOf(playable.url) + playable.fallbackUrls
         candidateIndex = 0
 
-        exo.setMediaItem(playerFactory.mediaItem(playable.url, playable.title))
-        exo.prepare()
-        if (playable.startPositionMs > 0) exo.seekTo(playable.startPositionMs)
+        if (fresh) {
+            exo.setMediaItem(playerFactory.mediaItem(playable.url, playable.title))
+            exo.prepare()
+            if (playable.startPositionMs > 0) exo.seekTo(playable.startPositionMs)
+        }
         exo.playWhenReady = true
 
         val index = channelIds.indexOf(playable.itemId)
@@ -464,6 +496,62 @@ class PlayerViewModel @Inject constructor(
         if (exo.isPlaying) exo.pause() else exo.play()
     }
 
+    fun searchCastDevices() {
+        if (_state.value.castSearching) return
+        viewModelScope.launch {
+            _state.value = _state.value.copy(castSearching = true)
+            val found = upnp.discover()
+            _state.value = _state.value.copy(castDevices = found, castSearching = false)
+        }
+    }
+
+    /** Adds a device typed in by hand, for televisions discovery misses. */
+    fun addCastDevice(address: String) {
+        viewModelScope.launch {
+            _state.value = _state.value.copy(castSearching = true, castError = false)
+            val device = upnp.describeManual(address)
+            _state.value = if (device == null) {
+                _state.value.copy(castSearching = false, castError = true)
+            } else {
+                _state.value.copy(
+                    castSearching = false,
+                    castDevices = (_state.value.castDevices + device).distinctBy { it.id }
+                )
+            }
+        }
+    }
+
+    /**
+     * Hands the stream to [device]. Local playback pauses: the provider is
+     * already serving the other device, and two clients on one account is what
+     * most connection limits are counting.
+     */
+    fun castTo(device: CastDevice) {
+        val playable = _state.value.playable ?: return
+        val url = candidates.getOrNull(candidateIndex) ?: playable.url
+        viewModelScope.launch {
+            upnp.play(device, url, playable.title)
+                .onSuccess {
+                    player?.pause()
+                    _state.value = _state.value.copy(castingTo = device.name)
+                }
+                .onFailure {
+                    logger.w("Cast", "No se pudo enviar a ${device.name}", it)
+                    _state.value = _state.value.copy(castError = true)
+                }
+        }
+    }
+
+    /** Stops the other device and takes the stream back here. */
+    fun stopCast() {
+        val device = _state.value.castDevices.firstOrNull { it.name == _state.value.castingTo }
+        viewModelScope.launch {
+            device?.let { upnp.stop(it) }
+            _state.value = _state.value.copy(castingTo = null)
+            player?.play()
+        }
+    }
+
     /** Absolute seek, used by the progress bar. */
     fun seekTo(positionMs: Long) {
         val exo = player ?: return
@@ -545,8 +633,20 @@ class PlayerViewModel @Inject constructor(
         recordProgress()
         reconnectJob?.cancel()
         ticker?.cancel()
-        player?.release()
+        val exo = player
+        // A live channel is handed to the preview instead of being torn down;
+        // anything else has nowhere to go and is released.
+        if (exo != null && _state.value.playable?.isLive == true && keepChannelOnExit) {
+            handover.park(exo, streamKey, signature, listener)
+        } else {
+            exo?.release()
+        }
         player = null
         super.onCleared()
     }
+
+    private fun buildSignature(settings: Settings, userAgent: String): String =
+        "${settings.bufferProfile.name}|${settings.resilientPlayback}|" +
+            "${settings.subtitlesEnabled}|$userAgent"
+
 }

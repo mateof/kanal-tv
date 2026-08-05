@@ -32,6 +32,8 @@ de programación **XMLTV**.
   aparato.
 - **Tolerancia a interrupciones**: reconexión automática ante cortes de la emisión y prueba
   de contenedores alternativos cuando un canal no responde.
+- **Envío a otro aparato** de la red mediante DLNA/UPnP, sin necesidad de Chromecast ni de
+  servicios de Google.
 - **Temporizador de apagado** y aviso de inactividad configurable.
 - **Manejo táctil y disposición vertical** en móvil y tablet.
 - **Registro exportable** de la actividad de la aplicación.

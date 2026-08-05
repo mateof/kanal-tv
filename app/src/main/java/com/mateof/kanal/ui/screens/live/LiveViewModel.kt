@@ -22,6 +22,7 @@ import com.mateof.kanal.data.repo.ContentRepository
 import com.mateof.kanal.data.repo.EpgRepository
 import com.mateof.kanal.data.repo.PlaybackRepository
 import com.mateof.kanal.player.PlayerFactory
+import com.mateof.kanal.player.PlayerHandover
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.Job
@@ -51,6 +52,7 @@ class LiveViewModel @Inject constructor(
     private val epg: EpgRepository,
     private val playback: PlaybackRepository,
     private val playerFactory: PlayerFactory,
+    private val handover: PlayerHandover,
     private val logger: FileLogger
 ) : ViewModel() {
 
@@ -93,6 +95,18 @@ class LiveViewModel @Inject constructor(
 
     /** What the cached preview player was built for. */
     private var playerSignature = ""
+
+    /** What the preview is playing, so the handover can match on it. */
+    private var previewKey = ""
+
+    private val listener = object : Player.Listener {
+        override fun onPlayerError(error: PlaybackException) {
+            logger.w("Preview", "Vista previa fallida: ${error.errorCodeName}")
+            if (advancePreview()) return
+            _previewError.value = UiText(R.string.live_preview_failed)
+            _previewActive.value = false
+        }
+    }
     private var previewTitle = ""
 
     val source: StateFlow<Source?> =
@@ -216,12 +230,44 @@ class LiveViewModel @Inject constructor(
             previewIndex = 0
             previewTitle = playable.title
 
-            val exo = ensurePlayer(playable.userAgent, config)
-            exo.setMediaItem(playerFactory.mediaItem(playable.url, playable.title))
-            exo.prepare()
-            exo.playWhenReady = true
+            previewKey = playable.url
+            val signature = signatureOf(config, playable.userAgent)
+
+            // Coming back from full screen the player is already on this very
+            // channel: adopting it keeps the picture running instead of
+            // dropping the connection and opening another one.
+            val adopted = handover.adopt(previewKey, signature)
+            if (adopted != null) {
+                releasePlayer()
+                adopted.addListener(listener)
+                player = adopted
+                playerSignature = signature
+                adopted.playWhenReady = true
+            } else {
+                val exo = ensurePlayer(playable.userAgent, config)
+                exo.setMediaItem(playerFactory.mediaItem(playable.url, playable.title))
+                exo.prepare()
+                exo.playWhenReady = true
+            }
             _previewActive.value = true
         }
+    }
+
+    /** Must match what the full-screen player builds, or neither adopts. */
+    private fun signatureOf(config: Settings, userAgent: String): String =
+        "${config.bufferProfile.name}|${config.resilientPlayback}|" +
+            "${config.subtitlesEnabled}|$userAgent"
+
+    /**
+     * Parks the preview for the full-screen player about to open, so opening a
+     * channel from the list carries on rather than reconnecting.
+     */
+    fun handOffPreview() {
+        val exo = player ?: return
+        if (!_previewActive.value || previewKey.isEmpty()) return
+        handover.park(exo, previewKey, playerSignature, listener)
+        player = null
+        _previewActive.value = false
     }
 
     private fun ensurePlayer(userAgent: String, config: Settings): ExoPlayer {
@@ -229,22 +275,23 @@ class LiveViewModel @Inject constructor(
         // cached one keeps whatever was set when it was created. Without this
         // check, changing the buffer in Settings and coming straight back to the
         // list appears to do nothing at all.
-        val signature = "${config.bufferProfile.name}|$userAgent"
+        val signature = signatureOf(config, userAgent)
         if (player != null && signature != playerSignature) {
             logger.d("Preview", "Ajustes cambiados, se rehace el reproductor de vista previa")
             releasePlayer()
         }
         player?.let { return it }
         playerSignature = signature
-        val created = playerFactory.create(userAgent, config.bufferProfile)
-        created.addListener(object : Player.Listener {
-            override fun onPlayerError(error: PlaybackException) {
-                logger.w("Preview", "Vista previa fallida: ${error.errorCodeName}")
-                if (advancePreview()) return
-                _previewError.value = UiText(R.string.live_preview_failed)
-                _previewActive.value = false
-            }
-        })
+        // Built exactly like the full-screen one, settings included: the two
+        // hand the instance to each other, and a player made under different
+        // settings cannot be adopted.
+        val created = playerFactory.create(
+            userAgent,
+            config.bufferProfile,
+            config.resilientPlayback,
+            config.subtitlesEnabled
+        )
+        created.addListener(listener)
         player = created
         return created
     }

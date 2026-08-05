@@ -10,6 +10,7 @@ import androidx.lifecycle.lifecycleScope
 import com.mateof.kanal.core.InactivityWatcher
 import com.mateof.kanal.core.SleepTimer
 import com.mateof.kanal.data.prefs.AppPreferences
+import com.mateof.kanal.player.PlayerHandover
 import com.mateof.kanal.ui.AppShell
 import com.mateof.kanal.ui.KanalNavHost
 import com.mateof.kanal.ui.theme.KanalTheme
@@ -28,6 +29,8 @@ class MainActivity : ComponentActivity() {
     @Inject lateinit var inactivity: InactivityWatcher
 
     @Inject lateinit var prefs: AppPreferences
+
+    @Inject lateinit var handover: PlayerHandover
 
     override fun onCreate(savedInstanceState: Bundle?) {
         installSplashScreen()
@@ -71,6 +74,9 @@ class MainActivity : ComponentActivity() {
     override fun onStop() {
         super.onStop()
         inactivity.stop()
+        // A player parked mid-handover would otherwise keep pulling the stream
+        // with nothing on screen to hand it to.
+        handover.discard()
     }
 
     /** Every touch and every key press on the remote passes through here. */
