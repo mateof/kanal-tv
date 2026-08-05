@@ -53,12 +53,16 @@ class UpnpClient @Inject constructor(
             DatagramSocket().use { socket ->
                 socket.soTimeout = 600
                 socket.broadcast = true
-                val payload = SEARCH.toByteArray()
                 val group = InetAddress.getByName(SSDP_HOST)
-                // Sent more than once: SSDP runs over UDP and a single datagram
-                // going missing is normal on a busy wireless network.
+                // Asked for in several ways, and each one twice. Not every
+                // renderer answers the MediaRenderer device type — some only
+                // reply to the AVTransport service, others just to ssdp:all —
+                // and SSDP runs over UDP, where a lost datagram is routine.
                 repeat(2) {
-                    socket.send(DatagramPacket(payload, payload.size, group, SSDP_PORT))
+                    for (target in SEARCH_TARGETS) {
+                        val payload = searchFor(target).toByteArray()
+                        socket.send(DatagramPacket(payload, payload.size, group, SSDP_PORT))
+                    }
                 }
 
                 val deadline = System.currentTimeMillis() + timeoutMs
@@ -76,8 +80,10 @@ class UpnpClient @Inject constructor(
             }
         }.onFailure { logger.w("Cast", "Fallo buscando aparatos", it) }
 
-        logger.i("Cast", "SSDP: ${locations.size} respuestas")
-        locations.mapNotNull { describe(it) }
+        logger.i("Cast", "SSDP: ${locations.size} descripciones distintas")
+        // ssdp:all answers with everything on the network, printers included.
+        // The description is what decides: only those offering AVTransport stay.
+        locations.mapNotNull { describe(it) }.distinctBy { it.controlUrl }
     }
 
     /**
@@ -137,13 +143,26 @@ class UpnpClient @Inject constructor(
     suspend fun play(device: CastDevice, url: String, title: String): Result<Unit> =
         withContext(Dispatchers.IO) {
             runCatching {
-                soap(device, "SetAVTransportURI", buildString {
+                // Several televisions refuse a new URI while the transport still
+                // holds the previous one, so it is cleared first. A failure here
+                // is expected when nothing was playing and must not stop us.
+                runCatching { soap(device, "Stop", "<InstanceID>0</InstanceID>") }
+
+                fun setUri(metadata: String) = soap(device, "SetAVTransportURI", buildString {
                     append("<InstanceID>0</InstanceID>")
                     append("<CurrentURI>").append(escape(url)).append("</CurrentURI>")
-                    append("<CurrentURIMetaData>")
-                    append(escape(metadata(url, title)))
-                    append("</CurrentURIMetaData>")
+                    append("<CurrentURIMetaData>").append(metadata).append("</CurrentURIMetaData>")
                 })
+
+                // Metadata is where renderers are fussiest — a protocolInfo they
+                // dislike is enough for a refusal — so a rejection is retried
+                // with none at all, which many of them accept.
+                runCatching { setUri(escape(metadata(url, title))) }
+                    .onFailure { first ->
+                        logger.w("Cast", "${device.name} rechazó los metadatos, se reintenta sin ellos: ${first.message}")
+                        setUri("")
+                    }
+
                 soap(device, "Play", "<InstanceID>0</InstanceID><Speed>1</Speed>")
                 logger.i("Cast", "Enviado '$title' a ${device.name}")
             }
@@ -161,12 +180,25 @@ class UpnpClient @Inject constructor(
         val request = Request.Builder()
             .url(device.controlUrl)
             .addHeader("SOAPAction", "\"$AV_TRANSPORT#$action\"")
+            .addHeader("Connection", "close")
             .post(envelope.toRequestBody("text/xml; charset=\"utf-8\"".toMediaType()))
             .build()
 
         http.client.newCall(request).execute().use { response ->
+            val text = runCatching { response.body?.string().orEmpty() }.getOrDefault("")
             if (!response.isSuccessful) {
-                error("$action devolvió ${response.code}")
+                // A UPnP refusal carries its reason in the body. Reporting only
+                // the HTTP status leaves nothing to act on: 500 alone does not
+                // distinguish an unsupported format from a busy transport.
+                val code = tag(text, "errorCode")
+                val reason = tag(text, "errorDescription")
+                error(
+                    buildString {
+                        append("$action devolvió ${response.code}")
+                        if (code != null) append(" · UPnP $code")
+                        if (reason != null) append(" · $reason")
+                    }
+                )
             }
         }
     }
@@ -179,8 +211,20 @@ class UpnpClient @Inject constructor(
             """<item id="0" parentID="-1" restricted="1">""" +
             """<dc:title>${escape(title)}</dc:title>""" +
             """<upnp:class>object.item.videoItem</upnp:class>""" +
-            """<res protocolInfo="http-get:*:video/mpeg:*">${escape(url)}</res>""" +
+            """<res protocolInfo="http-get:*:${mimeOf(url)}:${DLNA_FLAGS}">${escape(url)}</res>""" +
             """</item></DIDL-Lite>"""
+
+    /** Renderers match on this; announcing the wrong container gets refused. */
+    private fun mimeOf(url: String): String {
+        val path = url.substringBefore('?').lowercase()
+        return when {
+            path.endsWith(".m3u8") -> "application/x-mpegURL"
+            path.endsWith(".mp4") -> "video/mp4"
+            path.endsWith(".mkv") -> "video/x-matroska"
+            path.endsWith(".ts") -> "video/mp2t"
+            else -> "video/mpeg"
+        }
+    }
 
     private fun escape(value: String): String = value
         .replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
@@ -205,10 +249,20 @@ class UpnpClient @Inject constructor(
         return tag(xml.substring(at), name)
     }
 
+    private fun searchFor(target: String): String =
+        "M-SEARCH * HTTP/1.1\r\n" +
+            "HOST: $SSDP_HOST:$SSDP_PORT\r\n" +
+            "MAN: \"ssdp:discover\"\r\n" +
+            "MX: 2\r\n" +
+            "ST: $target\r\n\r\n"
+
     private companion object {
         const val SSDP_HOST = "239.255.255.250"
         const val SSDP_PORT = 1900
         const val AV_TRANSPORT = "urn:schemas-upnp-org:service:AVTransport:1"
+
+        /** Live stream, no seeking: what most renderers expect for IPTV. */
+        const val DLNA_FLAGS = "DLNA.ORG_OP=00;DLNA.ORG_FLAGS=01700000000000000000000000000000"
 
         /** Where renderers usually publish their description. */
         val COMMON_PATHS = listOf(
@@ -216,12 +270,16 @@ class UpnpClient @Inject constructor(
             "/rootDesc.xml", "/upnp/desc.xml", ":8060/dial/dd.xml"
         )
 
-        val SEARCH = buildString {
-            append("M-SEARCH * HTTP/1.1\r\n")
-            append("HOST: $SSDP_HOST:$SSDP_PORT\r\n")
-            append("MAN: \"ssdp:discover\"\r\n")
-            append("MX: 2\r\n")
-            append("ST: urn:schemas-upnp-org:device:MediaRenderer:1\r\n\r\n")
-        }
+        /**
+         * Asked for in three ways. Not every renderer answers the
+         * MediaRenderer device type: some reply only to the AVTransport
+         * service, and a few only to ssdp:all. The description then sorts
+         * the wheat from the chaff.
+         */
+        val SEARCH_TARGETS = listOf(
+            "urn:schemas-upnp-org:device:MediaRenderer:1",
+            AV_TRANSPORT,
+            "ssdp:all"
+        )
     }
 }
