@@ -56,6 +56,16 @@ Conviene identificar el origen antes de modificar ajustes:
   Ninguna opción del reproductor reconstruye datos que llegan corruptos; el problema está en
   la instalación o en el proveedor.
 
+### El envío a otro aparato falla
+
+| Síntoma | Qué comprobar |
+| --- | --- |
+| El televisor no aparece en la lista | Que admita DLNA y lo tenga habilitado. En LG suele estar en los ajustes de compartir pantalla o dispositivos conectados; en Samsung, dentro de las opciones de red. Debe estar encendido y en la misma red |
+| Aparece pero rechaza el envío | El registro indica el código UPnP concreto. Kanal ya reintenta sin metadatos, que es la causa más frecuente |
+| Reproduce pero se corta | El televisor descarga la emisión por su cuenta: le aplican los límites de conexiones del proveedor |
+
+Si el aparato no aparece, puede añadirse indicando su dirección IP.
+
 ### La aplicación no se instala
 
 Por orden de frecuencia:
