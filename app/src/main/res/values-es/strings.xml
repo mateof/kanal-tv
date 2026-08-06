@@ -363,4 +363,10 @@
     <string name="cast_address">Dirección del aparato</string>
     <string name="cast_address_hint">Si no aparece en la lista: su IP, o la URL de su descripción.</string>
     <string name="cast_add">Añadir</string>
+
+    <string name="cast_hint_716">La tele no pudo descargar la emisión. Suele ser el límite de conexiones del proveedor —si ya la estás viendo aquí, esa conexión está ocupada— o que la tele no admita emisiones en directo. Prueba a enviarle una película.</string>
+    <string name="cast_hint_714">La tele no admite ese formato de vídeo.</string>
+    <string name="cast_hint_701">La tele estaba ocupada. Inténtalo de nuevo.</string>
+    <string name="cast_hint_402">La tele no entendió la petición.</string>
+    <string name="cast_hint_401">La tele no admite esta acción.</string>
 </resources>

@@ -363,4 +363,10 @@
     <string name="cast_address">Device address</string>
     <string name="cast_address_hint">If it is not listed: its IP, or the URL of its description.</string>
     <string name="cast_add">Add</string>
+
+    <string name="cast_hint_716">The television could not fetch the stream. Usually the connection limit of the provider (if you are already watching it here, that connection is taken), or a television that does not accept live streams. Try sending it a film.</string>
+    <string name="cast_hint_714">The television does not accept that video format.</string>
+    <string name="cast_hint_701">The television was busy. Try again.</string>
+    <string name="cast_hint_402">The television did not understand the request.</string>
+    <string name="cast_hint_401">The television does not support this action.</string>
 </resources>

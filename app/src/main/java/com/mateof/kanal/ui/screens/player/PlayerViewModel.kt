@@ -78,6 +78,8 @@ data class PlayerUiState(
     val castingTo: String? = null,
     /** Why the last attempt failed, shown as-is: the UPnP code is the clue. */
     val castError: String? = null,
+    /** Plain-language reading of the renderer's refusal, when it is known. */
+    val castHint: UiText? = null,
     /** Days the provider sent guide for, for the in-player guide panel. */
     val guideDays: List<Long> = emptyList(),
     val selectedDay: Long = 0L,
@@ -512,7 +514,7 @@ class PlayerViewModel @Inject constructor(
     /** Adds a device typed in by hand, for televisions discovery misses. */
     fun addCastDevice(address: String) {
         viewModelScope.launch {
-            _state.value = _state.value.copy(castSearching = true, castError = null)
+            _state.value = _state.value.copy(castSearching = true, castError = null, castHint = null)
             val device = upnp.describeManual(address)
             _state.value = if (device == null) {
                 _state.value.copy(
@@ -550,15 +552,17 @@ class PlayerViewModel @Inject constructor(
 
             upnp.play(device, url, playable.title)
                 .onSuccess {
-                    _state.value = _state.value.copy(castingTo = device.name, castError = null)
+                    _state.value = _state.value.copy(castingTo = device.name, castError = null, castHint = null)
                 }
                 .onFailure { failure ->
                     logger.w("Cast", "No se pudo enviar a ${device.name}", failure)
                     resumeLocally(resumeFrom)
                     // Shown verbatim on purpose: "no se pudo enviar" is useless
                     // when the renderer already said exactly what it objects to.
+                    val detail = failure.message ?: "Error desconocido"
                     _state.value = _state.value.copy(
-                        castError = failure.message ?: "Error desconocido"
+                        castError = detail,
+                        castHint = hintFor(detail)
                     )
                 }
         }
@@ -574,6 +578,19 @@ class PlayerViewModel @Inject constructor(
             delay(SLOT_RELEASE_MS)
             resumeLocally(resumeFrom)
         }
+    }
+
+    /**
+     * A UPnP code is exact but says nothing about what to do. This turns the
+     * handful that actually come up into something the user can act on.
+     */
+    private fun hintFor(detail: String): UiText? = when {
+        detail.contains("UPnP 716") -> UiText(R.string.cast_hint_716)
+        detail.contains("UPnP 714") -> UiText(R.string.cast_hint_714)
+        detail.contains("UPnP 701") -> UiText(R.string.cast_hint_701)
+        detail.contains("UPnP 402") -> UiText(R.string.cast_hint_402)
+        detail.contains("UPnP 401") -> UiText(R.string.cast_hint_401)
+        else -> null
     }
 
     /** Restarts playback here after the connection was handed over or given up. */

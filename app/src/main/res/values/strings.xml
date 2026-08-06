@@ -370,4 +370,10 @@
     <string name="cast_address">Enderezo do aparato</string>
     <string name="cast_address_hint">Se non aparece na lista: a súa IP, ou a URL da súa descrición.</string>
     <string name="cast_add">Engadir</string>
+
+    <string name="cast_hint_716">A tele non puido descargar a emisión. Adoita ser o límite de conexións do provedor —se xa a está a ver aquí, esa conexión está ocupada— ou que a tele non admita emisións en directo. Proba a enviarlle unha película.</string>
+    <string name="cast_hint_714">A tele non admite ese formato de vídeo.</string>
+    <string name="cast_hint_701">A tele estaba ocupada. Téntao de novo.</string>
+    <string name="cast_hint_402">A tele non entendeu a petición.</string>
+    <string name="cast_hint_401">A tele non admite esta acción.</string>
 </resources>

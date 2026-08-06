@@ -820,9 +820,18 @@ private fun CastSheet(
                 style = MaterialTheme.typography.bodyMedium,
                 color = KanalColors.Error
             )
+            state.castHint?.let { hint ->
+                Spacer(Modifier.height(6.dp))
+                Text(
+                    hint.resolve(),
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = KanalColors.OnSurfaceMuted
+                )
+            }
+            Spacer(Modifier.height(6.dp))
             Text(
                 reason,
-                style = MaterialTheme.typography.bodySmall,
+                style = MaterialTheme.typography.labelSmall,
                 color = KanalColors.OnSurfaceFaint
             )
             Spacer(Modifier.height(12.dp))
