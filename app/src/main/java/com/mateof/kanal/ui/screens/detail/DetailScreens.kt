@@ -24,6 +24,7 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Star
 import androidx.compose.material.icons.outlined.Movie
+import androidx.compose.material.icons.outlined.Cast
 import androidx.compose.material.icons.outlined.PlayArrow
 import androidx.compose.material.icons.outlined.Tv
 import androidx.compose.material3.MaterialTheme
@@ -47,6 +48,9 @@ import com.mateof.kanal.R
 import com.mateof.kanal.core.resolve
 import com.mateof.kanal.core.formatDuration
 import com.mateof.kanal.data.db.EpisodeEntity
+import com.mateof.kanal.ui.cast.CastSheet
+import com.mateof.kanal.ui.cast.CastTarget
+import com.mateof.kanal.ui.cast.CastViewModel
 import com.mateof.kanal.ui.components.ArtworkImage
 import com.mateof.kanal.ui.components.ButtonTone
 import com.mateof.kanal.ui.components.ErrorState
@@ -64,12 +68,15 @@ fun MovieDetailScreen(
     onBack: () -> Unit
 ) {
     val vm: MovieDetailViewModel = hiltViewModel()
+    val castVm: CastViewModel = hiltViewModel()
+    val castState by castVm.state.collectAsStateWithLifecycle()
     val state by vm.state.collectAsStateWithLifecycle()
     val compact = isCompact
 
     LaunchedEffect(movieId) { vm.load(movieId) }
     BackHandler { onBack() }
 
+    Box(Modifier.fillMaxSize()) {
     when {
         state.loading -> LoadingState(stringResource(R.string.detail_loading))
         state.movie == null -> ErrorState(state.error?.resolve().orEmpty()) { KanalButton(stringResource(R.string.common_back), onBack) }
@@ -152,7 +159,8 @@ fun MovieDetailScreen(
                         onPlay = { onPlay(movie.streamId) },
                         isFavorite = state.isFavorite,
                         onToggleFavorite = vm::toggleFavorite,
-                        onBack = onBack
+                        onBack = onBack,
+                        onCast = { castVm.open(CastTarget.Movie(movie.streamId), movie.name) }
                     )
                 }
             }
@@ -213,6 +221,15 @@ fun MovieDetailScreen(
             }
         }
     }
+        CastSheet(
+            state = castState,
+            onSearch = castVm::search,
+            onPick = castVm::sendTo,
+            onAdd = castVm::addByAddress,
+            onStop = castVm::stopSending,
+            onClose = castVm::close
+        )
+    }
 }
 
 @Composable
@@ -222,12 +239,15 @@ fun SeriesDetailScreen(
     onBack: () -> Unit
 ) {
     val vm: SeriesDetailViewModel = hiltViewModel()
+    val castVm: CastViewModel = hiltViewModel()
+    val castState by castVm.state.collectAsStateWithLifecycle()
     val state by vm.state.collectAsStateWithLifecycle()
     val compact = isCompact
 
     LaunchedEffect(seriesId) { vm.load(seriesId) }
     BackHandler { onBack() }
 
+    Box(Modifier.fillMaxSize()) {
     when {
         state.loading -> LoadingState(stringResource(R.string.detail_loading_episodes))
         state.series == null -> ErrorState(state.error?.resolve().orEmpty()) { KanalButton(stringResource(R.string.common_back), onBack) }
@@ -303,7 +323,13 @@ fun SeriesDetailScreen(
                         }
                     }
                     items(episodes, key = { it.episodeId }) { episode ->
-                        EpisodeRow(episode, compact = true) { onPlayEpisode(episode.episodeId) }
+                        EpisodeRow(
+                            episode,
+                            compact = true,
+                            onLongClick = {
+                                castVm.open(CastTarget.Episode(episode.episodeId), episode.title)
+                            }
+                        ) { onPlayEpisode(episode.episodeId) }
                     }
                 }
                 return
@@ -373,13 +399,28 @@ fun SeriesDetailScreen(
                             verticalArrangement = Arrangement.spacedBy(8.dp)
                         ) {
                             items(episodes, key = { it.episodeId }) { episode ->
-                                EpisodeRow(episode, compact = false) { onPlayEpisode(episode.episodeId) }
+                                EpisodeRow(
+                                    episode,
+                                    compact = false,
+                                    onLongClick = {
+                                        castVm.open(CastTarget.Episode(episode.episodeId), episode.title)
+                                    }
+                                ) { onPlayEpisode(episode.episodeId) }
                             }
                         }
                     }
                 }
             }
         }
+    }
+        CastSheet(
+            state = castState,
+            onSearch = castVm::search,
+            onPick = castVm::sendTo,
+            onAdd = castVm::addByAddress,
+            onStop = castVm::stopSending,
+            onClose = castVm::close
+        )
     }
 }
 
@@ -428,7 +469,9 @@ private fun DetailActions(
     onPlay: () -> Unit,
     isFavorite: Boolean,
     onToggleFavorite: () -> Unit,
-    onBack: () -> Unit
+    onBack: () -> Unit,
+    /** Sending straight from here never opens a connection on this device. */
+    onCast: (() -> Unit)? = null
 ) {
     val favoriteLabel = if (isFavorite) stringResource(R.string.detail_in_favorites) else stringResource(R.string.detail_add_favorite)
     if (compact) {
@@ -439,6 +482,14 @@ private fun DetailActions(
                     onClick = onPlay,
                     icon = Icons.Outlined.PlayArrow,
                     tone = ButtonTone.Primary,
+                    modifier = Modifier.fillMaxWidth()
+                )
+            }
+            onCast?.let {
+                KanalButton(
+                    text = stringResource(R.string.cast_send),
+                    onClick = it,
+                    icon = Icons.Outlined.Cast,
                     modifier = Modifier.fillMaxWidth()
                 )
             }
@@ -460,6 +511,9 @@ private fun DetailActions(
                     tone = ButtonTone.Primary
                 )
             }
+            onCast?.let {
+                KanalButton(text = stringResource(R.string.cast_send), onClick = it, icon = Icons.Outlined.Cast)
+            }
             KanalButton(text = favoriteLabel, onClick = onToggleFavorite, icon = Icons.Filled.Star)
             KanalButton(text = stringResource(R.string.common_back), onClick = onBack)
         }
@@ -470,10 +524,12 @@ private fun DetailActions(
 private fun EpisodeRow(
     episode: EpisodeEntity,
     compact: Boolean,
+    onLongClick: (() -> Unit)? = null,
     onClick: () -> Unit
 ) {
     FocusableSurface(
         onClick = onClick,
+        onLongClick = onLongClick,
         modifier = Modifier.fillMaxWidth(),
         shape = RoundedCornerShape(14.dp),
         color = KanalColors.Surface,

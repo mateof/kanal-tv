@@ -8,6 +8,7 @@ import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.interaction.collectIsPressedAsState
 import androidx.compose.foundation.layout.Box
@@ -55,6 +56,8 @@ fun FocusableSurface(
     focusedScale: Float = 1.06f,
     enabled: Boolean = true,
     onFocusState: (Boolean) -> Unit = {},
+    /** Extra actions for this item; null leaves the long press doing nothing. */
+    onLongClick: (() -> Unit)? = null,
     content: @Composable BoxScope.(focused: Boolean) -> Unit
 ) {
     var focused by remember { mutableStateOf(false) }
@@ -107,10 +110,14 @@ fun FocusableSurface(
                 ),
                 shape
             )
-            .clickable(
+            // combinedClickable rather than clickable so a held OK, or a long
+            // press of the finger, can offer the extra actions without adding a
+            // second focusable target beside every row.
+            .combinedClickable(
                 enabled = enabled,
                 interactionSource = interactionSource,
                 indication = null,
+                onLongClick = onLongClick,
                 onClick = onClick
             )
     ) {

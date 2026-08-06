@@ -58,6 +58,9 @@ import com.mateof.kanal.core.resolve
 import com.mateof.kanal.core.formatClock
 import com.mateof.kanal.data.db.ChannelEntity
 import com.mateof.kanal.data.db.EpgEntity
+import com.mateof.kanal.ui.cast.CastSheet
+import com.mateof.kanal.ui.cast.CastTarget
+import com.mateof.kanal.ui.cast.CastViewModel
 import com.mateof.kanal.ui.components.ArtworkImage
 import com.mateof.kanal.ui.components.ChannelGuide
 import com.mateof.kanal.ui.components.FocusableSurface
@@ -82,6 +85,8 @@ fun LiveScreen(
     onBack: () -> Unit = {}
 ) {
     val vm: LiveViewModel = hiltViewModel()
+    val castVm: CastViewModel = hiltViewModel()
+    val castState by castVm.state.collectAsStateWithLifecycle()
 
     // Every route into the full-screen player goes through here, so the preview
     // is always handed over rather than left to be torn down and rebuilt.
@@ -151,7 +156,16 @@ fun LiveScreen(
             favorites = favorites,
             sourceId = source?.id.orEmpty(),
             onSelectCategory = vm::selectCategory,
-            onPlay = { id -> play(id, 0L) }
+            onPlay = { id -> play(id, 0L) },
+            onCastRequest = { id, name -> castVm.open(CastTarget.Channel(id), name) }
+        )
+        CastSheet(
+            state = castState,
+            onSearch = castVm::search,
+            onPick = castVm::sendTo,
+            onAdd = castVm::addByAddress,
+            onStop = castVm::stopSending,
+            onClose = castVm::close
         )
         return
     }
@@ -215,7 +229,10 @@ fun LiveScreen(
                                 now = nowPlaying[channel.epgChannelId],
                                 isFavorite = true,
                                 onFocused = { vm.onChannelFocused(channel) },
-                                onClick = { play(channel.streamId, 0L) }
+                                onClick = { play(channel.streamId, 0L) },
+                                onLongClick = {
+                                    castVm.open(CastTarget.Channel(channel.streamId), channel.name)
+                                }
                             )
                         }
                     }
@@ -232,7 +249,10 @@ fun LiveScreen(
                             now = nowPlaying[channel.epgChannelId],
                             isFavorite = source?.let { favorites.contains("LIVE:${it.id}:${channel.streamId}") } == true,
                             onFocused = { vm.onChannelFocused(channel) },
-                            onClick = { play(channel.streamId, 0L) }
+                            onClick = { play(channel.streamId, 0L) },
+                            onLongClick = {
+                                castVm.open(CastTarget.Channel(channel.streamId), channel.name)
+                            }
                         )
                     }
                     if (paged.itemCount == 0) {
@@ -300,6 +320,14 @@ fun LiveScreen(
             }
         )
     }
+        CastSheet(
+                    state = castState,
+                    onSearch = castVm::search,
+                    onPick = castVm::sendTo,
+                    onAdd = castVm::addByAddress,
+                    onStop = castVm::stopSending,
+                    onClose = castVm::close
+                )
     }
 }
 
@@ -313,7 +341,8 @@ private fun CompactLive(
     favorites: Set<String>,
     sourceId: String,
     onSelectCategory: (String) -> Unit,
-    onPlay: (String) -> Unit
+    onPlay: (String) -> Unit,
+    onCastRequest: (String, String) -> Unit
 ) {
     Column(Modifier.fillMaxSize()) {
         Text(
@@ -368,7 +397,10 @@ private fun CompactLive(
                             now = nowPlaying[channel.epgChannelId],
                             isFavorite = true,
                             onFocused = {},
-                            onClick = { onPlay(channel.streamId) }
+                            onClick = { onPlay(channel.streamId) },
+                            onLongClick = {
+                                onCastRequest(channel.streamId, channel.name)
+                            }
                         )
                     }
                 }
@@ -385,7 +417,10 @@ private fun CompactLive(
                         now = nowPlaying[channel.epgChannelId],
                         isFavorite = favorites.contains("LIVE:$sourceId:${channel.streamId}"),
                         onFocused = {},
-                        onClick = { onPlay(channel.streamId) }
+                        onClick = { onPlay(channel.streamId) },
+                        onLongClick = {
+                            onCastRequest(channel.streamId, channel.name)
+                        }
                     )
                 }
                 if (paged.itemCount == 0) {
@@ -434,7 +469,8 @@ private fun ChannelListRow(
     now: EpgEntity?,
     isFavorite: Boolean,
     onFocused: () -> Unit,
-    onClick: () -> Unit
+    onClick: () -> Unit,
+    onLongClick: (() -> Unit)? = null
 ) {
     FocusableSurface(
         onClick = onClick,
@@ -443,7 +479,8 @@ private fun ChannelListRow(
         color = KanalColors.Surface,
         focusedColor = KanalColors.SurfaceVariant,
         focusedScale = 1.02f,
-        onFocusState = { if (it) onFocused() }
+        onFocusState = { if (it) onFocused() },
+        onLongClick = onLongClick
     ) { isFocused ->
         Row(
             modifier = Modifier

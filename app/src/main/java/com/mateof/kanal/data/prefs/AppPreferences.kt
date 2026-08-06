@@ -99,6 +99,7 @@ class AppPreferences @Inject constructor(
         val SLEEP_MINUTES = intPreferencesKey("sleep_minutes")
         val STILL_WATCHING = booleanPreferencesKey("still_watching")
         val SUBTITLES = booleanPreferencesKey("subtitles_enabled")
+        val CAST_ADDRESSES = stringPreferencesKey("cast_addresses")
     }
 
     // --- Sources -------------------------------------------------------------
@@ -245,6 +246,23 @@ class AppPreferences @Inject constructor(
     suspend fun setSleepTimerMinutes(value: Int) = edit { it[Keys.SLEEP_MINUTES] = value }
     suspend fun setStillWatching(value: Boolean) = edit { it[Keys.STILL_WATCHING] = value }
     suspend fun setSubtitlesEnabled(value: Boolean) = edit { it[Keys.SUBTITLES] = value }
+
+    /**
+     * Televisions added by hand, kept between sessions: the ones that need it
+     * are exactly the ones discovery never finds, so asking again every time
+     * would be asking forever.
+     */
+    val castAddresses: Flow<List<String>> = context.dataStore.data.map { prefs ->
+        decode(prefs[Keys.CAST_ADDRESSES], emptyList())
+    }
+
+    suspend fun rememberCastAddress(address: String) {
+        context.dataStore.edit { prefs ->
+            val all = decode<List<String>>(prefs[Keys.CAST_ADDRESSES], emptyList()).toMutableList()
+            if (!all.contains(address)) all += address
+            prefs[Keys.CAST_ADDRESSES] = json.encodeToString(all)
+        }
+    }
 
     val lastUpdateCheck: Flow<Long> = context.dataStore.data.map { it[Keys.LAST_UPDATE_CHECK] ?: 0L }
     suspend fun setLastUpdateCheck(value: Long) = edit { it[Keys.LAST_UPDATE_CHECK] = value }
