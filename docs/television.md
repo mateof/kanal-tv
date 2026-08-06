@@ -81,9 +81,14 @@ activados siguen activos hasta que se elija **Sin subtítulos**.
 
 ### Enviar a otro aparato
 
-El control **Enviar a…** busca reproductores **DLNA/UPnP** en la red local y ofrece la lista.
-Al elegir uno, la emisión pasa a ese aparato y la reproducción local se detiene; **Traer de
-vuelta** la recupera.
+Hay dos formas de hacerlo:
+
+- **Desde la lista**, con una pulsación larga sobre un canal. Es la recomendada: la emisión
+  no llega a abrirse en este aparato, de modo que sólo se pide una vez al proveedor.
+- **Desde el reproductor**, con el control **Enviar a…**. La reproducción local se detiene
+  antes de dar la orden; **Traer de vuelta** la recupera.
+
+Ambas buscan reproductores **DLNA/UPnP** en la red local y ofrecen la lista.
 
 Consideraciones:
 
@@ -93,7 +98,9 @@ Consideraciones:
   conexión adicional frente al proveedor, y le aplican sus restricciones de agente y de
   número de conexiones simultáneas.
 - Si el televisor no aparece en la lista, puede añadirse indicando su dirección IP o la URL
-  de su descripción UPnP.
+  de su descripción UPnP. Los aparatos añadidos así se conservan entre sesiones.
+- Con cuentas que permiten una sola conexión simultánea no es posible ver el mismo contenido
+  en el televisor y en este aparato a la vez.
 
 No requiere Chromecast ni servicios de Google, por lo que funciona también en aparatos sin
 ellos.

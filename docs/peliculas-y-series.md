@@ -37,6 +37,12 @@ progreso. Los títulos completados dejan de mostrarse.
 El historial se almacena en el aparato y puede borrarse desde
 [Ajustes](ajustes.md#borrar-historial).
 
+## Enviar a otro aparato
+
+Las películas ofrecen **Enviar a…** en su ficha, y los episodios responden a una pulsación
+larga en la lista. En ambos casos el contenido se envía sin abrirse aquí. Ver
+[Televisión en directo](television.md#enviar-a-otro-aparato) para los detalles.
+
 ## Favoritos
 
 Canales, películas y series admiten marcado como favoritos, y todos ellos se agrupan en la
