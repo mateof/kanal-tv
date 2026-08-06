@@ -16,8 +16,8 @@ android {
         // Fire TV sticks of the 2015-2018 generation still run API 22-25.
         minSdk = 23
         targetSdk = 35
-        versionCode = 19
-        versionName = "0.5.2"
+        versionCode = 20
+        versionName = "0.5.3"
     }
 
     signingConfigs {

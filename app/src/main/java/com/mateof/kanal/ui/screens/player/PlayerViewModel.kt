@@ -40,6 +40,9 @@ private const val MAX_RECONNECTS = 6
 /** Ticks of half a second between progress writes. */
 private const val SAVE_EVERY_TICKS = 30
 
+/** Grace for the provider to notice the connection has gone. */
+private const val SLOT_RELEASE_MS = 1_200L
+
 data class TrackOption(
     val id: String,
     /** What the provider called the track, or null when it did not name it. */
@@ -526,21 +529,32 @@ class PlayerViewModel @Inject constructor(
     }
 
     /**
-     * Hands the stream to [device]. Local playback pauses: the provider is
-     * already serving the other device, and two clients on one account is what
-     * most connection limits are counting.
+     * Hands the stream to [device].
+     *
+     * Local playback is stopped *first*, and that order matters. Most IPTV
+     * accounts allow very few simultaneous connections — often exactly one — and
+     * the television fetches the stream itself. Asking it to play something this
+     * app is still holding gets the second client refused by the provider, which
+     * the renderer reports back as "716 Resource not found": an error that points
+     * at the URL and hides the real cause. Pausing is not enough either, since a
+     * paused player keeps its connection open.
      */
     fun castTo(device: CastDevice) {
         val playable = _state.value.playable ?: return
         val url = candidates.getOrNull(candidateIndex) ?: playable.url
         viewModelScope.launch {
+            val resumeFrom = player?.currentPosition ?: 0L
+            player?.stop()
+            // Providers do not always free the slot the instant the socket goes.
+            delay(SLOT_RELEASE_MS)
+
             upnp.play(device, url, playable.title)
                 .onSuccess {
-                    player?.pause()
-                    _state.value = _state.value.copy(castingTo = device.name)
+                    _state.value = _state.value.copy(castingTo = device.name, castError = null)
                 }
                 .onFailure { failure ->
                     logger.w("Cast", "No se pudo enviar a ${device.name}", failure)
+                    resumeLocally(resumeFrom)
                     // Shown verbatim on purpose: "no se pudo enviar" is useless
                     // when the renderer already said exactly what it objects to.
                     _state.value = _state.value.copy(
@@ -553,11 +567,21 @@ class PlayerViewModel @Inject constructor(
     /** Stops the other device and takes the stream back here. */
     fun stopCast() {
         val device = _state.value.castDevices.firstOrNull { it.name == _state.value.castingTo }
+        val resumeFrom = _state.value.positionMs
         viewModelScope.launch {
             device?.let { upnp.stop(it) }
             _state.value = _state.value.copy(castingTo = null)
-            player?.play()
+            delay(SLOT_RELEASE_MS)
+            resumeLocally(resumeFrom)
         }
+    }
+
+    /** Restarts playback here after the connection was handed over or given up. */
+    private fun resumeLocally(positionMs: Long) {
+        val exo = player ?: return
+        exo.prepare()
+        if (positionMs > 0 && _state.value.playable?.isLive == false) exo.seekTo(positionMs)
+        exo.playWhenReady = true
     }
 
     /** Absolute seek, used by the progress bar. */
