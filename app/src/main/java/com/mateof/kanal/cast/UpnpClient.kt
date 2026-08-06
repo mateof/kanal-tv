@@ -164,7 +164,10 @@ class UpnpClient @Inject constructor(
                     }
 
                 soap(device, "Play", "<InstanceID>0</InstanceID><Speed>1</Speed>")
-                logger.i("Cast", "Enviado '$title' a ${device.name}")
+                // The URL goes in the log too: if the renderer accepts the order
+                // and still shows nothing, the next thing to check is whether it
+                // can fetch that address at all, and that needs the address.
+                logger.i("Cast", "Enviado '$title' a ${device.name}: ${redact(url)}")
             }
         }
 
@@ -225,6 +228,10 @@ class UpnpClient @Inject constructor(
             else -> "video/mpeg"
         }
     }
+
+    /** Keeps credentials out of a log the user may end up sharing. */
+    private fun redact(url: String): String =
+        url.replace(Regex("(password|pass|pwd)=[^&]*", RegexOption.IGNORE_CASE), "$1=***")
 
     private fun escape(value: String): String = value
         .replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")

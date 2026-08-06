@@ -814,11 +814,16 @@ private fun CastSheet(
             )
             Spacer(Modifier.height(12.dp))
         }
-        if (state.castError) {
+        state.castError?.let { reason ->
             Text(
                 stringResource(R.string.cast_failed),
                 style = MaterialTheme.typography.bodyMedium,
                 color = KanalColors.Error
+            )
+            Text(
+                reason,
+                style = MaterialTheme.typography.bodySmall,
+                color = KanalColors.OnSurfaceFaint
             )
             Spacer(Modifier.height(12.dp))
         }

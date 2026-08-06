@@ -73,7 +73,8 @@ data class PlayerUiState(
     val castSearching: Boolean = false,
     /** Name of the device the stream was handed to, if any. */
     val castingTo: String? = null,
-    val castError: Boolean = false,
+    /** Why the last attempt failed, shown as-is: the UPnP code is the clue. */
+    val castError: String? = null,
     /** Days the provider sent guide for, for the in-player guide panel. */
     val guideDays: List<Long> = emptyList(),
     val selectedDay: Long = 0L,
@@ -508,10 +509,13 @@ class PlayerViewModel @Inject constructor(
     /** Adds a device typed in by hand, for televisions discovery misses. */
     fun addCastDevice(address: String) {
         viewModelScope.launch {
-            _state.value = _state.value.copy(castSearching = true, castError = false)
+            _state.value = _state.value.copy(castSearching = true, castError = null)
             val device = upnp.describeManual(address)
             _state.value = if (device == null) {
-                _state.value.copy(castSearching = false, castError = true)
+                _state.value.copy(
+                    castSearching = false,
+                    castError = "No responde en esa dirección"
+                )
             } else {
                 _state.value.copy(
                     castSearching = false,
@@ -535,9 +539,13 @@ class PlayerViewModel @Inject constructor(
                     player?.pause()
                     _state.value = _state.value.copy(castingTo = device.name)
                 }
-                .onFailure {
-                    logger.w("Cast", "No se pudo enviar a ${device.name}", it)
-                    _state.value = _state.value.copy(castError = true)
+                .onFailure { failure ->
+                    logger.w("Cast", "No se pudo enviar a ${device.name}", failure)
+                    // Shown verbatim on purpose: "no se pudo enviar" is useless
+                    // when the renderer already said exactly what it objects to.
+                    _state.value = _state.value.copy(
+                        castError = failure.message ?: "Error desconocido"
+                    )
                 }
         }
     }
