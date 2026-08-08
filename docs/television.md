@@ -64,6 +64,20 @@ movimiento, de modo que recorrer una película no provoca una recarga por cada p
 
 Los botones **10 s** siguen disponibles para ajustes finos sin necesidad de enfocar la barra.
 
+### Gestos táctiles
+
+En móvil y tablet, sobre la imagen:
+
+| Gesto | Efecto |
+| --- | --- |
+| Tocar | Muestra los controles; con algo visible, lo oculta |
+| Deslizar a izquierda o derecha | Cierra el vídeo y vuelve a la lista |
+| Deslizar hacia arriba | Pantalla completa en horizontal, sin barras del sistema |
+| Deslizar hacia abajo | Reduce a ventana flotante |
+
+La orientación y las barras del sistema vuelven a su estado anterior al salir de la
+reproducción.
+
 ### Controles
 
 - **Ficha** — descripción completa del programa.

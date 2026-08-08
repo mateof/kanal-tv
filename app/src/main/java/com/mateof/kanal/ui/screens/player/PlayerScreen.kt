@@ -1,5 +1,17 @@
 package com.mateof.kanal.ui.screens.player
 
+import android.app.Activity
+import android.content.Context
+import android.content.ContextWrapper
+import android.content.pm.ActivityInfo
+import androidx.compose.foundation.gestures.detectDragGestures
+import androidx.compose.runtime.DisposableEffect
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalDensity
+import androidx.core.view.WindowInsetsCompat
+import androidx.core.view.WindowInsetsControllerCompat
+import kotlin.math.abs
 import androidx.activity.compose.BackHandler
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.fadeIn
@@ -136,6 +148,31 @@ fun PlayerScreen(
     val castFocus = remember { FocusRequester() }
     var detail by remember { mutableStateOf<ProgrammeDetail?>(null) }
 
+    val context = LocalContext.current
+    val activity = remember(context) { context.findActivity() }
+    val swipeThreshold = with(LocalDensity.current) { 110.dp.toPx() }
+
+    fun goFullscreenLandscape() {
+        val window = activity?.window ?: return
+        activity.requestedOrientation = ActivityInfo.SCREEN_ORIENTATION_SENSOR_LANDSCAPE
+        WindowInsetsControllerCompat(window, window.decorView).apply {
+            systemBarsBehavior =
+                WindowInsetsControllerCompat.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE
+            hide(WindowInsetsCompat.Type.systemBars())
+        }
+    }
+
+    // Whatever the gestures did to the screen belongs to the player, so it is
+    // undone on the way out rather than left for the next screen to inherit.
+    DisposableEffect(activity) {
+        onDispose {
+            val window = activity?.window ?: return@onDispose
+            activity.requestedOrientation = ActivityInfo.SCREEN_ORIENTATION_UNSPECIFIED
+            WindowInsetsControllerCompat(window, window.decorView)
+                .show(WindowInsetsCompat.Type.systemBars())
+        }
+    }
+
     val isLive = state.playable?.isLive == true
     fun liveChannelId(): String? = state.playable?.takeIf { it.isLive }?.itemId
 
@@ -222,7 +259,35 @@ fun PlayerScreen(
             // top and consume their own taps, so they are unaffected.
             .pointerInput(Unit) {
                 detectTapGestures {
-                    if (mode == Mode.Watching) openControls() else mode = Mode.Watching
+                    // Anything showing goes away, including the title band:
+                    // switching mode alone left it up until its timer ran out,
+                    // which read as the tap not having worked.
+                    if (mode != Mode.Watching || osdVisible) {
+                        mode = Mode.Watching
+                        osdVisible = false
+                    } else {
+                        openControls()
+                    }
+                }
+            }
+            // Gestures for the hand, mirroring what the remote does with keys.
+            .pointerInput(swipeThreshold) {
+                var travelled = Offset.Zero
+                detectDragGestures(
+                    onDragStart = { travelled = Offset.Zero },
+                    onDragEnd = {
+                        val (dx, dy) = travelled
+                        when {
+                            abs(dx) > abs(dy) && abs(dx) > swipeThreshold ->
+                                onBack(liveChannelId())
+
+                            dy < -swipeThreshold -> goFullscreenLandscape()
+                            dy > swipeThreshold -> vm.enterPip()
+                        }
+                    }
+                ) { change, drag ->
+                    travelled += drag
+                    change.consume()
                 }
             }
             // Preview, not onKeyEvent: a key event reaches the focused child
@@ -998,4 +1063,17 @@ private fun resizeLabel(mode: Int): String = when (mode) {
     AspectRatioFrameLayout.RESIZE_MODE_ZOOM -> stringResource(R.string.player_zoom)
     AspectRatioFrameLayout.RESIZE_MODE_FILL -> stringResource(R.string.player_stretch)
     else -> stringResource(R.string.player_adjust)
+}
+
+/**
+ * The composition's context is a wrapper around the activity, not the activity
+ * itself, so orientation and system bars have to be reached through the chain.
+ */
+private fun Context.findActivity(): Activity? {
+    var current: Context = this
+    while (current is ContextWrapper) {
+        if (current is Activity) return current
+        current = current.baseContext
+    }
+    return null
 }
