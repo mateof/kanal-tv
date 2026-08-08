@@ -31,6 +31,7 @@ import androidx.compose.material.icons.outlined.ClosedCaption
 import androidx.compose.material.icons.outlined.Forward10
 import androidx.compose.material.icons.outlined.Info
 import androidx.compose.material.icons.outlined.Pause
+import androidx.compose.material.icons.outlined.PictureInPictureAlt
 import androidx.compose.material.icons.outlined.PlayArrow
 import androidx.compose.material.icons.outlined.Replay10
 import androidx.compose.material.icons.outlined.Tune
@@ -119,6 +120,7 @@ fun PlayerScreen(
 ) {
     val vm: PlayerViewModel = hiltViewModel()
     val state by vm.state.collectAsStateWithLifecycle()
+    val inPip by vm.inPip.collectAsStateWithLifecycle()
 
     var mode by remember { mutableStateOf(Mode.Watching) }
     var osdVisible by remember { mutableStateOf(true) }
@@ -149,6 +151,16 @@ fun PlayerScreen(
     }
 
     LaunchedEffect(kind, itemId, startMillis) { vm.load(kind, itemId, startMillis) }
+
+    // A window that small has room for the picture and nothing else, so any
+    // panel still open is put away as it shrinks.
+    LaunchedEffect(inPip) {
+        if (inPip) {
+            mode = Mode.Watching
+            osdVisible = false
+            detail = null
+        }
+    }
 
     // Focus follows the mode, so the arrows always land where the user expects.
     // The control bar and the track panel appear with the same frame that
@@ -305,7 +317,7 @@ fun PlayerScreen(
             )
         }
 
-        if (state.loading || (state.buffering && state.error == null)) {
+        if (!inPip && (state.loading || (state.buffering && state.error == null))) {
             Column(
                 modifier = Modifier.align(Alignment.Center),
                 horizontalAlignment = Alignment.CenterHorizontally
@@ -328,7 +340,7 @@ fun PlayerScreen(
             }
         }
 
-        state.error?.let { errorText ->
+        state.error?.takeIf { !inPip }?.let { errorText ->
             Column(
                 modifier = Modifier
                     .align(Alignment.Center)
@@ -350,7 +362,7 @@ fun PlayerScreen(
         }
 
         AnimatedVisibility(
-            visible = osdVisible && state.error == null,
+            visible = osdVisible && state.error == null && !inPip,
             enter = fadeIn(),
             exit = fadeOut(),
             modifier = Modifier.align(Alignment.BottomStart)
@@ -370,6 +382,8 @@ fun PlayerScreen(
                 onSeekTo = { target -> vm.seekTo(target); poke() },
                 onOpenTracks = { mode = Mode.Tracks; poke() },
                 onOpenCast = { mode = Mode.Cast; vm.searchCastDevices(); poke() },
+                onEnterPip = { vm.enterPip() },
+                pipAvailable = android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.O,
                 onOpenGuide = { mode = Mode.Guide; poke() },
                 onOpenDetail = {
                     val now = state.now ?: return@Osd
@@ -382,7 +396,7 @@ fun PlayerScreen(
             )
         }
 
-        if (mode == Mode.Cast) {
+        if (mode == Mode.Cast && !inPip) {
             CastSheet(
                 state = state,
                 focusRequester = castFocus,
@@ -394,7 +408,7 @@ fun PlayerScreen(
             )
         }
 
-        if (mode == Mode.Tracks) {
+        if (mode == Mode.Tracks && !inPip) {
             TrackPanel(
                 state = state,
                 focusRequester = tracksFocus,
@@ -409,7 +423,7 @@ fun PlayerScreen(
             ProgrammeDialog(detail = open, onDismiss = { detail = null; poke() })
         }
 
-        if (mode == Mode.Guide) {
+        if (mode == Mode.Guide && !inPip) {
             GuidePanel(
                 state = state,
                 focusRequester = guideFocus,
@@ -494,6 +508,8 @@ private fun Osd(
     onSeekForward: () -> Unit,
     onSeekTo: (Long) -> Unit,
     onOpenCast: () -> Unit,
+    onEnterPip: () -> Unit,
+    pipAvailable: Boolean,
     onOpenTracks: () -> Unit,
     onOpenGuide: () -> Unit,
     onOpenDetail: () -> Unit
@@ -671,6 +687,16 @@ private fun Osd(
             add(ControlAction(resizeLabel, Icons.Outlined.AspectRatio, ButtonTone.Neutral, onCycleResize))
             add(ControlAction(stringResource(R.string.player_audio_subtitles), Icons.Outlined.Tune, ButtonTone.Neutral, onOpenTracks))
             add(ControlAction(stringResource(R.string.cast_send), Icons.Outlined.Cast, ButtonTone.Neutral, onOpenCast))
+            if (pipAvailable) {
+                add(
+                    ControlAction(
+                        stringResource(R.string.player_pip),
+                        Icons.Outlined.PictureInPictureAlt,
+                        ButtonTone.Neutral,
+                        onEnterPip
+                    )
+                )
+            }
         }
 
         // FlowRow, not Row: on a phone the five controls do not fit across one

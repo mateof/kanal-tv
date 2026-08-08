@@ -79,6 +79,20 @@ Los subtítulos permanecen **desactivados** hasta que se seleccionan de forma ex
 la emisión los incluya. La elección se conserva entre reproducciones y entre sesiones: una vez
 activados siguen activos hasta que se elija **Sin subtítulos**.
 
+### Ventana pequeña
+
+El control **Ventana pequeña** reduce la reproducción a una ventana flotante y deja el resto
+del aparato libre. También ocurre al salir de la aplicación mientras se reproduce.
+
+La emisión no se interrumpe: la conexión con el proveedor se mantiene abierta, de modo que no
+cuenta como una reproducción nueva.
+
+Dentro de la ventana no se muestra ningún control de la aplicación. El sistema aporta los
+suyos al tocarla: cerrar, ajustes y volver a pantalla completa. La ventana se puede mover y
+redimensionar con los gestos habituales del sistema.
+
+Requiere Android 8.0 o superior; en versiones anteriores el control no aparece.
+
 ### Enviar a otro aparato
 
 Hay dos formas de hacerlo:

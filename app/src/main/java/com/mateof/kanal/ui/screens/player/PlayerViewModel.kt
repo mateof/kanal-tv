@@ -7,6 +7,7 @@ import androidx.media3.common.PlaybackException
 import androidx.media3.common.Player
 import androidx.media3.common.TrackSelectionOverride
 import androidx.media3.common.Tracks
+import androidx.media3.common.VideoSize
 import androidx.media3.exoplayer.ExoPlayer
 import com.mateof.kanal.R
 import com.mateof.kanal.core.UiText
@@ -23,6 +24,7 @@ import com.mateof.kanal.data.repo.EpgRepository
 import com.mateof.kanal.data.repo.Playable
 import com.mateof.kanal.data.repo.PlaybackRepository
 import com.mateof.kanal.player.PlayerFactory
+import com.mateof.kanal.player.PipController
 import com.mateof.kanal.player.PlayerHandover
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.Job
@@ -94,6 +96,7 @@ class PlayerViewModel @Inject constructor(
     private val epg: EpgRepository,
     private val playerFactory: PlayerFactory,
     private val handover: PlayerHandover,
+    private val pip: PipController,
     private val upnp: UpnpClient,
     private val logger: FileLogger
 ) : ViewModel() {
@@ -328,6 +331,12 @@ class PlayerViewModel @Inject constructor(
                 buffering = false,
                 playing = false
             )
+        }
+
+        override fun onVideoSizeChanged(videoSize: VideoSize) {
+            // The floating window is given the picture's own shape, so a 4:3
+            // channel does not end up letterboxed inside a 16:9 box.
+            pip.setVideoSize(videoSize.width, videoSize.height)
         }
 
         override fun onTracksChanged(tracks: Tracks) {
@@ -569,6 +578,12 @@ class PlayerViewModel @Inject constructor(
     }
 
     /** Stops the other device and takes the stream back here. */
+    /** True while the app is the little floating window. */
+    val inPip: StateFlow<Boolean> = pip.active
+
+    /** Asks the activity to shrink into a floating window. */
+    fun enterPip() = pip.request()
+
     fun stopCast() {
         val device = _state.value.castDevices.firstOrNull { it.name == _state.value.castingTo }
         val resumeFrom = _state.value.positionMs
@@ -679,6 +694,7 @@ class PlayerViewModel @Inject constructor(
     }
 
     override fun onCleared() {
+        pip.clearVideo()
         recordProgress()
         reconnectJob?.cancel()
         ticker?.cancel()

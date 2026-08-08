@@ -369,4 +369,5 @@
     <string name="cast_hint_701">The television was busy. Try again.</string>
     <string name="cast_hint_402">The television did not understand the request.</string>
     <string name="cast_hint_401">The television does not support this action.</string>
+    <string name="player_pip">Small window</string>
 </resources>

@@ -376,4 +376,5 @@
     <string name="cast_hint_701">A tele estaba ocupada. Téntao de novo.</string>
     <string name="cast_hint_402">A tele non entendeu a petición.</string>
     <string name="cast_hint_401">A tele non admite esta acción.</string>
+    <string name="player_pip">Ventá pequena</string>
 </resources>
