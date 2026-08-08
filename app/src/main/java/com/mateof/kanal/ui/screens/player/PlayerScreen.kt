@@ -516,6 +516,11 @@ private fun Osd(
 ) {
     val playable = state.playable ?: return
     val isCompactWidth = isCompact
+
+    // Which button the focus is on, so its name can be shown while the rest stay
+    // as bare icons.
+    var focusedLabel by remember { mutableStateOf<String?>(null) }
+    LaunchedEffect(controlsActive) { if (!controlsActive) focusedLabel = null }
     Column(
         Modifier
             .fillMaxWidth()
@@ -712,14 +717,20 @@ private fun Osd(
                     onClick = action.onClick,
                     icon = action.icon,
                     tone = action.tone,
+                    iconOnly = true,
+                    onFocusState = { focused -> if (focused) focusedLabel = action.label },
                     modifier = if (index == 0) Modifier.focusRequester(controlsFocus) else Modifier
                 )
             }
         }
 
         Spacer(Modifier.height(14.dp))
+        // Seven labelled buttons ate half the screen over the picture, so the
+        // labels went. The one that matters is the focused button's, and it
+        // takes the line the hint was already using rather than a new one.
         Text(
             text = when {
+                focusedLabel != null -> focusedLabel.orEmpty()
                 controlsActive -> stringResource(R.string.player_hint_controls)
                 playable.isLive -> stringResource(R.string.player_hint_live)
                 else -> stringResource(R.string.player_hint_vod)
