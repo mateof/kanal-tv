@@ -131,7 +131,7 @@
     <string name="player_no_subtitle_tracks">This stream carries no subtitles.</string>
     <string name="player_track_number">Track %d</string>
     <string name="player_reconnecting">Reconnecting… (%d)</string>
-    <string name="player_hint_live">Up and down change channel · Hold OK for the menu · BACK exits</string>
+    <string name="player_hint_live">Up and down walk the channels · Hold OK for the menu · BACK exits</string>
     <string name="player_hint_vod">Left and right ±10 s · Hold OK for the menu · BACK exits</string>
 
     <!-- Playback errors -->
@@ -372,4 +372,6 @@
     <string name="player_back_10">Back 10 s</string>
     <string name="player_forward_10">Forward 10 s</string>
     <string name="player_image_mode">Picture: %1$s</string>
+    <string name="player_hint_browse">Up and down walk the list · OK switches to this channel · BACK returns</string>
+    <string name="player_channel_position">%1$d of %2$d</string>
 </resources>

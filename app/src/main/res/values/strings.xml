@@ -138,7 +138,7 @@
     <string name="player_no_subtitle_tracks">Esta emisión non trae subtítulos.</string>
     <string name="player_track_number">Pista %d</string>
     <string name="player_reconnecting">Reconectando… (%d)</string>
-    <string name="player_hint_live">Arriba e abaixo cambian de canle · Mantén premido OK para o menú · ATRÁS sae</string>
+    <string name="player_hint_live">Arriba e abaixo percorren as canles · Mantén premido OK para o menú · ATRÁS sae</string>
     <string name="player_hint_vod">Esquerda e dereita ±10 s · Mantén premido OK para o menú · ATRÁS sae</string>
 
     <!-- Erros de reprodución -->
@@ -379,4 +379,6 @@
     <string name="player_back_10">Atrás 10 s</string>
     <string name="player_forward_10">Adiante 10 s</string>
     <string name="player_image_mode">Imaxe: %1$s</string>
+    <string name="player_hint_browse">Arriba e abaixo percorren a lista · OK cambia a esta canle · ATRÁS volve</string>
+    <string name="player_channel_position">%1$d de %2$d</string>
 </resources>

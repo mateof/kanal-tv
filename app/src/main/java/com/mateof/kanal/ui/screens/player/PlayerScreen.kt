@@ -177,6 +177,9 @@ fun PlayerScreen(
     }
 
     fun openMenu() {
+        // The menu acts on the channel playing, so a browsed one is dropped
+        // rather than left to make the two disagree about what is on screen.
+        vm.cancelBrowse()
         osdVisible = true
         osdTick++
         mode = Mode.Menu
@@ -216,10 +219,13 @@ fun PlayerScreen(
     }
 
     // The bar only fades out while watching; it must stay while it is being used.
+    // A browsed channel expires with it, so the next press reports the channel
+    // actually playing rather than resuming a walk the user has left behind.
     LaunchedEffect(osdTick, mode) {
         if (mode != Mode.Watching) return@LaunchedEffect
         delay(OSD_TIMEOUT_MS)
         osdVisible = false
+        vm.cancelBrowse()
     }
 
     fun goBack() {
@@ -227,8 +233,17 @@ fun PlayerScreen(
             Mode.Tracks, Mode.Guide, Mode.Cast -> mode = Mode.Menu
             Mode.Menu -> mode = Mode.Watching
             // The title sitting over the picture has to go the moment BACK is
-            // pressed, not on the next auto-hide tick.
-            Mode.Watching -> if (osdVisible) osdVisible = false else onBack(liveChannelId())
+            // pressed, not on the next auto-hide tick. A channel being browsed
+            // goes with it: the band and what it is reporting are one thing.
+            Mode.Watching -> when {
+                state.browse != null -> {
+                    vm.cancelBrowse()
+                    osdVisible = false
+                }
+
+                osdVisible -> osdVisible = false
+                else -> onBack(liveChannelId())
+            }
         }
     }
 
@@ -263,6 +278,7 @@ fun PlayerScreen(
                         if (mode != Mode.Watching || osdVisible) {
                             mode = Mode.Watching
                             osdVisible = false
+                            vm.cancelBrowse()
                         } else {
                             poke()
                         }
@@ -319,15 +335,18 @@ fun PlayerScreen(
                 if (mode != Mode.Watching) return@onKeyEvent false
                 if (event.type != KeyEventType.KeyDown) return@onKeyEvent false
                 when (event.key) {
+                    // Walk the list without leaving the channel. Nothing is tuned
+                    // until OK says so, so passing over a channel costs neither a
+                    // reconnection nor the picture being watched.
                     Key.DirectionUp -> {
                         poke()
-                        if (isLive) vm.zap(-1)
+                        if (isLive) vm.browse(-1)
                         true
                     }
 
                     Key.DirectionDown -> {
                         poke()
-                        if (isLive) vm.zap(1)
+                        if (isLive) vm.browse(1)
                         true
                     }
 
@@ -353,6 +372,9 @@ fun PlayerScreen(
                             swallowCentreUp = true
                             openMenu()
                         } else {
+                            // Confirms the channel being browsed; with nothing
+                            // browsed it is just "show me what is on".
+                            vm.playBrowsed()
                             poke()
                         }
                         true
@@ -384,6 +406,11 @@ fun PlayerScreen(
                 update = { view ->
                     view.player = player
                     view.resizeMode = resizeMode
+                    // Holding the last frame is right for a stumble mid-channel,
+                    // where the picture returns in a moment. On a change of
+                    // channel it is wrong: it would leave the previous channel
+                    // on screen for as long as the new one takes to arrive.
+                    view.setKeepContentOnPlayerReset(!state.switching)
                 },
                 modifier = Modifier.fillMaxSize()
             )
@@ -669,6 +696,17 @@ private fun Osd(
     val playable = state.playable ?: return
     val isCompactWidth = isCompact
 
+    // While the arrows are walking the list the band reports the channel being
+    // looked at, not the one playing. Everything below reads these rather than
+    // the state directly, so there is one place where the two can differ.
+    val browse = state.browse
+    val title = browse?.title ?: playable.title
+    val logo = browse?.logo ?: playable.logo
+    val subtitle = browse?.subtitle ?: playable.subtitle
+    val position = browse?.index ?: state.channelIndex
+    val now = browse?.now ?: state.now
+    val next = browse?.next ?: state.next
+
     Column(
         Modifier
             .fillMaxWidth()
@@ -678,7 +716,7 @@ private fun Osd(
             .padding(start = 56.dp, end = 56.dp, top = 60.dp, bottom = 40.dp)
     ) {
         Row(verticalAlignment = Alignment.CenterVertically) {
-            if (playable.logo.isNotBlank()) {
+            if (logo.isNotBlank()) {
                 Box(
                     Modifier
                         .size(84.dp, 52.dp)
@@ -686,8 +724,8 @@ private fun Osd(
                         .background(Color(0x33FFFFFF))
                 ) {
                     ArtworkImage(
-                        url = playable.logo,
-                        label = playable.title,
+                        url = logo,
+                        label = title,
                         fallbackIcon = Icons.Outlined.ClosedCaption,
                         contentScale = ContentScale.Fit,
                         padding = 6.dp
@@ -697,18 +735,26 @@ private fun Osd(
             }
             Column(Modifier.weight(1f)) {
                 Text(
-                    playable.title,
+                    title,
                     style = MaterialTheme.typography.headlineSmall,
-                    color = Color.White,
+                    // Tinted while browsing, so a glance tells the band apart
+                    // from the one reporting the channel actually playing.
+                    color = if (browse != null) KanalColors.Accent else Color.White,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis
                 )
                 Text(
                     buildString {
-                        if (playable.subtitle.isNotBlank()) append(playable.subtitle)
-                        if (state.channelCount > 0 && state.channelIndex >= 0) {
+                        if (subtitle.isNotBlank()) append(subtitle)
+                        if (state.channelCount > 0 && position >= 0) {
                             if (isNotEmpty()) append("  ·  ")
-                            append("${state.channelIndex + 1} de ${state.channelCount}")
+                            append(
+                                stringResource(
+                                    R.string.player_channel_position,
+                                    position + 1,
+                                    state.channelCount
+                                )
+                            )
                         }
                     },
                     style = MaterialTheme.typography.labelMedium,
@@ -721,7 +767,6 @@ private fun Osd(
 
         Spacer(Modifier.height(18.dp))
 
-        val now = state.now
         if (playable.isLive && now != null) {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Text(
@@ -759,7 +804,7 @@ private fun Osd(
                     modifier = Modifier.fillMaxWidth(if (isCompactWidth) 1f else 0.72f)
                 )
             }
-            state.next?.let { next ->
+            next?.let { next ->
                 Spacer(Modifier.height(8.dp))
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Text(
@@ -817,10 +862,10 @@ private fun Osd(
         // The one line that says how to reach everything else. Without it the
         // long press is invisible: there is nothing on screen to suggest it.
         Text(
-            text = if (playable.isLive) {
-                stringResource(R.string.player_hint_live)
-            } else {
-                stringResource(R.string.player_hint_vod)
+            text = when {
+                browse != null -> stringResource(R.string.player_hint_browse)
+                playable.isLive -> stringResource(R.string.player_hint_live)
+                else -> stringResource(R.string.player_hint_vod)
             },
             style = MaterialTheme.typography.labelSmall,
             color = KanalColors.OnSurfaceFaint

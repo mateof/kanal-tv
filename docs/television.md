@@ -50,15 +50,29 @@ que exceden el ancho disponible se desplazan horizontalmente.
 
 | Tecla | Emisión en directo | Películas y series |
 | --- | --- | --- |
-| **Arriba / Abajo** | Canal siguiente y anterior | — |
+| **Arriba / Abajo** | Recorren la lista de canales | — |
 | **Izquierda / Derecha** | — | Retroceso y avance de 10 segundos |
-| **OK** | Muestra el rótulo del canal | Muestra la barra de progreso |
+| **OK** | Cambia al canal recorrido, o muestra el rótulo | Muestra la barra de progreso |
 | **OK mantenido** | Abre el menú | Abre el menú |
-| **ATRÁS** | Sale de la reproducción | Sale de la reproducción |
+| **ATRÁS** | Cancela el recorrido, o sale | Sale de la reproducción |
 
 Con el menú abierto, **arriba** y **abajo** recorren las opciones y **ATRÁS** regresa al vídeo.
 La línea inferior recuerda esta correspondencia, ya que muchos mandos de televisión carecen de
 tecla de menú; donde exista, **MENÚ** o **INFO** abren lo mismo con una sola pulsación.
+
+### Recorrer canales sin cambiar
+
+Arriba y abajo recorren la lista mientras el canal en curso continúa emitiéndose. El rótulo
+inferior pasa a describir el canal señalado —nombre, logotipo, posición y programación— y se
+distingue del habitual porque el nombre aparece resaltado. Nada se sintoniza hasta que se
+pulsa **OK**, de modo que pasar por encima de diez canales no cuesta diez conexiones ni
+interrumpe lo que se está viendo.
+
+**ATRÁS** abandona el recorrido, igual que dejar pasar unos segundos sin tocar el mando. En
+ambos casos la siguiente pulsación de OK vuelve a describir el canal en emisión.
+
+Al cambiar, la emisión anterior se corta de inmediato: no se solapan ni la imagen ni el
+sonido, y la conexión con el proveedor se libera antes de pedir la siguiente.
 
 ### Desplazarse por la reproducción
 

@@ -60,6 +60,22 @@ data class TrackOption(
     val trackIndex: Int
 )
 
+/**
+ * A channel being looked at without being tuned to.
+ *
+ * Up and down walk the list while the current channel carries on playing, so
+ * the guide can be checked before committing to a change. Holds its own copy of
+ * what to show, because none of it belongs to what is on screen.
+ */
+data class BrowseInfo(
+    val index: Int,
+    val title: String,
+    val subtitle: String,
+    val logo: String,
+    val now: EpgEntity? = null,
+    val next: EpgEntity? = null
+)
+
 data class PlayerUiState(
     val playable: Playable? = null,
     val loading: Boolean = true,
@@ -74,6 +90,10 @@ data class PlayerUiState(
     val subtitleTracks: List<TrackOption> = emptyList(),
     val channelIndex: Int = -1,
     val channelCount: Int = 0,
+    /** Non-null while the arrows are walking the list instead of zapping. */
+    val browse: BrowseInfo? = null,
+    /** True from queueing a new channel until its first frame is on screen. */
+    val switching: Boolean = false,
     /** Non-zero while silently reconnecting after a dropout. */
     val reconnectAttempt: Int = 0,
     val castDevices: List<CastDevice> = emptyList(),
@@ -122,7 +142,11 @@ class PlayerViewModel @Inject constructor(
     private var candidateIndex = 0
     private var reconnectJob: Job? = null
     private var favoritesJob: Job? = null
+    private var browseJob: Job? = null
     private var reconnects = 0
+
+    /** Where the arrows have walked to, kept out of the state so it can lead it. */
+    private var browseIndex: Int? = null
 
     /** Stamped when a stream is queued, to time how long the picture takes. */
     private var startedAt = 0L
@@ -202,14 +226,17 @@ class PlayerViewModel @Inject constructor(
         reconnectJob?.cancel()
         reconnects = 0
         signature = buildSignature(settings, playable.userAgent)
+        val previousKey = streamKey
         streamKey = playable.url
 
         // The preview may already be playing this very channel. Taking its
         // player over keeps the connection and the buffer, so opening a channel
         // from the list is instant instead of reconnecting from scratch.
+        var adoptedFromPreview = false
         val adopted = player ?: handover.adopt(streamKey, signature)?.also {
             it.addListener(listener)
             player = it
+            adoptedFromPreview = true
         }
         val fresh = adopted == null
         val exo = adopted ?: playerFactory.create(
@@ -225,7 +252,20 @@ class PlayerViewModel @Inject constructor(
         candidates = listOf(playable.url) + playable.fallbackUrls
         candidateIndex = 0
 
-        if (fresh) {
+        // Only a player taken over from the preview is already showing this
+        // stream. Anything else has to be pointed at it — including the player
+        // we already had, which is the case when changing channel. Skipping this
+        // left the previous channel running: it carried on until it happened to
+        // fail, and only then did the retry pick up the new url, which is what
+        // made a change of channel take seconds and sound like the old one.
+        val alreadyPlayingThis = adoptedFromPreview || (!fresh && previousKey == playable.url)
+        if (!alreadyPlayingThis) {
+            // Stopped first and on purpose: a channel change should cut, not
+            // fade. It also frees the provider's connection slot before the
+            // next request asks for another one.
+            exo.stop()
+            exo.clearMediaItems()
+            _state.value = _state.value.copy(switching = true)
             exo.setMediaItem(playerFactory.mediaItem(playable.url, playable.title))
             exo.prepare()
             if (playable.startPositionMs > 0) exo.seekTo(playable.startPositionMs)
@@ -376,6 +416,12 @@ class PlayerViewModel @Inject constructor(
                 buffering = false,
                 playing = false
             )
+        }
+
+        // The new channel is on screen, so the picture is worth keeping again if
+        // the connection stumbles later.
+        override fun onRenderedFirstFrame() {
+            if (_state.value.switching) _state.value = _state.value.copy(switching = false)
         }
 
         override fun onVideoSizeChanged(videoSize: VideoSize) {
@@ -677,17 +723,67 @@ class PlayerViewModel @Inject constructor(
         exo.seekTo((exo.currentPosition + deltaMs).coerceAtLeast(0))
     }
 
-    /** @return false when there is nothing to zap to. */
-    fun zap(delta: Int): Boolean {
+    /**
+     * Moves the browsed position by [delta] without touching what is playing.
+     *
+     * The index advances at once and the details are filled in when the read
+     * lands, so holding the arrow down runs along the list at the speed of the
+     * remote rather than the speed of the database.
+     *
+     * @return false when there is nothing to walk through.
+     */
+    fun browse(delta: Int): Boolean {
         val current = source ?: return false
         if (channelIds.isEmpty()) return false
-        val index = _state.value.channelIndex
-        if (index < 0) return false
-        val target = (index + delta).mod(channelIds.size)
+        val from = browseIndex ?: _state.value.channelIndex
+        if (from < 0) return false
+
+        val target = (from + delta).mod(channelIds.size)
+        browseIndex = target
+        browseJob?.cancel()
+        browseJob = viewModelScope.launch {
+            val channel = content.channel(current.id, channelIds[target]) ?: return@launch
+            val nowNext = channel.epgChannelId
+                .takeIf { it.isNotBlank() }
+                ?.let { epg.nowNext(current.id, it) }
+            _state.value = _state.value.copy(
+                browse = BrowseInfo(
+                    index = target,
+                    title = channel.name,
+                    subtitle = channel.categoryName,
+                    logo = channel.logo,
+                    now = nowNext?.now,
+                    next = nowNext?.next
+                )
+            )
+        }
+        return true
+    }
+
+    /** Gives up on the browsed channel and goes back to reporting the current one. */
+    fun cancelBrowse() {
+        if (browseIndex == null && _state.value.browse == null) return
+        browseIndex = null
+        browseJob?.cancel()
+        _state.value = _state.value.copy(browse = null)
+    }
+
+    /**
+     * Tunes to whatever was being browsed.
+     *
+     * @return false when nothing was being browsed, so the caller can treat the
+     *   press as the plain "show me what is on" it then is.
+     */
+    fun playBrowsed(): Boolean {
+        val target = browseIndex ?: return false
+        val current = source ?: return false
+        cancelBrowse()
+        if (target == _state.value.channelIndex) return false
+
         viewModelScope.launch {
             val channel = content.channel(current.id, channelIds[target]) ?: return@launch
             val playable = playback.forChannel(current, channel)
-            _state.value = _state.value.copy(channelIndex = target, error = null)
+            _state.value = _state.value.copy(channelIndex = target, error = null, buffering = true)
             start(playable)
         }
         return true
