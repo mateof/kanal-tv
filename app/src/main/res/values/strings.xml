@@ -138,9 +138,8 @@
     <string name="player_no_subtitle_tracks">Esta emisión non trae subtítulos.</string>
     <string name="player_track_number">Pista %d</string>
     <string name="player_reconnecting">Reconectando… (%d)</string>
-    <string name="player_hint_live">Arriba e abaixo cambian de canle · OK abre os controis e a guía · ATRÁS sae</string>
-    <string name="player_hint_vod">Esquerda e dereita ±10 s · OK abre os controis · ATRÁS sae</string>
-    <string name="player_hint_controls">Esquerda e dereita para moverte polos botóns · ATRÁS volve ao vídeo</string>
+    <string name="player_hint_live">Arriba e abaixo cambian de canle · Mantén premido OK para o menú · ATRÁS sae</string>
+    <string name="player_hint_vod">Esquerda e dereita ±10 s · Mantén premido OK para o menú · ATRÁS sae</string>
 
     <!-- Erros de reprodución -->
     <string name="error_no_source">Non hai ningunha fonte activa.</string>
@@ -377,4 +376,7 @@
     <string name="cast_hint_402">A tele non entendeu a petición.</string>
     <string name="cast_hint_401">A tele non admite esta acción.</string>
     <string name="player_pip">Ventá pequena</string>
+    <string name="player_back_10">Atrás 10 s</string>
+    <string name="player_forward_10">Adiante 10 s</string>
+    <string name="player_image_mode">Imaxe: %1$s</string>
 </resources>

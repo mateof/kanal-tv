@@ -131,9 +131,8 @@
     <string name="player_no_subtitle_tracks">This stream carries no subtitles.</string>
     <string name="player_track_number">Track %d</string>
     <string name="player_reconnecting">Reconnecting… (%d)</string>
-    <string name="player_hint_live">Up and down change channel · OK opens the controls and the guide · BACK exits</string>
-    <string name="player_hint_vod">Left and right ±10 s · OK opens the controls · BACK exits</string>
-    <string name="player_hint_controls">Left and right move between buttons · BACK returns to the video</string>
+    <string name="player_hint_live">Up and down change channel · Hold OK for the menu · BACK exits</string>
+    <string name="player_hint_vod">Left and right ±10 s · Hold OK for the menu · BACK exits</string>
 
     <!-- Playback errors -->
     <string name="error_no_source">No source is active.</string>
@@ -370,4 +369,7 @@
     <string name="cast_hint_402">The television did not understand the request.</string>
     <string name="cast_hint_401">The television does not support this action.</string>
     <string name="player_pip">Small window</string>
+    <string name="player_back_10">Back 10 s</string>
+    <string name="player_forward_10">Forward 10 s</string>
+    <string name="player_image_mode">Picture: %1$s</string>
 </resources>

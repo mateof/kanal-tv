@@ -27,6 +27,16 @@ previa. Desde la lista:
 - **ATRÁS** devuelve el canal a pantalla completa.
 - **ATRÁS dos veces consecutivas** abandona la lista.
 
+### Favoritos
+
+Una pulsación larga sobre cualquier canal de la lista —el dedo sobre la fila, o la tecla OK
+mantenida— abre un menú con **Añadir a favoritos** y **Enviar a…**. La opción cambia de nombre
+según el estado, de manera que sirve tanto para marcar como para desmarcar, y la estrella
+aparece en la fila en el momento. Los canales marcados se filtran con la pestaña **Favoritos**
+del listado.
+
+Lo mismo puede hacerse desde el propio reproductor, en el menú descrito más abajo.
+
 ## Reproductor
 
 ![Reproductor](img/reproductor.png)
@@ -42,12 +52,13 @@ que exceden el ancho disponible se desplazan horizontalmente.
 | --- | --- | --- |
 | **Arriba / Abajo** | Canal siguiente y anterior | — |
 | **Izquierda / Derecha** | — | Retroceso y avance de 10 segundos |
-| **OK** | Abre los controles | Abre los controles |
+| **OK** | Muestra el rótulo del canal | Muestra la barra de progreso |
+| **OK mantenido** | Abre el menú | Abre el menú |
 | **ATRÁS** | Sale de la reproducción | Sale de la reproducción |
 
-Con los controles abiertos, **izquierda** y **derecha** desplazan el foco entre los botones y
-**ATRÁS** regresa al vídeo. La línea inferior recuerda esta correspondencia, ya que muchos
-mandos de televisión carecen de tecla de menú.
+Con el menú abierto, **arriba** y **abajo** recorren las opciones y **ATRÁS** regresa al vídeo.
+La línea inferior recuerda esta correspondencia, ya que muchos mandos de televisión carecen de
+tecla de menú; donde exista, **MENÚ** o **INFO** abren lo mismo con una sola pulsación.
 
 ### Desplazarse por la reproducción
 
@@ -62,7 +73,8 @@ Mientras la barra se mueve se muestra el punto de destino y su diferencia respec
 posición actual. El salto se aplica al soltar, al pulsar OK o tras un instante sin
 movimiento, de modo que recorrer una película no provoca una recarga por cada pulsación.
 
-Los botones **10 s** siguen disponibles para ajustes finos sin necesidad de enfocar la barra.
+Las opciones **Retroceder 10 s** y **Avanzar 10 s** del menú permiten ajustes finos sin
+necesidad de enfocar la barra.
 
 ### Gestos táctiles
 
@@ -70,7 +82,8 @@ En móvil y tablet, sobre la imagen:
 
 | Gesto | Efecto |
 | --- | --- |
-| Tocar | Muestra los controles; con algo visible, lo oculta |
+| Tocar | Muestra el rótulo y la programación; con algo visible, lo oculta |
+| Mantener pulsado | Abre el menú de opciones |
 | Deslizar a izquierda o derecha | Cierra el vídeo y vuelve a la lista |
 | Deslizar hacia arriba | Pantalla completa en horizontal, sin barras del sistema |
 | Deslizar hacia abajo | Reduce a ventana flotante |
@@ -78,12 +91,22 @@ En móvil y tablet, sobre la imagen:
 La orientación y las barras del sistema vuelven a su estado anterior al salir de la
 reproducción.
 
-### Controles
+### El menú
 
+Sobre la imagen sólo permanecen el rótulo de lo que se ve y la programación en curso. El resto
+de opciones se abre manteniendo pulsado OK, o el dedo sobre el vídeo, y aparece como una lista
+con los nombres completos:
+
+- **Añadir o quitar de favoritos** — en canales y películas.
 - **Ficha** — descripción completa del programa.
 - **Guía** — programación del canal sin abandonar la reproducción.
-- **Ajustar** — alterna entre ajustar, zoom y estirar, para material que no se emite en 16:9.
+- **Imagen** — alterna entre ajustar, zoom y estirar, para material que no se emite en 16:9.
+  La opción permanece abierta, de modo que pueden probarse los tres modos seguidos.
 - **Audio y subtítulos** — pistas disponibles en la emisión, con idioma y códec.
+- **Enviar a…** — reproducción en otro aparato de la red.
+- **Ventana pequeña** — reduce la imagen sin cortar la emisión.
+
+En películas y series se añaden la pausa y los saltos de 10 segundos.
 
 ![Ficha de programa](img/ficha-programa.png)
 

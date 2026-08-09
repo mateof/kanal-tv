@@ -27,10 +27,7 @@ fun KanalButton(
     modifier: Modifier = Modifier,
     icon: ImageVector? = null,
     tone: ButtonTone = ButtonTone.Neutral,
-    enabled: Boolean = true,
-    /** Drops the label and keeps the icon, for bars sitting over the picture. */
-    iconOnly: Boolean = false,
-    onFocusState: (Boolean) -> Unit = {}
+    enabled: Boolean = true
 ) {
     val resting = when (tone) {
         ButtonTone.Primary -> KanalColors.AccentDim
@@ -51,8 +48,7 @@ fun KanalButton(
         focusedColor = focusedBackground,
         focusedScale = 1.04f,
         restingBorderColor = KanalColors.Outline,
-        enabled = enabled,
-        onFocusState = onFocusState
+        enabled = enabled
     ) { focused ->
         val content = when {
             !enabled -> KanalColors.OnSurfaceFaint
@@ -60,31 +56,18 @@ fun KanalButton(
             focused -> Color(0xFF06231F)
             else -> KanalColors.OnBackground
         }
-        val compactIcon = iconOnly && icon != null
         Row(
             modifier = Modifier
                 .align(Alignment.Center)
-                .padding(
-                    horizontal = if (compactIcon) 15.dp else 22.dp,
-                    vertical = 13.dp
-                ),
+                .padding(horizontal = 22.dp, vertical = 13.dp),
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.Center
         ) {
             if (icon != null) {
-                Icon(
-                    icon,
-                    // Without a visible label the icon carries the name, so a
-                    // screen reader still has something to announce.
-                    contentDescription = if (compactIcon) text else null,
-                    tint = content,
-                    modifier = Modifier.size(if (compactIcon) 22.dp else 18.dp)
-                )
-                if (!compactIcon) Spacer(Modifier.width(10.dp))
+                Icon(icon, contentDescription = null, tint = content, modifier = Modifier.size(18.dp))
+                Spacer(Modifier.width(10.dp))
             }
-            if (!compactIcon) {
-                Text(text, style = MaterialTheme.typography.labelLarge, color = content)
-            }
+            Text(text, style = MaterialTheme.typography.labelLarge, color = content)
         }
     }
 }

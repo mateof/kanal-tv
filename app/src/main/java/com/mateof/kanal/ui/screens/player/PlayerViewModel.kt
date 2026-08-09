@@ -15,7 +15,9 @@ import com.mateof.kanal.cast.CastDevice
 import com.mateof.kanal.cast.UpnpClient
 import com.mateof.kanal.core.log.FileLogger
 import com.mateof.kanal.data.db.EpgEntity
+import com.mateof.kanal.data.model.ContentKind
 import com.mateof.kanal.data.model.Source
+import com.mateof.kanal.data.model.favoriteKey
 import com.mateof.kanal.data.net.redactUrl
 import com.mateof.kanal.data.prefs.AppPreferences
 import com.mateof.kanal.data.prefs.Settings
@@ -82,6 +84,9 @@ data class PlayerUiState(
     val castError: String? = null,
     /** Plain-language reading of the renderer's refusal, when it is known. */
     val castHint: UiText? = null,
+    /** True while what is playing can be made a favourite at all. */
+    val canFavorite: Boolean = false,
+    val isFavorite: Boolean = false,
     /** Days the provider sent guide for, for the in-player guide panel. */
     val guideDays: List<Long> = emptyList(),
     val selectedDay: Long = 0L,
@@ -116,6 +121,7 @@ class PlayerViewModel @Inject constructor(
     private var candidates: List<String> = emptyList()
     private var candidateIndex = 0
     private var reconnectJob: Job? = null
+    private var favoritesJob: Job? = null
     private var reconnects = 0
 
     /** Stamped when a stream is queued, to time how long the picture takes. */
@@ -238,7 +244,46 @@ class PlayerViewModel @Inject constructor(
         logger.i("Player", "Reproduciendo '${playable.title}'")
 
         loadGuide(playable)
+        watchFavorites(playable)
         startTicker()
+    }
+
+    /**
+     * Keeps the menu's favourite entry honest for whatever is playing now.
+     *
+     * Read from the stored set rather than kept as a local flag, so marking a
+     * channel here and marking it in the list cannot disagree. Zapping restarts
+     * the subscription, since the answer belongs to the channel, not the player.
+     *
+     * An episode is deliberately left out: favourites of that kind are keyed by
+     * series, and an episode id in that slot would save something the series
+     * page could never find again.
+     */
+    private fun watchFavorites(playable: Playable) {
+        favoritesJob?.cancel()
+        val kind = playable.kind
+        if (kind != ContentKind.LIVE && kind != ContentKind.MOVIE) {
+            _state.value = _state.value.copy(canFavorite = false, isFavorite = false)
+            return
+        }
+        val key = favoriteKey(kind, playable.sourceId, playable.itemId)
+        favoritesJob = viewModelScope.launch {
+            prefs.favorites.collect { keys ->
+                _state.value = _state.value.copy(
+                    canFavorite = true,
+                    isFavorite = keys.contains(key)
+                )
+            }
+        }
+    }
+
+    fun toggleFavorite() {
+        val playable = _state.value.playable ?: return
+        if (!_state.value.canFavorite) return
+        viewModelScope.launch {
+            val nowFavorite = prefs.toggleFavorite(playable.kind, playable.sourceId, playable.itemId)
+            logger.d("Player", "Favorito '${playable.title}': $nowFavorite")
+        }
     }
 
     private fun loadGuide(playable: Playable) {

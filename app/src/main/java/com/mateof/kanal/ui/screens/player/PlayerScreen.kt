@@ -36,6 +36,8 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Star
+import androidx.compose.material.icons.outlined.StarOutline
 import androidx.compose.material.icons.outlined.AspectRatio
 import androidx.compose.material.icons.outlined.CalendarMonth
 import androidx.compose.material.icons.outlined.Cast
@@ -86,8 +88,10 @@ import com.mateof.kanal.cast.CastDevice
 import com.mateof.kanal.core.resolve
 import com.mateof.kanal.core.formatClock
 import com.mateof.kanal.core.formatDuration
+import com.mateof.kanal.ui.components.ActionMenu
 import com.mateof.kanal.ui.components.ArtworkImage
 import com.mateof.kanal.ui.components.ChannelGuide
+import com.mateof.kanal.ui.components.MenuAction
 import com.mateof.kanal.ui.components.ButtonTone
 import com.mateof.kanal.ui.components.FocusableSurface
 import com.mateof.kanal.ui.components.KanalButton
@@ -112,15 +116,7 @@ private const val OSD_TIMEOUT_MS = 6_000L
  * never moves and, on a remote with no MENU key, there is no way in at all.
  * So the modes are explicit and only [Mode.Watching] consumes the arrows.
  */
-private enum class Mode { Watching, Controls, Tracks, Guide, Cast }
-
-/** One button of the control bar, so the first can be given the focus anchor. */
-private data class ControlAction(
-    val label: String,
-    val icon: androidx.compose.ui.graphics.vector.ImageVector,
-    val tone: ButtonTone,
-    val onClick: () -> Unit
-)
+private enum class Mode { Watching, Menu, Tracks, Guide, Cast }
 
 @Composable
 fun PlayerScreen(
@@ -142,7 +138,6 @@ fun PlayerScreen(
     var swallowCentreUp by remember { mutableStateOf(false) }
 
     val stageFocus = remember { FocusRequester() }
-    val controlsFocus = remember { FocusRequester() }
     val tracksFocus = remember { FocusRequester() }
     val guideFocus = remember { FocusRequester() }
     val castFocus = remember { FocusRequester() }
@@ -181,10 +176,10 @@ fun PlayerScreen(
         osdTick++
     }
 
-    fun openControls() {
+    fun openMenu() {
         osdVisible = true
         osdTick++
-        mode = Mode.Controls
+        mode = Mode.Menu
     }
 
     LaunchedEffect(kind, itemId, startMillis) { vm.load(kind, itemId, startMillis) }
@@ -208,7 +203,8 @@ fun PlayerScreen(
     LaunchedEffect(mode, detail == null) {
         val target = when (mode) {
             Mode.Watching -> stageFocus
-            Mode.Controls -> controlsFocus
+            // The menu anchors its own first row as it appears.
+            Mode.Menu -> return@LaunchedEffect
             Mode.Tracks -> tracksFocus
             Mode.Guide -> guideFocus
             Mode.Cast -> castFocus
@@ -228,8 +224,8 @@ fun PlayerScreen(
 
     fun goBack() {
         when (mode) {
-            Mode.Tracks, Mode.Guide, Mode.Cast -> mode = Mode.Controls
-            Mode.Controls -> mode = Mode.Watching
+            Mode.Tracks, Mode.Guide, Mode.Cast -> mode = Mode.Menu
+            Mode.Menu -> mode = Mode.Watching
             // The title sitting over the picture has to go the moment BACK is
             // pressed, not on the next auto-hide tick.
             Mode.Watching -> if (osdVisible) osdVisible = false else onBack(liveChannelId())
@@ -254,21 +250,24 @@ fun PlayerScreen(
         Modifier
             .fillMaxSize()
             .background(Color.Black)
-            // A finger has no OK key. Tapping the picture opens the controls and
-            // tapping outside them puts it away again. The buttons are drawn on
-            // top and consume their own taps, so they are unaffected.
+            // A finger has no OK key, so the picture itself is the control: a
+            // tap brings the title and the guide back, holding opens the menu,
+            // and a tap while something is showing puts it away.
             .pointerInput(Unit) {
-                detectTapGestures {
-                    // Anything showing goes away, including the title band:
-                    // switching mode alone left it up until its timer ran out,
-                    // which read as the tap not having worked.
-                    if (mode != Mode.Watching || osdVisible) {
-                        mode = Mode.Watching
-                        osdVisible = false
-                    } else {
-                        openControls()
+                detectTapGestures(
+                    onLongPress = { openMenu() },
+                    onTap = {
+                        // Anything showing goes away, including the title band:
+                        // switching mode alone left it up until its timer ran
+                        // out, which read as the tap not having worked.
+                        if (mode != Mode.Watching || osdVisible) {
+                            mode = Mode.Watching
+                            osdVisible = false
+                        } else {
+                            poke()
+                        }
                     }
-                }
+                )
             }
             // Gestures for the hand, mirroring what the remote does with keys.
             .pointerInput(swipeThreshold) {
@@ -344,10 +343,18 @@ fun PlayerScreen(
                         true
                     }
 
-                    // The only way into the controls on a remote without MENU.
+                    // Held OK is the remote's long press. The repeat counter is
+                    // what this reads rather than the system's long-press flag,
+                    // which is only raised for a view that asked to track the
+                    // key; the repeats arrive either way. A short press just
+                    // brings the title and the guide back.
                     Key.DirectionCenter, Key.Enter -> {
-                        swallowCentreUp = true
-                        openControls()
+                        if (event.nativeKeyEvent.repeatCount > 0) {
+                            swallowCentreUp = true
+                            openMenu()
+                        } else {
+                            poke()
+                        }
                         true
                     }
 
@@ -356,7 +363,7 @@ fun PlayerScreen(
                     }
 
                     Key.Menu, Key.Info -> {
-                        openControls(); true
+                        openMenu(); true
                     }
 
                     else -> false
@@ -434,29 +441,114 @@ fun PlayerScreen(
         ) {
             Osd(
                 state = state,
-                controlsActive = mode == Mode.Controls,
-                controlsFocus = controlsFocus,
-                resizeLabel = resizeLabel(resizeMode),
-                onCycleResize = {
-                    resizeMode = nextResizeMode(resizeMode)
-                    poke()
-                },
-                onTogglePlay = { vm.togglePlayPause(); poke() },
-                onSeekBack = { vm.seekBy(-10_000); poke() },
-                onSeekForward = { vm.seekBy(10_000); poke() },
-                onSeekTo = { target -> vm.seekTo(target); poke() },
-                onOpenTracks = { mode = Mode.Tracks; poke() },
-                onOpenCast = { mode = Mode.Cast; vm.searchCastDevices(); poke() },
-                onEnterPip = { vm.enterPip() },
-                pipAvailable = android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.O,
-                onOpenGuide = { mode = Mode.Guide; poke() },
-                onOpenDetail = {
-                    val now = state.now ?: return@Osd
-                    detail = ProgrammeDetail(
-                        programme = now,
-                        channelName = state.playable?.title.orEmpty(),
-                        channelLogo = state.playable?.logo.orEmpty()
+                onSeekTo = { target -> vm.seekTo(target); poke() }
+            )
+        }
+
+        // Everything that used to sit as a row of icons over the picture. Held
+        // OK on the remote, or a long press of the finger, brings it up.
+        if (mode == Mode.Menu && !inPip) {
+            val playable = state.playable
+            ActionMenu(
+                title = playable?.title.orEmpty(),
+                subtitle = state.now?.title,
+                onDismiss = { mode = Mode.Watching },
+                actions = buildList {
+                    if (playable != null && !playable.isLive) {
+                        add(
+                            MenuAction(
+                                label = if (state.playing) {
+                                    stringResource(R.string.player_pause)
+                                } else {
+                                    stringResource(R.string.player_play)
+                                },
+                                icon = if (state.playing) {
+                                    Icons.Outlined.Pause
+                                } else {
+                                    Icons.Outlined.PlayArrow
+                                }
+                            ) { vm.togglePlayPause(); mode = Mode.Watching; poke() }
+                        )
+                        add(
+                            MenuAction(stringResource(R.string.player_back_10), Icons.Outlined.Replay10) {
+                                vm.seekBy(-10_000); mode = Mode.Watching; poke()
+                            }
+                        )
+                        add(
+                            MenuAction(stringResource(R.string.player_forward_10), Icons.Outlined.Forward10) {
+                                vm.seekBy(10_000); mode = Mode.Watching; poke()
+                            }
+                        )
+                    }
+                    if (state.canFavorite) {
+                        add(
+                            MenuAction(
+                                label = if (state.isFavorite) {
+                                    stringResource(R.string.live_remove_favorite)
+                                } else {
+                                    stringResource(R.string.live_add_favorite)
+                                },
+                                icon = if (state.isFavorite) {
+                                    Icons.Filled.Star
+                                } else {
+                                    Icons.Outlined.StarOutline
+                                },
+                                active = state.isFavorite,
+                                // Stays open: the entry changing is the only
+                                // confirmation the press did anything.
+                                onClick = vm::toggleFavorite
+                            )
+                        )
+                    }
+                    if (playable != null && playable.isLive && state.now != null) {
+                        add(
+                            MenuAction(stringResource(R.string.player_details), Icons.Outlined.Info) {
+                                detail = ProgrammeDetail(
+                                    programme = state.now ?: return@MenuAction,
+                                    channelName = playable.title,
+                                    channelLogo = playable.logo
+                                )
+                                mode = Mode.Watching
+                            }
+                        )
+                    }
+                    if (playable != null && playable.isLive && state.guideDays.isNotEmpty()) {
+                        add(
+                            MenuAction(stringResource(R.string.player_guide), Icons.Outlined.CalendarMonth) {
+                                mode = Mode.Guide
+                            }
+                        )
+                    }
+                    add(
+                        MenuAction(
+                            stringResource(R.string.player_image_mode, resizeLabel(resizeMode)),
+                            Icons.Outlined.AspectRatio
+                        ) {
+                            // Stays open on purpose: finding the right one means
+                            // trying them, and reopening the menu each time to
+                            // do it would be tedious.
+                            resizeMode = nextResizeMode(resizeMode)
+                        }
                     )
+                    add(
+                        MenuAction(stringResource(R.string.player_audio_subtitles), Icons.Outlined.Tune) {
+                            mode = Mode.Tracks
+                        }
+                    )
+                    add(
+                        MenuAction(stringResource(R.string.cast_send), Icons.Outlined.Cast) {
+                            mode = Mode.Cast
+                            vm.searchCastDevices()
+                        }
+                    )
+                    if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.O) {
+                        add(
+                            MenuAction(
+                                stringResource(R.string.player_pip),
+                                Icons.Outlined.PictureInPictureAlt
+                            ) { vm.enterPip() }
+                        )
+                    }
                 }
             )
         }
@@ -469,7 +561,7 @@ fun PlayerScreen(
                 onPick = { device -> vm.castTo(device); mode = Mode.Watching },
                 onBringBack = { vm.stopCast() },
                 onAdd = { vm.addCastDevice(it) },
-                onClose = { mode = Mode.Controls }
+                onClose = { mode = Mode.Menu }
             )
         }
 
@@ -479,7 +571,7 @@ fun PlayerScreen(
                 focusRequester = tracksFocus,
                 onSelect = { option -> vm.selectTrack(option); poke() },
                 onDisableSubtitles = { vm.disableSubtitles(); poke() },
-                onClose = { mode = Mode.Controls },
+                onClose = { mode = Mode.Menu },
                 modifier = Modifier.align(Alignment.CenterEnd)
             )
         }
@@ -500,7 +592,7 @@ fun PlayerScreen(
                         channelLogo = state.playable?.logo.orEmpty()
                     )
                 },
-                onClose = { mode = Mode.Controls },
+                onClose = { mode = Mode.Menu },
                 modifier = Modifier.align(Alignment.CenterEnd)
             )
         }
@@ -561,31 +653,22 @@ private fun GuidePanel(
     }
 }
 
+/**
+ * What is playing, and how far in.
+ *
+ * Deliberately nothing to operate: the actions moved to a menu behind a long
+ * press, so this band stays out of the way of the picture it sits on. The one
+ * exception is the progress bar, which is not a control so much as the position
+ * itself, and is worth dragging directly.
+ */
 @Composable
 private fun Osd(
     state: PlayerUiState,
-    controlsActive: Boolean,
-    controlsFocus: FocusRequester,
-    resizeLabel: String,
-    onCycleResize: () -> Unit,
-    onTogglePlay: () -> Unit,
-    onSeekBack: () -> Unit,
-    onSeekForward: () -> Unit,
-    onSeekTo: (Long) -> Unit,
-    onOpenCast: () -> Unit,
-    onEnterPip: () -> Unit,
-    pipAvailable: Boolean,
-    onOpenTracks: () -> Unit,
-    onOpenGuide: () -> Unit,
-    onOpenDetail: () -> Unit
+    onSeekTo: (Long) -> Unit
 ) {
     val playable = state.playable ?: return
     val isCompactWidth = isCompact
 
-    // Which button the focus is on, so its name can be shown while the rest stay
-    // as bare icons.
-    var focusedLabel by remember { mutableStateOf<String?>(null) }
-    LaunchedEffect(controlsActive) { if (!controlsActive) focusedLabel = null }
     Column(
         Modifier
             .fillMaxWidth()
@@ -730,75 +813,14 @@ private fun Osd(
             )
         }
 
-        Spacer(Modifier.height(18.dp))
-
-        // Focus goes to a real button, never to a container: requesting focus on
-        // a focus group can silently land nowhere, and then the arrows have no
-        // anchor to search from and the remote appears dead.
-        val actions = buildList {
-            if (!playable.isLive) {
-                add(
-                    ControlAction(
-                        label = if (state.playing) stringResource(R.string.player_pause) else stringResource(R.string.player_play),
-                        icon = if (state.playing) Icons.Outlined.Pause else Icons.Outlined.PlayArrow,
-                        tone = ButtonTone.Primary,
-                        onClick = onTogglePlay
-                    )
-                )
-                add(ControlAction("10 s", Icons.Outlined.Replay10, ButtonTone.Neutral, onSeekBack))
-                add(ControlAction("10 s", Icons.Outlined.Forward10, ButtonTone.Neutral, onSeekForward))
-            }
-            if (playable.isLive && state.now != null) {
-                add(ControlAction(stringResource(R.string.player_details), Icons.Outlined.Info, ButtonTone.Primary, onOpenDetail))
-            }
-            if (playable.isLive && state.guideDays.isNotEmpty()) {
-                add(ControlAction(stringResource(R.string.player_guide), Icons.Outlined.CalendarMonth, ButtonTone.Neutral, onOpenGuide))
-            }
-            add(ControlAction(resizeLabel, Icons.Outlined.AspectRatio, ButtonTone.Neutral, onCycleResize))
-            add(ControlAction(stringResource(R.string.player_audio_subtitles), Icons.Outlined.Tune, ButtonTone.Neutral, onOpenTracks))
-            add(ControlAction(stringResource(R.string.cast_send), Icons.Outlined.Cast, ButtonTone.Neutral, onOpenCast))
-            if (pipAvailable) {
-                add(
-                    ControlAction(
-                        stringResource(R.string.player_pip),
-                        Icons.Outlined.PictureInPictureAlt,
-                        ButtonTone.Neutral,
-                        onEnterPip
-                    )
-                )
-            }
-        }
-
-        // FlowRow, not Row: on a phone the five controls do not fit across one
-        // line and the last of them ended up clipped off the screen.
-        FlowRow(
-            modifier = Modifier.fillMaxWidth().focusGroup(),
-            horizontalArrangement = Arrangement.spacedBy(12.dp),
-            verticalArrangement = Arrangement.spacedBy(10.dp)
-        ) {
-            actions.forEachIndexed { index, action ->
-                KanalButton(
-                    text = action.label,
-                    onClick = action.onClick,
-                    icon = action.icon,
-                    tone = action.tone,
-                    iconOnly = true,
-                    onFocusState = { focused -> if (focused) focusedLabel = action.label },
-                    modifier = if (index == 0) Modifier.focusRequester(controlsFocus) else Modifier
-                )
-            }
-        }
-
-        Spacer(Modifier.height(14.dp))
-        // Seven labelled buttons ate half the screen over the picture, so the
-        // labels went. The one that matters is the focused button's, and it
-        // takes the line the hint was already using rather than a new one.
+        Spacer(Modifier.height(16.dp))
+        // The one line that says how to reach everything else. Without it the
+        // long press is invisible: there is nothing on screen to suggest it.
         Text(
-            text = when {
-                focusedLabel != null -> focusedLabel.orEmpty()
-                controlsActive -> stringResource(R.string.player_hint_controls)
-                playable.isLive -> stringResource(R.string.player_hint_live)
-                else -> stringResource(R.string.player_hint_vod)
+            text = if (playable.isLive) {
+                stringResource(R.string.player_hint_live)
+            } else {
+                stringResource(R.string.player_hint_vod)
             },
             style = MaterialTheme.typography.labelSmall,
             color = KanalColors.OnSurfaceFaint

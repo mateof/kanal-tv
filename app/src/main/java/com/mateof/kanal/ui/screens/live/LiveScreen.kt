@@ -58,6 +58,9 @@ import com.mateof.kanal.core.resolve
 import com.mateof.kanal.core.formatClock
 import com.mateof.kanal.data.db.ChannelEntity
 import com.mateof.kanal.data.db.EpgEntity
+import com.mateof.kanal.data.model.ContentKind
+import com.mateof.kanal.ui.actions.ItemActionsSheet
+import com.mateof.kanal.ui.actions.ItemActionsViewModel
 import com.mateof.kanal.ui.cast.CastSheet
 import com.mateof.kanal.ui.cast.CastTarget
 import com.mateof.kanal.ui.cast.CastViewModel
@@ -87,6 +90,12 @@ fun LiveScreen(
     val vm: LiveViewModel = hiltViewModel()
     val castVm: CastViewModel = hiltViewModel()
     val castState by castVm.state.collectAsStateWithLifecycle()
+    val actionsVm: ItemActionsViewModel = hiltViewModel()
+
+    /** A long press on a channel offers what can be done with it. */
+    val openActions: (ChannelEntity) -> Unit = { channel ->
+        actionsVm.open(ContentKind.LIVE, channel.streamId, channel.name)
+    }
 
     // Every route into the full-screen player goes through here, so the preview
     // is always handed over rather than left to be torn down and rebuilt.
@@ -157,7 +166,7 @@ fun LiveScreen(
             sourceId = source?.id.orEmpty(),
             onSelectCategory = vm::selectCategory,
             onPlay = { id -> play(id, 0L) },
-            onCastRequest = { id, name -> castVm.open(CastTarget.Channel(id), name) }
+            onActions = openActions
         )
         CastSheet(
             state = castState,
@@ -166,6 +175,10 @@ fun LiveScreen(
             onAdd = castVm::addByAddress,
             onStop = castVm::stopSending,
             onClose = castVm::close
+        )
+        ItemActionsSheet(
+            vm = actionsVm,
+            onCast = { request -> castVm.open(CastTarget.Channel(request.itemId), request.title) }
         )
         return
     }
@@ -230,9 +243,7 @@ fun LiveScreen(
                                 isFavorite = true,
                                 onFocused = { vm.onChannelFocused(channel) },
                                 onClick = { play(channel.streamId, 0L) },
-                                onLongClick = {
-                                    castVm.open(CastTarget.Channel(channel.streamId), channel.name)
-                                }
+                                onLongClick = { openActions(channel) }
                             )
                         }
                     }
@@ -250,9 +261,7 @@ fun LiveScreen(
                             isFavorite = source?.let { favorites.contains("LIVE:${it.id}:${channel.streamId}") } == true,
                             onFocused = { vm.onChannelFocused(channel) },
                             onClick = { play(channel.streamId, 0L) },
-                            onLongClick = {
-                                castVm.open(CastTarget.Channel(channel.streamId), channel.name)
-                            }
+                            onLongClick = { openActions(channel) }
                         )
                     }
                     if (paged.itemCount == 0) {
@@ -321,13 +330,18 @@ fun LiveScreen(
         )
     }
         CastSheet(
-                    state = castState,
-                    onSearch = castVm::search,
-                    onPick = castVm::sendTo,
-                    onAdd = castVm::addByAddress,
-                    onStop = castVm::stopSending,
-                    onClose = castVm::close
-                )
+            state = castState,
+            onSearch = castVm::search,
+            onPick = castVm::sendTo,
+            onAdd = castVm::addByAddress,
+            onStop = castVm::stopSending,
+            onClose = castVm::close
+        )
+        // Last in the box, so it is drawn over the list rather than behind it.
+        ItemActionsSheet(
+            vm = actionsVm,
+            onCast = { request -> castVm.open(CastTarget.Channel(request.itemId), request.title) }
+        )
     }
 }
 
@@ -342,7 +356,7 @@ private fun CompactLive(
     sourceId: String,
     onSelectCategory: (String) -> Unit,
     onPlay: (String) -> Unit,
-    onCastRequest: (String, String) -> Unit
+    onActions: (ChannelEntity) -> Unit
 ) {
     Column(Modifier.fillMaxSize()) {
         Text(
@@ -398,9 +412,7 @@ private fun CompactLive(
                             isFavorite = true,
                             onFocused = {},
                             onClick = { onPlay(channel.streamId) },
-                            onLongClick = {
-                                onCastRequest(channel.streamId, channel.name)
-                            }
+                            onLongClick = { onActions(channel) }
                         )
                     }
                 }
@@ -418,9 +430,7 @@ private fun CompactLive(
                         isFavorite = favorites.contains("LIVE:$sourceId:${channel.streamId}"),
                         onFocused = {},
                         onClick = { onPlay(channel.streamId) },
-                        onLongClick = {
-                            onCastRequest(channel.streamId, channel.name)
-                        }
+                        onLongClick = { onActions(channel) }
                     )
                 }
                 if (paged.itemCount == 0) {
