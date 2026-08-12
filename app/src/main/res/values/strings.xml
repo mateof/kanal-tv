@@ -381,4 +381,6 @@
     <string name="player_image_mode">Imaxe: %1$s</string>
     <string name="player_hint_browse">Arriba e abaixo percorren a lista · OK cambia a esta canle · ATRÁS volve</string>
     <string name="player_channel_position">%1$d de %2$d</string>
+    <string name="player_fullscreen">Pantalla completa</string>
+    <string name="player_leave_fullscreen">Saír da pantalla completa</string>
 </resources>

@@ -10,6 +10,7 @@ import androidx.media3.common.Tracks
 import androidx.media3.common.VideoSize
 import androidx.media3.exoplayer.ExoPlayer
 import com.mateof.kanal.R
+import com.mateof.kanal.core.SleepTimer
 import com.mateof.kanal.core.UiText
 import com.mateof.kanal.cast.CastDevice
 import com.mateof.kanal.cast.UpnpClient
@@ -122,6 +123,7 @@ class PlayerViewModel @Inject constructor(
     private val playerFactory: PlayerFactory,
     private val handover: PlayerHandover,
     private val pip: PipController,
+    private val sleepTimer: SleepTimer,
     private val upnp: UpnpClient,
     private val logger: FileLogger
 ) : ViewModel() {
@@ -674,6 +676,21 @@ class PlayerViewModel @Inject constructor(
 
     /** Asks the activity to shrink into a floating window. */
     fun enterPip() = pip.request()
+
+    // --- Sleep timer ---------------------------------------------------------
+    //
+    // The same singleton the settings screen arms, so the two cannot disagree
+    // about whether a countdown is running. Offered here as well because the
+    // moment somebody decides to fall asleep to something is the moment they
+    // are already watching it, and leaving the film to find a setting is
+    // precisely what they do not want to do.
+
+    /** Milliseconds left on the countdown, or null when none is armed. */
+    val sleepRemainingMs: StateFlow<Long?> = sleepTimer.remainingMs
+
+    fun startSleep(minutes: Int) = sleepTimer.start(minutes)
+
+    fun cancelSleep() = sleepTimer.cancel()
 
     fun stopCast() {
         val device = _state.value.castDevices.firstOrNull { it.name == _state.value.castingTo }

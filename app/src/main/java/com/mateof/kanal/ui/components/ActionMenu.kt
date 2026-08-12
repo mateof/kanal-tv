@@ -98,8 +98,12 @@ fun ActionMenu(
     ) {
         Column(
             modifier = Modifier
-                .widthIn(max = 460.dp)
+                // Fraction first, cap second. The other way round the fraction
+                // is taken of the cap rather than of the screen, which on a
+                // phone turned sideways left a 230 dp card cutting every label
+                // in half.
                 .fillMaxWidth(if (isCompact) 0.92f else 0.5f)
+                .widthIn(max = 460.dp)
                 .heightIn(max = 560.dp)
                 .clip(RoundedCornerShape(22.dp))
                 .background(

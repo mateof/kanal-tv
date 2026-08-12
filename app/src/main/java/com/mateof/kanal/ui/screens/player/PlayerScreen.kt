@@ -4,9 +4,11 @@ import android.app.Activity
 import android.content.Context
 import android.content.ContextWrapper
 import android.content.pm.ActivityInfo
+import android.provider.Settings
 import androidx.compose.foundation.gestures.detectDragGestures
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
 import androidx.core.view.WindowInsetsCompat
@@ -39,6 +41,10 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Star
 import androidx.compose.material.icons.outlined.StarOutline
 import androidx.compose.material.icons.outlined.AspectRatio
+import androidx.compose.material.icons.outlined.Bedtime
+import androidx.compose.material.icons.outlined.Fullscreen
+import androidx.compose.material.icons.outlined.FullscreenExit
+import androidx.compose.material.icons.outlined.Timer
 import androidx.compose.material.icons.outlined.CalendarMonth
 import androidx.compose.material.icons.outlined.Cast
 import androidx.compose.material.icons.outlined.ClosedCaption
@@ -101,7 +107,9 @@ import com.mateof.kanal.ui.components.ProgrammeDialog
 import com.mateof.kanal.ui.components.SeekBar
 import com.mateof.kanal.ui.components.ThinProgress
 import com.mateof.kanal.ui.components.scrollingTitle
+import com.mateof.kanal.core.SleepTimer
 import com.mateof.kanal.ui.isCompact
+import com.mateof.kanal.ui.isTelevision
 import com.mateof.kanal.ui.theme.KanalColors
 import kotlinx.coroutines.delay
 
@@ -116,7 +124,13 @@ private const val OSD_TIMEOUT_MS = 6_000L
  * never moves and, on a remote with no MENU key, there is no way in at all.
  * So the modes are explicit and only [Mode.Watching] consumes the arrows.
  */
-private enum class Mode { Watching, Menu, Tracks, Guide, Cast }
+private enum class Mode { Watching, Menu, Tracks, Guide, Cast, Sleep }
+
+/**
+ * How long landscape is enforced after the gesture asks for it, before the
+ * accelerometer is given the screen back.
+ */
+private const val ORIENTATION_HOLD_MS = 6_000L
 
 @Composable
 fun PlayerScreen(
@@ -129,6 +143,8 @@ fun PlayerScreen(
     val vm: PlayerViewModel = hiltViewModel()
     val state by vm.state.collectAsStateWithLifecycle()
     val inPip by vm.inPip.collectAsStateWithLifecycle()
+    val sleepLeft by vm.sleepRemainingMs.collectAsStateWithLifecycle()
+    val onTelevision = isTelevision()
 
     var mode by remember { mutableStateOf(Mode.Watching) }
     var osdVisible by remember { mutableStateOf(true) }
@@ -147,14 +163,60 @@ fun PlayerScreen(
     val activity = remember(context) { context.findActivity() }
     val swipeThreshold = with(LocalDensity.current) { 110.dp.toPx() }
 
-    fun goFullscreenLandscape() {
-        val window = activity?.window ?: return
-        activity.requestedOrientation = ActivityInfo.SCREEN_ORIENTATION_SENSOR_LANDSCAPE
+    var immersive by remember { mutableStateOf(false) }
+    // Bumped every time landscape is asked for, to re-arm the release below.
+    var orientationHold by remember { mutableIntStateOf(0) }
+    val configuration = LocalConfiguration.current
+
+    /**
+     * Re-applied whenever the configuration changes, not once when asked for.
+     * Requesting landscape *is* a configuration change, and the system restores
+     * the bars across it — which is why the status bar was still sitting over
+     * the picture on a tablet that had to turn to obey.
+     */
+    LaunchedEffect(immersive, configuration) {
+        val window = activity?.window ?: return@LaunchedEffect
         WindowInsetsControllerCompat(window, window.decorView).apply {
-            systemBarsBehavior =
-                WindowInsetsControllerCompat.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE
-            hide(WindowInsetsCompat.Type.systemBars())
+            if (immersive) {
+                systemBarsBehavior =
+                    WindowInsetsControllerCompat.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE
+                hide(WindowInsetsCompat.Type.systemBars())
+            } else {
+                show(WindowInsetsCompat.Type.systemBars())
+            }
         }
+    }
+
+    /**
+     * Forcing landscape is held only long enough for the device to be turned.
+     *
+     * Kept forever it would mean the screen never obeys the accelerometer again:
+     * turning a tablet back upright did nothing, because the app was still
+     * insisting on landscape. After the hold the sensor gets it back, and if the
+     * device is by then being held sideways it simply stays sideways.
+     */
+    LaunchedEffect(orientationHold) {
+        if (orientationHold == 0) return@LaunchedEffect
+        delay(ORIENTATION_HOLD_MS)
+        // Only handed back when the device is actually willing to turn. With
+        // auto-rotate switched off, releasing would snap straight back to the
+        // locked orientation and the gesture would look like it did nothing —
+        // and turning the tablet would not bring it back, because the system is
+        // ignoring the sensor in the first place.
+        if (autoRotates(context)) {
+            activity?.requestedOrientation = ActivityInfo.SCREEN_ORIENTATION_UNSPECIFIED
+        }
+    }
+
+    fun goFullscreenLandscape() {
+        activity?.requestedOrientation = ActivityInfo.SCREEN_ORIENTATION_SENSOR_LANDSCAPE
+        orientationHold++
+        immersive = true
+    }
+
+    fun leaveFullscreen() {
+        activity?.requestedOrientation = ActivityInfo.SCREEN_ORIENTATION_UNSPECIFIED
+        immersive = false
     }
 
     // Whatever the gestures did to the screen belongs to the player, so it is
@@ -206,8 +268,8 @@ fun PlayerScreen(
     LaunchedEffect(mode, detail == null) {
         val target = when (mode) {
             Mode.Watching -> stageFocus
-            // The menu anchors its own first row as it appears.
-            Mode.Menu -> return@LaunchedEffect
+            // These anchor their own first row as they appear.
+            Mode.Menu, Mode.Sleep -> return@LaunchedEffect
             Mode.Tracks -> tracksFocus
             Mode.Guide -> guideFocus
             Mode.Cast -> castFocus
@@ -230,7 +292,7 @@ fun PlayerScreen(
 
     fun goBack() {
         when (mode) {
-            Mode.Tracks, Mode.Guide, Mode.Cast -> mode = Mode.Menu
+            Mode.Tracks, Mode.Guide, Mode.Cast, Mode.Sleep -> mode = Mode.Menu
             Mode.Menu -> mode = Mode.Watching
             // The title sitting over the picture has to go the moment BACK is
             // pressed, not on the next auto-hide tick. A channel being browsed
@@ -568,12 +630,74 @@ fun PlayerScreen(
                             vm.searchCastDevices()
                         }
                     )
+                    // A television has one orientation and no accelerometer, so
+                    // offering to turn the picture there would be nonsense.
+                    if (!onTelevision) {
+                        add(
+                            if (immersive) {
+                                MenuAction(
+                                    stringResource(R.string.player_leave_fullscreen),
+                                    Icons.Outlined.FullscreenExit
+                                ) { leaveFullscreen(); mode = Mode.Watching }
+                            } else {
+                                MenuAction(
+                                    stringResource(R.string.player_fullscreen),
+                                    Icons.Outlined.Fullscreen
+                                ) { goFullscreenLandscape(); mode = Mode.Watching }
+                            }
+                        )
+                    }
+                    add(
+                        MenuAction(
+                            label = sleepLeft?.let {
+                                stringResource(R.string.settings_sleep_running, formatDuration(it))
+                            } ?: stringResource(R.string.settings_sleep_timer),
+                            icon = Icons.Outlined.Bedtime,
+                            active = sleepLeft != null
+                        ) { mode = Mode.Sleep }
+                    )
                     if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.O) {
                         add(
                             MenuAction(
                                 stringResource(R.string.player_pip),
                                 Icons.Outlined.PictureInPictureAlt
                             ) { vm.enterPip() }
+                        )
+                    }
+                }
+            )
+        }
+
+        // Presets only: the point of reaching for this mid-film is not to do
+        // arithmetic. The exact minute lives in Ajustes for whoever wants it.
+        if (mode == Mode.Sleep && !inPip) {
+            ActionMenu(
+                title = stringResource(R.string.settings_sleep_timer),
+                subtitle = sleepLeft?.let {
+                    stringResource(R.string.settings_sleep_running, formatDuration(it))
+                },
+                onDismiss = { mode = Mode.Menu },
+                actions = buildList {
+                    SleepTimer.PRESETS.forEach { minutes ->
+                        add(
+                            MenuAction(
+                                stringResource(R.string.settings_sleep_minutes, minutes),
+                                Icons.Outlined.Timer
+                            ) {
+                                vm.startSleep(minutes)
+                                mode = Mode.Watching
+                            }
+                        )
+                    }
+                    if (sleepLeft != null) {
+                        add(
+                            MenuAction(
+                                stringResource(R.string.settings_sleep_cancel),
+                                Icons.Outlined.Bedtime
+                            ) {
+                                vm.cancelSleep()
+                                mode = Mode.Watching
+                            }
                         )
                     }
                 }
@@ -1136,6 +1260,14 @@ private fun resizeLabel(mode: Int): String = when (mode) {
  * The composition's context is a wrapper around the activity, not the activity
  * itself, so orientation and system bars have to be reached through the chain.
  */
+/** Whether the system itself follows the accelerometer. */
+private fun autoRotates(context: Context): Boolean = runCatching {
+    Settings.System.getInt(
+        context.contentResolver,
+        Settings.System.ACCELEROMETER_ROTATION
+    ) == 1
+}.getOrDefault(false)
+
 private fun Context.findActivity(): Activity? {
     var current: Context = this
     while (current is ContextWrapper) {

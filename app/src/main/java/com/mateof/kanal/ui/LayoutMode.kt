@@ -1,9 +1,15 @@
 package com.mateof.kanal.ui
 
+import android.app.UiModeManager
+import android.content.Context
+import android.content.pm.PackageManager
+import android.content.res.Configuration
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.ReadOnlyComposable
+import androidx.compose.runtime.remember
 import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.ui.platform.LocalConfiguration
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 
@@ -30,6 +36,25 @@ val isCompact: Boolean
     @Composable
     @ReadOnlyComposable
     get() = LocalLayoutMode.current == LayoutMode.Compact
+
+/**
+ * Whether this is a television rather than something held in the hands.
+ *
+ * Not the same question as [isCompact], which is about how much width there is:
+ * a tablet in landscape is as wide as a television and needs the wide layout,
+ * but it can still be turned over and has no fixed orientation to respect. Only
+ * this tells the two apart.
+ */
+@Composable
+fun isTelevision(): Boolean {
+    val context = LocalContext.current
+    return remember(context) {
+        val leanback = context.packageManager.hasSystemFeature(PackageManager.FEATURE_LEANBACK)
+        val uiMode = (context.getSystemService(Context.UI_MODE_SERVICE) as? UiModeManager)
+            ?.currentModeType
+        leanback || uiMode == Configuration.UI_MODE_TYPE_TELEVISION
+    }
+}
 
 /** Screen padding: 10-foot overscan on a TV, thumb margins on a phone. */
 val screenPadding: Dp

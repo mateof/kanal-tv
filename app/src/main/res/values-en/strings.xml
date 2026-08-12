@@ -374,4 +374,6 @@
     <string name="player_image_mode">Picture: %1$s</string>
     <string name="player_hint_browse">Up and down walk the list · OK switches to this channel · BACK returns</string>
     <string name="player_channel_position">%1$d of %2$d</string>
+    <string name="player_fullscreen">Full screen</string>
+    <string name="player_leave_fullscreen">Leave full screen</string>
 </resources>

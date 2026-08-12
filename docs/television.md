@@ -102,8 +102,17 @@ En móvil y tablet, sobre la imagen:
 | Deslizar hacia arriba | Pantalla completa en horizontal, sin barras del sistema |
 | Deslizar hacia abajo | Reduce a ventana flotante |
 
-La orientación y las barras del sistema vuelven a su estado anterior al salir de la
-reproducción.
+En pantalla completa se ocultan tanto la barra de estado como la de navegación; se recuperan
+momentáneamente deslizando desde el borde. El menú incluye **Pantalla completa** y **Salir de
+pantalla completa** para quien prefiera un botón al gesto; no aparecen en televisores, donde
+no hay más que una orientación posible.
+
+La orientación horizontal se impone durante unos segundos y después el acelerómetro recupera
+el mando, de modo que girar el aparato vuelve a surtir efecto. Si el sistema tiene el giro
+automático desactivado, la orientación se mantiene: soltarla devolvería la pantalla a su
+posición bloqueada y el gesto no serviría de nada.
+
+Al salir de la reproducción, orientación y barras vuelven a su estado anterior.
 
 ### El menú
 
@@ -118,6 +127,10 @@ con los nombres completos:
   La opción permanece abierta, de modo que pueden probarse los tres modos seguidos.
 - **Audio y subtítulos** — pistas disponibles en la emisión, con idioma y códec.
 - **Enviar a…** — reproducción en otro aparato de la red.
+- **Temporizador de apagado** — con los valores habituales, para no salir de la emisión a
+  buscarlo. Muestra el tiempo restante cuando hay una cuenta en marcha y permite cancelarla.
+  Es el mismo temporizador de [Ajustes](ajustes.md#temporizador-de-apagado), donde además
+  puede fijarse un número de minutos a medida.
 - **Ventana pequeña** — reduce la imagen sin cortar la emisión.
 
 En películas y series se añaden la pausa y los saltos de 10 segundos.
