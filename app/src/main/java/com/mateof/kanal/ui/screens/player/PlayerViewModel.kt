@@ -15,6 +15,7 @@ import com.mateof.kanal.core.UiText
 import com.mateof.kanal.cast.CastDevice
 import com.mateof.kanal.cast.UpnpClient
 import com.mateof.kanal.core.log.FileLogger
+import com.mateof.kanal.data.db.ChannelEntity
 import com.mateof.kanal.data.db.EpgEntity
 import com.mateof.kanal.data.model.ContentKind
 import com.mateof.kanal.data.model.Source
@@ -47,6 +48,9 @@ private const val SAVE_EVERY_TICKS = 30
 
 /** Grace for the provider to notice the connection has gone. */
 private const val SLOT_RELEASE_MS = 1_200L
+
+/** Tiles loaded either side of the selection for the channel strip. */
+private const val STRIP_WINDOW = 40
 
 data class TrackOption(
     val id: String,
@@ -93,6 +97,10 @@ data class PlayerUiState(
     val channelCount: Int = 0,
     /** Non-null while the arrows are walking the list instead of zapping. */
     val browse: BrowseInfo? = null,
+    /** Every channel that can be zapped to, in order; the strip's tiles. */
+    val channelIds: List<String> = emptyList(),
+    /** Rows loaded so far for those ids, keyed by stream id. */
+    val stripChannels: Map<String, ChannelEntity> = emptyMap(),
     /** True from queueing a new channel until its first frame is on screen. */
     val switching: Boolean = false,
     /** Non-zero while silently reconnecting after a dropout. */
@@ -150,6 +158,9 @@ class PlayerViewModel @Inject constructor(
     /** Where the arrows have walked to, kept out of the state so it can lead it. */
     private var browseIndex: Int? = null
 
+    /** Channel rows fetched for the strip, kept across openings. */
+    private val stripRows = mutableMapOf<String, ChannelEntity>()
+
     /** Stamped when a stream is queued, to time how long the picture takes. */
     private var startedAt = 0L
 
@@ -182,6 +193,7 @@ class PlayerViewModel @Inject constructor(
 
             if (playable.isLive || kind == "LIVE") {
                 channelIds = content.channelIds(current.id, "", "")
+                _state.value = _state.value.copy(channelIds = channelIds)
             }
 
             start(playable)
@@ -750,13 +762,17 @@ class PlayerViewModel @Inject constructor(
      * @return false when there is nothing to walk through.
      */
     fun browse(delta: Int): Boolean {
-        val current = source ?: return false
-        if (channelIds.isEmpty()) return false
         val from = browseIndex ?: _state.value.channelIndex
         if (from < 0) return false
+        return browseTo((from + delta).mod(channelIds.size.coerceAtLeast(1)))
+    }
 
-        val target = (from + delta).mod(channelIds.size)
+    /** Walks straight to [target], for a tap on the strip or for opening it. */
+    fun browseTo(target: Int): Boolean {
+        val current = source ?: return false
+        if (target !in channelIds.indices) return false
         browseIndex = target
+        loadStripWindow(target)
         browseJob?.cancel()
         browseJob = viewModelScope.launch {
             val channel = content.channel(current.id, channelIds[target]) ?: return@launch
@@ -775,6 +791,31 @@ class PlayerViewModel @Inject constructor(
             )
         }
         return true
+    }
+
+    /**
+     * Fills in the tiles around [center] that are not loaded yet.
+     *
+     * A window rather than the whole list: the strip only ever shows a handful,
+     * and a large playlist would cost megabytes to hold in full for them.
+     */
+    private fun loadStripWindow(center: Int) {
+        val current = source ?: return
+        if (channelIds.isEmpty()) return
+        val from = (center - STRIP_WINDOW).coerceAtLeast(0)
+        val to = (center + STRIP_WINDOW).coerceAtMost(channelIds.lastIndex)
+        val missing = (from..to).map { channelIds[it] }.filterNot { stripRows.containsKey(it) }
+        if (missing.isEmpty()) return
+        viewModelScope.launch {
+            content.channelsByIds(current.id, missing).forEach { stripRows[it.streamId] = it }
+            _state.value = _state.value.copy(stripChannels = stripRows.toMap())
+        }
+    }
+
+    /** Opens the strip on whatever is playing, so it starts where the eye is. */
+    fun openStrip() {
+        val index = _state.value.channelIndex
+        if (index >= 0) browseTo(index) else loadStripWindow(0)
     }
 
     /** Gives up on the browsed channel and goes back to reporting the current one. */

@@ -50,26 +50,32 @@ que exceden el ancho disponible se desplazan horizontalmente.
 
 | Tecla | Emisión en directo | Películas y series |
 | --- | --- | --- |
-| **Arriba / Abajo** | Recorren la lista de canales | — |
+| **Arriba / Abajo** | Abren la lista de canales | — |
 | **Izquierda / Derecha** | — | Retroceso y avance de 10 segundos |
-| **OK** | Cambia al canal recorrido, o muestra el rótulo | Muestra la barra de progreso |
+| **OK** | Con la lista abierta, cambia al canal señalado | Muestra la barra de progreso |
 | **OK mantenido** | Abre el menú | Abre el menú |
-| **ATRÁS** | Cancela el recorrido, o sale | Sale de la reproducción |
+| **ATRÁS** | Cierra la lista, o sale | Sale de la reproducción |
 
 Con el menú abierto, **arriba** y **abajo** recorren las opciones y **ATRÁS** regresa al vídeo.
 La línea inferior recuerda esta correspondencia, ya que muchos mandos de televisión carecen de
 tecla de menú; donde exista, **MENÚ** o **INFO** abren lo mismo con una sola pulsación.
 
-### Recorrer canales sin cambiar
+### Lista de canales sobre la imagen
 
-Arriba y abajo recorren la lista mientras el canal en curso continúa emitiéndose. El rótulo
-inferior pasa a describir el canal señalado —nombre, logotipo, posición y programación— y se
-distingue del habitual porque el nombre aparece resaltado. Nada se sintoniza hasta que se
-pulsa **OK**, de modo que pasar por encima de diez canales no cuesta diez conexiones ni
-interrumpe lo que se está viendo.
+Arriba o abajo despliegan una tira de logotipos al pie de la pantalla, con el canal en
+emisión señalado en el centro y los demás a ambos lados. **Izquierda** y **derecha** la
+recorren; el rótulo superior describe en cada momento el canal señalado —nombre, logotipo,
+posición y programación— y lo distingue del que se está viendo resaltando su nombre.
 
-**ATRÁS** abandona el recorrido, igual que dejar pasar unos segundos sin tocar el mando. En
-ambos casos la siguiente pulsación de OK vuelve a describir el canal en emisión.
+Nada se sintoniza hasta pulsar **OK**, de modo que pasar por encima de diez canales no cuesta
+diez conexiones ni interrumpe lo que se está viendo. **ATRÁS** cierra la tira sin tocar nada.
+
+En pantallas táctiles, donde no hay flechas, la tira se abre desde la opción **Canales** del
+menú, y basta tocar un logotipo para cambiar a ese canal.
+
+La tira abarca la lista completa, pero solo carga los canales próximos a la posición señalada:
+una lista de decenas de miles no cabe en memoria por ocho iconos en pantalla. Los que aún no
+han llegado muestran su número mientras tanto.
 
 Al cambiar, la emisión anterior se corta de inmediato: no se solapan ni la imagen ni el
 sonido, y la conexión con el proveedor se libera antes de pedir la siguiente.

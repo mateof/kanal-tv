@@ -75,6 +75,10 @@ interface ChannelDao {
     @Query("SELECT * FROM channels WHERE sourceId = :sourceId AND streamId = :streamId")
     suspend fun byId(sourceId: String, streamId: String): ChannelEntity?
 
+    /** Whole rows for a handful of ids, for the strip of logos in the player. */
+    @Query("SELECT * FROM channels WHERE sourceId = :sourceId AND streamId IN (:ids)")
+    suspend fun rowsByIds(sourceId: String, ids: List<String>): List<ChannelEntity>
+
     @Query("SELECT * FROM channels WHERE sourceId = :sourceId AND streamId IN (:ids)")
     fun observeByIds(sourceId: String, ids: List<String>): Flow<List<ChannelEntity>>
 

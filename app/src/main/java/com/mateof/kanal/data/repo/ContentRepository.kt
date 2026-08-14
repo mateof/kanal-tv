@@ -92,6 +92,17 @@ class ContentRepository @Inject constructor(
     suspend fun channel(sourceId: String, streamId: String): ChannelEntity? =
         db.channels().byId(sourceId, streamId)
 
+    /**
+     * Whole rows for the given ids, in no particular order.
+     *
+     * The player's strip of logos asks for a window around whatever is selected
+     * rather than the whole selection: a playlist of forty thousand channels
+     * would otherwise be held in memory in full for the sake of the eight tiles
+     * actually on screen.
+     */
+    suspend fun channelsByIds(sourceId: String, ids: List<String>): List<ChannelEntity> =
+        if (ids.isEmpty()) emptyList() else db.channels().rowsByIds(sourceId, ids)
+
     /** Whole rows for the guide wall, capped so a 40k playlist cannot drown it. */
     suspend fun channelList(
         sourceId: String,

@@ -18,7 +18,11 @@ import androidx.activity.compose.BackHandler
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.spring
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.focusable
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.Arrangement
@@ -34,8 +38,12 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.itemsIndexed
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Star
@@ -50,6 +58,7 @@ import androidx.compose.material.icons.outlined.Cast
 import androidx.compose.material.icons.outlined.ClosedCaption
 import androidx.compose.material.icons.outlined.Forward10
 import androidx.compose.material.icons.outlined.Info
+import androidx.compose.material.icons.outlined.LiveTv
 import androidx.compose.material.icons.outlined.Pause
 import androidx.compose.material.icons.outlined.PictureInPictureAlt
 import androidx.compose.material.icons.outlined.PlayArrow
@@ -73,6 +82,7 @@ import androidx.compose.foundation.focusGroup
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.key.Key
 import androidx.compose.ui.input.key.KeyEventType
 import androidx.compose.ui.input.key.key
@@ -91,6 +101,7 @@ import androidx.media3.ui.PlayerView
 import androidx.compose.ui.res.stringResource
 import com.mateof.kanal.R
 import com.mateof.kanal.cast.CastDevice
+import com.mateof.kanal.data.db.ChannelEntity
 import com.mateof.kanal.core.resolve
 import com.mateof.kanal.core.formatClock
 import com.mateof.kanal.core.formatDuration
@@ -124,13 +135,16 @@ private const val OSD_TIMEOUT_MS = 6_000L
  * never moves and, on a remote with no MENU key, there is no way in at all.
  * So the modes are explicit and only [Mode.Watching] consumes the arrows.
  */
-private enum class Mode { Watching, Menu, Tracks, Guide, Cast, Sleep }
+private enum class Mode { Watching, Menu, Channels, Tracks, Guide, Cast, Sleep }
 
 /**
  * How long landscape is enforced after the gesture asks for it, before the
  * accelerometer is given the screen back.
  */
 private const val ORIENTATION_HOLD_MS = 6_000L
+
+private val TILE_WIDTH = 104.dp
+private val TILE_GAP = 12.dp
 
 @Composable
 fun PlayerScreen(
@@ -267,7 +281,8 @@ fun PlayerScreen(
     // or the arrows have nothing to move from and the remote goes dead.
     LaunchedEffect(mode, detail == null) {
         val target = when (mode) {
-            Mode.Watching -> stageFocus
+            // The strip is driven by the arrows at the root, not by focus.
+            Mode.Watching, Mode.Channels -> stageFocus
             // These anchor their own first row as they appear.
             Mode.Menu, Mode.Sleep -> return@LaunchedEffect
             Mode.Tracks -> tracksFocus
@@ -293,6 +308,10 @@ fun PlayerScreen(
     fun goBack() {
         when (mode) {
             Mode.Tracks, Mode.Guide, Mode.Cast, Mode.Sleep -> mode = Mode.Menu
+            Mode.Channels -> {
+                vm.cancelBrowse()
+                mode = Mode.Watching
+            }
             Mode.Menu -> mode = Mode.Watching
             // The title sitting over the picture has to go the moment BACK is
             // pressed, not on the next auto-hide tick. A channel being browsed
@@ -393,22 +412,38 @@ fun PlayerScreen(
             .focusRequester(stageFocus)
             .focusable()
             .onKeyEvent { event ->
-                // Outside Watching the arrows belong to Compose's focus system.
-                if (mode != Mode.Watching) return@onKeyEvent false
                 if (event.type != KeyEventType.KeyDown) return@onKeyEvent false
-                when (event.key) {
-                    // Walk the list without leaving the channel. Nothing is tuned
-                    // until OK says so, so passing over a channel costs neither a
-                    // reconnection nor the picture being watched.
-                    Key.DirectionUp -> {
-                        poke()
-                        if (isLive) vm.browse(-1)
-                        true
-                    }
 
-                    Key.DirectionDown -> {
+                // The strip is a list of its own and answers the arrows itself;
+                // everywhere else outside Watching they belong to Compose's
+                // focus system.
+                if (mode == Mode.Channels) {
+                    return@onKeyEvent when (event.key) {
+                        Key.DirectionLeft, Key.DirectionUp -> { vm.browse(-1); poke(); true }
+                        Key.DirectionRight, Key.DirectionDown -> { vm.browse(1); poke(); true }
+                        Key.DirectionCenter, Key.Enter -> {
+                            swallowCentreUp = true
+                            vm.playBrowsed()
+                            mode = Mode.Watching
+                            poke()
+                            true
+                        }
+
+                        else -> false
+                    }
+                }
+                if (mode != Mode.Watching) return@onKeyEvent false
+                when (event.key) {
+                    // Both arrows open the strip rather than one of them
+                    // stepping through channels on its own: two ways of picking
+                    // a channel, on keys next to each other, would only be a
+                    // question about which one the user is in.
+                    Key.DirectionUp, Key.DirectionDown -> {
+                        if (isLive) {
+                            vm.openStrip()
+                            mode = Mode.Channels
+                        }
                         poke()
-                        if (isLive) vm.browse(1)
                         true
                     }
 
@@ -522,16 +557,34 @@ fun PlayerScreen(
             }
         }
 
-        AnimatedVisibility(
-            visible = osdVisible && state.error == null && !inPip,
-            enter = fadeIn(),
-            exit = fadeOut(),
-            modifier = Modifier.align(Alignment.BottomStart)
-        ) {
-            Osd(
-                state = state,
-                onSeekTo = { target -> vm.seekTo(target); poke() }
-            )
+        // Band and strip stack at the foot of the picture: the band says what
+        // the selection is, the strip shows where it sits among the rest.
+        Column(Modifier.align(Alignment.BottomStart).fillMaxWidth()) {
+            AnimatedVisibility(
+                visible = osdVisible && state.error == null && !inPip,
+                enter = fadeIn(),
+                exit = fadeOut()
+            ) {
+                Osd(
+                    state = state,
+                    onSeekTo = { target -> vm.seekTo(target); poke() }
+                )
+            }
+
+            if (mode == Mode.Channels && !inPip) {
+                ChannelStrip(
+                    channelIds = state.channelIds,
+                    rows = state.stripChannels,
+                    selected = state.browse?.index ?: state.channelIndex,
+                    onPick = { index ->
+                        // A finger has no OK: the tap both chooses and tunes.
+                        vm.browseTo(index)
+                        vm.playBrowsed()
+                        mode = Mode.Watching
+                        poke()
+                    }
+                )
+            }
         }
 
         // Everything that used to sit as a row of icons over the picture. Held
@@ -587,6 +640,20 @@ fun PlayerScreen(
                                 // confirmation the press did anything.
                                 onClick = vm::toggleFavorite
                             )
+                        )
+                    }
+                    // The strip answers the arrows, which a phone has none of;
+                    // without this it would be a television-only feature.
+                    if (playable != null && playable.isLive && state.channelIds.isNotEmpty()) {
+                        add(
+                            MenuAction(
+                                stringResource(R.string.player_channels),
+                                Icons.Outlined.LiveTv
+                            ) {
+                                vm.openStrip()
+                                mode = Mode.Channels
+                                poke()
+                            }
                         )
                     }
                     if (playable != null && playable.isLive && state.now != null) {
@@ -801,6 +868,111 @@ private fun GuidePanel(
 
         Spacer(Modifier.height(14.dp))
         KanalButton(stringResource(R.string.common_close), onClose, tone = ButtonTone.Primary)
+    }
+}
+
+/**
+ * The channels either side of the one playing, as a row of logos.
+ *
+ * Deliberately not a set of focusable tiles: on a remote the arrows drive the
+ * selection from the root of the screen, so a playlist of hundreds of channels
+ * does not turn into hundreds of focus stops for the D-pad to walk through, and
+ * the selection moves before anything is tuned. A finger gets the shorter route
+ * — a tap picks and changes in one go.
+ *
+ * Tiles whose row has not been fetched yet show their position instead of a
+ * logo, which is what the window loading is for: the strip spans the whole list
+ * but only ever holds the part of it anywhere near the screen.
+ */
+@Composable
+private fun ChannelStrip(
+    channelIds: List<String>,
+    rows: Map<String, ChannelEntity>,
+    selected: Int,
+    onPick: (Int) -> Unit
+) {
+    if (channelIds.isEmpty()) return
+    val listState = rememberLazyListState()
+    val tilePx = with(LocalDensity.current) { (TILE_WIDTH + TILE_GAP).roundToPx() }
+
+    // Centred rather than simply scrolled into view: landing the selection on
+    // the edge of the screen hides the very channels the user is heading
+    // towards, which is the whole point of walking the strip.
+    LaunchedEffect(selected) {
+        if (selected < 0) return@LaunchedEffect
+        val viewport = listState.layoutInfo.viewportSize.width
+        val offset = if (viewport > tilePx) -((viewport - tilePx) / 2) else 0
+        listState.animateScrollToItem(selected, offset)
+    }
+
+    LazyRow(
+        state = listState,
+        modifier = Modifier
+            .fillMaxWidth()
+            .background(Brush.verticalGradient(0f to Color(0x8005070C), 1f to Color(0xF205070C)))
+            .padding(vertical = 16.dp),
+        contentPadding = PaddingValues(horizontal = 40.dp),
+        horizontalArrangement = Arrangement.spacedBy(TILE_GAP)
+    ) {
+        itemsIndexed(channelIds, key = { _, id -> id }) { index, id ->
+            ChannelTile(
+                channel = rows[id],
+                position = index + 1,
+                selected = index == selected,
+                onClick = { onPick(index) }
+            )
+        }
+    }
+}
+
+@Composable
+private fun ChannelTile(
+    channel: ChannelEntity?,
+    position: Int,
+    selected: Boolean,
+    onClick: () -> Unit
+) {
+    val scale by animateFloatAsState(
+        targetValue = if (selected) 1.08f else 1f,
+        animationSpec = spring(dampingRatio = 0.7f, stiffness = 900f),
+        label = "tileScale"
+    )
+    Box(
+        modifier = Modifier
+            .size(TILE_WIDTH, 66.dp)
+            .graphicsLayer {
+                scaleX = scale
+                scaleY = scale
+            }
+            .clip(RoundedCornerShape(12.dp))
+            .background(if (selected) KanalColors.SurfaceVariant else Color(0xB30B1120))
+            .border(
+                BorderStroke(
+                    width = if (selected) 3.dp else 1.dp,
+                    color = if (selected) KanalColors.Accent else KanalColors.Outline
+                ),
+                RoundedCornerShape(12.dp)
+            )
+            // Tap only, and no clickable: making every tile focusable would put
+            // the whole playlist in the D-pad's way.
+            .pointerInput(onClick) { detectTapGestures { onClick() } }
+    ) {
+        if (channel != null) {
+            ArtworkImage(
+                url = channel.logo,
+                label = channel.name,
+                fallbackIcon = Icons.Outlined.LiveTv,
+                contentScale = ContentScale.Fit,
+                padding = 8.dp
+            )
+        } else {
+            Text(
+                position.toString(),
+                style = MaterialTheme.typography.labelMedium,
+                color = KanalColors.OnSurfaceFaint,
+                modifier = Modifier.align(Alignment.Center)
+            )
+        }
     }
 }
 
