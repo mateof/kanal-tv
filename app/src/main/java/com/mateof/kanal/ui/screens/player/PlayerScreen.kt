@@ -91,6 +91,7 @@ import androidx.compose.ui.input.key.onPreviewKeyEvent
 import androidx.compose.ui.input.key.type
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
@@ -957,20 +958,37 @@ private fun ChannelTile(
             // the whole playlist in the D-pad's way.
             .pointerInput(onClick) { detectTapGestures { onClick() } }
     ) {
-        if (channel != null) {
-            ArtworkImage(
+        when {
+            channel == null -> Text(
+                position.toString(),
+                style = MaterialTheme.typography.labelMedium,
+                color = KanalColors.OnSurfaceFaint,
+                modifier = Modifier.align(Alignment.Center)
+            )
+
+            channel.logo.isNotBlank() -> ArtworkImage(
                 url = channel.logo,
                 label = channel.name,
                 fallbackIcon = Icons.Outlined.LiveTv,
                 contentScale = ContentScale.Fit,
                 padding = 8.dp
             )
-        } else {
-            Text(
-                position.toString(),
-                style = MaterialTheme.typography.labelMedium,
-                color = KanalColors.OnSurfaceFaint,
-                modifier = Modifier.align(Alignment.Center)
+
+            // Whole name, small and wrapped, rather than the shared fallback of
+            // a generic icon over two letters. Plenty of playlists carry no
+            // logos at all, and there "La 1 HD" and "La 2 HD" both came out as
+            // "LA" beneath the same picture of a television — every tile alike,
+            // which is the one thing the strip exists to avoid.
+            else -> Text(
+                text = channel.name,
+                style = MaterialTheme.typography.labelSmall,
+                color = if (selected) KanalColors.OnBackground else KanalColors.OnSurfaceMuted,
+                textAlign = TextAlign.Center,
+                maxLines = 3,
+                overflow = TextOverflow.Ellipsis,
+                modifier = Modifier
+                    .align(Alignment.Center)
+                    .padding(horizontal = 6.dp)
             )
         }
     }

@@ -73,6 +73,10 @@ diez conexiones ni interrumpe lo que se está viendo. **ATRÁS** cierra la tira 
 En pantallas táctiles, donde no hay flechas, la tira se abre desde la opción **Canales** del
 menú, y basta tocar un logotipo para cambiar a ese canal.
 
+Los canales que traen logotipo lo muestran; los que no, su nombre completo en letra pequeña,
+hasta tres líneas. Muchas listas no incluyen logotipos, y una abreviatura de dos letras sobre
+un icono genérico dejaba todas las casillas iguales.
+
 La tira abarca la lista completa, pero solo carga los canales próximos a la posición señalada:
 una lista de decenas de miles no cabe en memoria por ocho iconos en pantalla. Los que aún no
 han llegado muestran su número mientras tanto.
