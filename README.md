@@ -1,5 +1,16 @@
 # Kanal
 
+<p align="center">
+  <a href="https://github.com/mateof/kanal-tv/actions/workflows/release.yml"><img alt="Build" src="https://img.shields.io/github/actions/workflow/status/mateof/kanal-tv/release.yml?branch=main&amp;label=build&amp;logo=github"></a>
+  <a href="https://github.com/mateof/kanal-tv/releases/latest"><img alt="Release" src="https://img.shields.io/github/v/release/mateof/kanal-tv?label=release&amp;color=blue"></a>
+  <a href="https://github.com/mateof/kanal-tv/releases"><img alt="Downloads" src="https://img.shields.io/github/downloads/mateof/kanal-tv/total?logo=android&amp;logoColor=white"></a>
+  <a href="#requisitos"><img alt="Android" src="https://img.shields.io/badge/Android-6.0%2B%20%C2%B7%20API%2023-3DDC84?logo=android&amp;logoColor=white"></a>
+  <a href="#compatibilidad"><img alt="Plataformas" src="https://img.shields.io/badge/plataformas-Android%20TV%20%C2%B7%20Google%20TV%20%C2%B7%20Fire%20TV-informational"></a>
+  <a href="https://kotlinlang.org"><img alt="Kotlin" src="https://img.shields.io/badge/Kotlin-2.1-7F52FF?logo=kotlin&amp;logoColor=white"></a>
+  <a href="LICENSE"><img alt="License" src="https://img.shields.io/github/license/mateof/kanal-tv"></a>
+  <a href="https://github.com/mateof/kanal-tv/commits/main"><img alt="Last commit" src="https://img.shields.io/github/last-commit/mateof/kanal-tv"></a>
+</p>
+
 Reproductor de televisión para **Android TV, Google TV y Fire TV**, escrito en Kotlin con
 Jetpack Compose. Se conecta a paneles **Xtream Codes** (incluido
 [Dispatcharr](https://github.com/Dispatcharr/Dispatcharr)) y a **listas M3U/M3U8**, con guía
