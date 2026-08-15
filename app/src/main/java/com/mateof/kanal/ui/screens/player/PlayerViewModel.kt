@@ -28,6 +28,7 @@ import com.mateof.kanal.data.repo.EpgRepository
 import com.mateof.kanal.data.repo.Playable
 import com.mateof.kanal.data.repo.PlaybackRepository
 import com.mateof.kanal.player.PlayerFactory
+import com.mateof.kanal.player.StreamProbe
 import com.mateof.kanal.player.PipController
 import com.mateof.kanal.player.PlayerHandover
 import dagger.hilt.android.lifecycle.HiltViewModel
@@ -113,6 +114,8 @@ data class PlayerUiState(
     val castError: String? = null,
     /** Plain-language reading of the renderer's refusal, when it is known. */
     val castHint: UiText? = null,
+    /** What the server actually answered, when a stream would not play. */
+    val errorDetail: String? = null,
     /** True while what is playing can be made a favourite at all. */
     val canFavorite: Boolean = false,
     val isFavorite: Boolean = false,
@@ -132,6 +135,7 @@ class PlayerViewModel @Inject constructor(
     private val handover: PlayerHandover,
     private val pip: PipController,
     private val sleepTimer: SleepTimer,
+    private val probe: StreamProbe,
     private val upnp: UpnpClient,
     private val logger: FileLogger
 ) : ViewModel() {
@@ -291,6 +295,7 @@ class PlayerViewModel @Inject constructor(
             playable = playable,
             loading = false,
             error = null,
+            errorDetail = null,
             channelIndex = index,
             channelCount = channelIds.size,
             reconnectAttempt = 0
@@ -430,6 +435,7 @@ class PlayerViewModel @Inject constructor(
                 buffering = false,
                 playing = false
             )
+            examineFailure(error)
         }
 
         // The new channel is on screen, so the picture is worth keeping again if
@@ -464,6 +470,31 @@ class PlayerViewModel @Inject constructor(
             _state.value = _state.value.copy(playing = isPlaying)
             if (!isPlaying) recordProgress()
         }
+    }
+
+    /**
+     * Asks the url that just failed what it was really serving.
+     *
+     * Only for the failures where the answer is in doubt — a container nothing
+     * could read. A timeout or a refused connection already says what happened.
+     */
+    private fun examineFailure(error: PlaybackException) {
+        if (!isContainerProblem(error)) return
+        val url = candidates.getOrNull(candidateIndex) ?: return
+        val userAgent = _state.value.playable?.userAgent ?: return
+        viewModelScope.launch {
+            val detail = probe.describe(url, userAgent)
+            if (detail != null) _state.value = _state.value.copy(errorDetail = detail)
+        }
+    }
+
+    private fun isContainerProblem(error: PlaybackException): Boolean = when (error.errorCode) {
+        PlaybackException.ERROR_CODE_PARSING_CONTAINER_UNSUPPORTED,
+        PlaybackException.ERROR_CODE_PARSING_CONTAINER_MALFORMED,
+        PlaybackException.ERROR_CODE_PARSING_MANIFEST_UNSUPPORTED,
+        PlaybackException.ERROR_CODE_PARSING_MANIFEST_MALFORMED -> true
+
+        else -> false
     }
 
     /**
@@ -850,7 +881,12 @@ class PlayerViewModel @Inject constructor(
     fun retry() {
         val exo = player ?: return
         reconnects = 0
-        _state.value = _state.value.copy(error = null, buffering = true, reconnectAttempt = 0)
+        _state.value = _state.value.copy(
+            error = null,
+            errorDetail = null,
+            buffering = true,
+            reconnectAttempt = 0
+        )
         // Start the candidate walk over: the channel may simply have been down.
         candidateIndex = 0
         candidates.firstOrNull()?.let { url ->

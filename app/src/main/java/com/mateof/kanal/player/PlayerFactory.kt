@@ -12,7 +12,11 @@ import androidx.media3.exoplayer.DefaultRenderersFactory
 import androidx.media3.exoplayer.ExoPlayer
 import androidx.media3.exoplayer.source.DefaultMediaSourceFactory
 import androidx.media3.exoplayer.trackselection.DefaultTrackSelector
+import android.net.Uri
 import androidx.media3.extractor.DefaultExtractorsFactory
+import androidx.media3.extractor.Extractor
+import androidx.media3.extractor.ExtractorsFactory
+import androidx.media3.extractor.ts.TsExtractor
 import com.mateof.kanal.core.log.FileLogger
 import com.mateof.kanal.data.net.HttpProvider
 import androidx.media3.exoplayer.upstream.DefaultLoadErrorHandlingPolicy
@@ -55,8 +59,9 @@ class PlayerFactory @Inject constructor(
             .setExtensionRendererMode(DefaultRenderersFactory.EXTENSION_RENDERER_MODE_ON)
             .setEnableDecoderFallback(true)
 
-        val extractors = DefaultExtractorsFactory()
-            .setConstantBitrateSeekingEnabled(true)
+        val extractors = TsWithoutSniffing(
+            DefaultExtractorsFactory().setConstantBitrateSeekingEnabled(true)
+        )
 
         // Waiting twice as long after a rebuffer as on a cold start avoids
         // stuttering straight back into another stall, but it cannot exceed the
@@ -133,6 +138,39 @@ class PlayerFactory @Inject constructor(
                 androidx.media3.common.MediaMetadata.Builder().setTitle(title).build()
             )
             .build()
+    }
+}
+
+/**
+ * Hands a `.ts` url straight to the transport-stream reader instead of asking
+ * the extractors to recognise it first.
+ *
+ * Sniffing is stricter than reading. It takes the first 940 bytes and requires
+ * the packet sync byte to fall on a regular 188-byte grid within them, so a
+ * stream with more than one packet's worth of anything in front of it is
+ * rejected before it is ever read — while the reader itself would have skipped
+ * ahead to the first sync byte and carried on. That is the difference between a
+ * channel VLC plays and Kanal refuses with "no recognisable format".
+ *
+ * Only applied where the url already says what it is. Anything else keeps the
+ * full set and its sniffing, which is what identifies VOD containers.
+ */
+@UnstableApi
+private class TsWithoutSniffing(
+    private val fallback: DefaultExtractorsFactory
+) : ExtractorsFactory {
+    override fun createExtractors(): Array<Extractor> = fallback.createExtractors()
+
+    override fun createExtractors(
+        uri: Uri,
+        responseHeaders: Map<String, List<String>>
+    ): Array<Extractor> {
+        val path = uri.path.orEmpty().substringBefore('?').lowercase()
+        return if (path.endsWith(".ts")) {
+            arrayOf(TsExtractor())
+        } else {
+            fallback.createExtractors(uri, responseHeaders)
+        }
     }
 }
 

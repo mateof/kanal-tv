@@ -98,3 +98,19 @@ mantiene los valores con los que empezó. Al abrir el canal de nuevo se aplican 
 
 Conviene adjuntar también la versión instalada, que aparece en Ajustes, y el modelo del
 aparato.
+
+## Canales que no llegan a reproducirse
+
+Cuando un canal agota todos sus formatos, Kanal pide los primeros kilobytes de la última
+dirección probada y anota en el registro qué recibió: código de respuesta, tipo de contenido y
+los primeros bytes. Las entradas llevan la etiqueta `Probe`.
+
+```
+I/Probe: http://…/live/***/***/6.ts → 200, tipo 'text/plain', 86 B leídos: parece HTML o XML
+D/Probe: Primeros bytes: 3c 68 74 6d 6c 3e …  |<html><body><h1>Stream not avail|
+```
+
+Sirve para separar dos casos que el reproductor no distingue: un servidor que responde con un
+mensaje de error —canal caído o límite de conexiones alcanzado, nada que corregir en la
+aplicación— y una emisión real en un contenedor que no se sabe leer. Cuando la respuesta es
+claramente texto, la pantalla lo indica bajo el mensaje de error.

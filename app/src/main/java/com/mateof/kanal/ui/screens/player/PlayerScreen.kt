@@ -550,6 +550,18 @@ fun PlayerScreen(
                     style = MaterialTheme.typography.titleLarge,
                     color = KanalColors.Error
                 )
+                // What the server actually answered, once it has been asked.
+                // "No recognisable format" alone leaves the user with nothing to
+                // act on; "answered 403" or "sent text instead of video" does.
+                state.errorDetail?.let { detail ->
+                    Spacer(Modifier.height(10.dp))
+                    Text(
+                        detail,
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = KanalColors.OnSurfaceMuted,
+                        textAlign = TextAlign.Center
+                    )
+                }
                 Spacer(Modifier.height(20.dp))
                 Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                     KanalButton(stringResource(R.string.common_retry), vm::retry, tone = ButtonTone.Primary)
