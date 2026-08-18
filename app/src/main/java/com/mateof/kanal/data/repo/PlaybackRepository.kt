@@ -41,8 +41,19 @@ data class Playable(
      * only answer in MPEG-TS, others only in HLS, and a few still use the old
      * prefix-less path.
      */
-    val fallbackUrls: List<String> = emptyList()
+    val fallbackUrls: List<String> = emptyList(),
+    /**
+     * Names each url in [url] followed by [fallbackUrls], so the one that ends
+     * up working can be remembered without storing an address that carries
+     * credentials and changes with them.
+     */
+    val candidateIds: List<String> = emptyList()
 )
+
+/** Identifies a way of asking for a live channel, for [Playable.candidateIds]. */
+private fun candidateId(format: StreamFormat): String = format.extension
+
+private const val LEGACY_CANDIDATE = "legacy"
 
 @Singleton
 class PlaybackRepository @Inject constructor(
@@ -52,6 +63,7 @@ class PlaybackRepository @Inject constructor(
         val settings = prefs.settings.first()
         val url: String
         val fallbacks: List<String>
+        var ids: List<String> = emptyList()
         when (source.type) {
             SourceType.M3U -> {
                 url = channel.url
@@ -61,11 +73,28 @@ class PlaybackRepository @Inject constructor(
             SourceType.XTREAM -> {
                 val preferred = settings.streamFormat
                 val other = if (preferred == StreamFormat.TS) StreamFormat.HLS else StreamFormat.TS
-                url = XtreamUrls.live(source, channel.streamId, preferred.extension)
-                fallbacks = listOf(
-                    XtreamUrls.live(source, channel.streamId, other.extension),
-                    XtreamUrls.legacyLive(source, channel.streamId)
+                var ordered = listOf(
+                    candidateId(preferred) to XtreamUrls.live(source, channel.streamId, preferred.extension),
+                    candidateId(other) to XtreamUrls.live(source, channel.streamId, other.extension),
+                    LEGACY_CANDIDATE to XtreamUrls.legacyLive(source, channel.streamId)
                 )
+
+                // Panels answer one channel in MPEG-TS and the next only in HLS,
+                // and the wrong guess is not free: the failure takes a couple of
+                // seconds to arrive before the next url is even tried, on every
+                // single opening. So whichever produced a picture last time goes
+                // first, and a channel never seen before follows whatever the
+                // rest of this source has been answering to.
+                val choices = prefs.streamChoices.first()
+                val remembered = choices[choiceKey(source.id, channel.streamId)]
+                    ?: mostCommonChoice(choices, source.id)
+                if (remembered != null) {
+                    ordered = ordered.sortedBy { if (it.first == remembered) 0 else 1 }
+                }
+
+                url = ordered.first().second
+                fallbacks = ordered.drop(1).map { it.second }
+                ids = ordered.map { it.first }
             }
         }
         return Playable(
@@ -79,8 +108,29 @@ class PlaybackRepository @Inject constructor(
             userAgent = userAgentFor(source),
             isLive = true,
             epgChannelId = channel.epgChannelId,
-            fallbackUrls = fallbacks
+            fallbackUrls = fallbacks,
+            candidateIds = ids
         )
+    }
+
+    /** Notes that [index] of the candidates is the one that produced a picture. */
+    suspend fun rememberWorkingCandidate(playable: Playable, index: Int) {
+        if (!playable.isLive) return
+        val id = playable.candidateIds.getOrNull(index) ?: return
+        prefs.rememberStreamChoice(choiceKey(playable.sourceId, playable.itemId), id)
+    }
+
+    private fun choiceKey(sourceId: String, itemId: String) = "$sourceId:$itemId"
+
+    /** What the rest of this source has been answering to, for a new channel. */
+    private fun mostCommonChoice(choices: Map<String, String>, sourceId: String): String? {
+        val prefix = "$sourceId:"
+        return choices.entries
+            .filter { it.key.startsWith(prefix) }
+            .groupingBy { it.value }
+            .eachCount()
+            .maxByOrNull { it.value }
+            ?.key
     }
 
     suspend fun forMovie(source: Source, movie: MovieEntity): Playable {

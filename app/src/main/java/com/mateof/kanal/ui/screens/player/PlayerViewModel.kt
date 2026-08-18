@@ -442,6 +442,10 @@ class PlayerViewModel @Inject constructor(
         // the connection stumbles later.
         override fun onRenderedFirstFrame() {
             if (_state.value.switching) _state.value = _state.value.copy(switching = false)
+            // A picture is the only proof that this url was the right one, so
+            // the note is taken here and not when playback merely started.
+            val playable = _state.value.playable ?: return
+            viewModelScope.launch { playback.rememberWorkingCandidate(playable, candidateIndex) }
         }
 
         override fun onVideoSizeChanged(videoSize: VideoSize) {

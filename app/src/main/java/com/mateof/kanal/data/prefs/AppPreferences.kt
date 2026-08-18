@@ -79,6 +79,7 @@ class AppPreferences @Inject constructor(
         val SOURCES = stringPreferencesKey("sources")
         val ACTIVE_SOURCE = stringPreferencesKey("active_source")
         val FAVORITES = stringPreferencesKey("favorites")
+        val STREAM_CHOICES = stringPreferencesKey("stream_choices")
         val HISTORY = stringPreferencesKey("history")
 
         val STREAM_FORMAT = stringPreferencesKey("stream_format")
@@ -170,6 +171,30 @@ class AppPreferences @Inject constructor(
             prefs[Keys.FAVORITES] = json.encodeToString(all.toList())
         }
         return nowFavorite
+    }
+
+    // --- Which stream format each channel answers to -------------------------
+
+    /** Channel key to the id of the url that last produced a picture. */
+    val streamChoices: Flow<Map<String, String>> = context.dataStore.data.map { prefs ->
+        decode<Map<String, String>>(prefs[Keys.STREAM_CHOICES], emptyMap())
+    }
+
+    /**
+     * Written only when the answer changes, which after the first pass through
+     * the list is almost never: a channel is opened far more often than it
+     * changes the format it answers in, and the whole map is rewritten on every
+     * edit.
+     */
+    suspend fun rememberStreamChoice(key: String, choice: String) {
+        val current = streamChoices.first()
+        if (current[key] == choice) return
+        context.dataStore.edit { prefs ->
+            val all = decode<Map<String, String>>(prefs[Keys.STREAM_CHOICES], emptyMap())
+                .toMutableMap()
+            all[key] = choice
+            prefs[Keys.STREAM_CHOICES] = json.encodeToString(all.toMap())
+        }
     }
 
     // --- History -------------------------------------------------------------
