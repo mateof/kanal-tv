@@ -113,12 +113,19 @@ fun FocusableSurface(
             // combinedClickable rather than clickable so a held OK, or a long
             // press of the finger, can offer the extra actions without adding a
             // second focusable target beside every row.
+            //
+            // Always enabled, with the callbacks guarded instead. Compose drops
+            // focusability along with the click, so a control disabled while it
+            // is the focused one takes the focus down with it and the D-pad
+            // resurfaces somewhere else entirely — pressing "check for updates"
+            // threw the user three sections up the settings screen, because the
+            // button greys itself out while it works. Staying focusable and
+            // simply not acting keeps the remote where the user left it.
             .combinedClickable(
-                enabled = enabled,
                 interactionSource = interactionSource,
                 indication = null,
-                onLongClick = onLongClick,
-                onClick = onClick
+                onLongClick = onLongClick?.let { action -> { if (enabled) action() } },
+                onClick = { if (enabled) onClick() }
             )
     ) {
         content(focused)

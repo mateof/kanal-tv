@@ -12,6 +12,8 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.LazyRow
+import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.Add
@@ -27,6 +29,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -81,34 +84,50 @@ fun SettingsScreen(
         mutableStateOf(settings.sleepTimerMinutes.toString())
     }
 
-    LazyColumn(
-        modifier = Modifier.fillMaxSize(),
-        contentPadding = PaddingValues(
-            start = contentInset,
-            end = if (isCompact) contentInset else 80.dp,
-            top = 32.dp,
-            bottom = 70.dp
-        ),
-        verticalArrangement = Arrangement.spacedBy(14.dp)
-    ) {
-        item {
+    // Six screens' worth of settings in one column meant walking past all of
+    // them to reach the last. They were already grouped; the groups are now the
+    // way in, with the heading and whatever is running kept in sight above.
+    val sections = listOf(
+        stringResource(R.string.language),
+        stringResource(R.string.settings_sources),
+        stringResource(R.string.settings_playback),
+        stringResource(R.string.settings_guide_content),
+        stringResource(R.string.settings_saving),
+        stringResource(R.string.settings_app)
+    )
+    var section by rememberSaveable { mutableStateOf(0) }
+
+    Column(Modifier.fillMaxSize()) {
+        Column(
+            Modifier.padding(
+                start = contentInset,
+                end = if (isCompact) contentInset else 80.dp,
+                top = 32.dp
+            )
+        ) {
             Text(
                 stringResource(R.string.settings_title),
                 style = MaterialTheme.typography.headlineMedium,
                 color = KanalColors.OnBackground
             )
-            Spacer(Modifier.height(4.dp))
-        }
-
-        if (busy) {
-            item {
+            Spacer(Modifier.height(12.dp))
+            LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                itemsIndexed(sections) { index, label ->
+                    KanalChip(
+                        label = label,
+                        selected = index == section,
+                        onClick = { section = index }
+                    )
+                }
+            }
+            if (busy) {
+                Spacer(Modifier.height(12.dp))
                 val running = syncState as? SyncState.Running
                 val label = running?.step?.resolve() ?: stringResource(R.string.common_working)
                 StepProgress(label, running?.progress ?: -1f)
             }
-        }
-        message?.let { text ->
-            item {
+            message?.let { text ->
+                Spacer(Modifier.height(10.dp))
                 Text(
                     text.resolve(),
                     style = MaterialTheme.typography.bodyMedium,
@@ -117,10 +136,21 @@ fun SettingsScreen(
             }
         }
 
+    LazyColumn(
+        modifier = Modifier.fillMaxSize(),
+        contentPadding = PaddingValues(
+            start = contentInset,
+            end = if (isCompact) contentInset else 80.dp,
+            top = 20.dp,
+            bottom = 70.dp
+        ),
+        verticalArrangement = Arrangement.spacedBy(14.dp)
+    ) {
+
+        if (section == 0) {
         // --- Language -------------------------------------------------------
         // First on the list on purpose: somebody who opened Kanal in a language
         // they cannot read has to find this without reading anything else.
-        item { SectionHeader(stringResource(R.string.language)) }
         item {
             OptionRow(
                 title = stringResource(R.string.language),
@@ -131,8 +161,10 @@ fun SettingsScreen(
             )
         }
 
+        }
+
+        if (section == 1) {
         // --- Sources --------------------------------------------------------
-        item { Spacer(Modifier.height(10.dp)); SectionHeader(stringResource(R.string.settings_sources)) }
         items(sources, key = { it.id }) { source ->
             SourceRow(
                 source = source,
@@ -167,8 +199,10 @@ fun SettingsScreen(
             }
         }
 
+        }
+
+        if (section == 2) {
         // --- Playback -------------------------------------------------------
-        item { Spacer(Modifier.height(10.dp)); SectionHeader(stringResource(R.string.settings_playback)) }
         item {
             OptionRow(
                 title = stringResource(R.string.settings_stream_format),
@@ -227,8 +261,10 @@ fun SettingsScreen(
             }
         }
 
+        }
+
+        if (section == 3) {
         // --- Guide and content ----------------------------------------------
-        item { Spacer(Modifier.height(10.dp)); SectionHeader(stringResource(R.string.settings_guide_content)) }
         item {
             OptionRow(
                 title = stringResource(R.string.settings_epg_days),
@@ -259,8 +295,10 @@ fun SettingsScreen(
             )
         }
 
+        }
+
+        if (section == 4) {
         // --- Shutdown and saving --------------------------------------------
-        item { Spacer(Modifier.height(10.dp)); SectionHeader(stringResource(R.string.settings_saving)) }
         item {
             Column {
                 OptionRow(
@@ -324,8 +362,10 @@ fun SettingsScreen(
             )
         }
 
+        }
+
+        if (section == 5) {
         // --- App ------------------------------------------------------------
-        item { Spacer(Modifier.height(10.dp)); SectionHeader(stringResource(R.string.settings_app)) }
         item {
             SettingSwitchRow(
                 title = stringResource(R.string.settings_auto_update),
@@ -408,6 +448,8 @@ fun SettingsScreen(
                 )
             }
         }
+        }
+    }
     }
 }
 
