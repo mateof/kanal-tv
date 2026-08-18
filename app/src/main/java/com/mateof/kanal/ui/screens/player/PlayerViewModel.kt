@@ -50,6 +50,9 @@ private const val SAVE_EVERY_TICKS = 30
 /** Grace for the provider to notice the connection has gone. */
 private const val SLOT_RELEASE_MS = 1_200L
 
+/** Seconds of grace before an episode rolls into the next one. */
+private const val NEXT_UP_SECONDS = 8
+
 /** Tiles loaded either side of the selection for the channel strip. */
 private const val STRIP_WINDOW = 40
 
@@ -80,6 +83,13 @@ data class BrowseInfo(
     val logo: String,
     val now: EpgEntity? = null,
     val next: EpgEntity? = null
+)
+
+/** The episode queued up behind the one that just finished. */
+data class NextUp(
+    val episodeId: String,
+    val title: String,
+    val secondsLeft: Int
 )
 
 data class PlayerUiState(
@@ -116,6 +126,8 @@ data class PlayerUiState(
     val castHint: UiText? = null,
     /** What the server actually answered, when a stream would not play. */
     val errorDetail: String? = null,
+    /** Counting down to the next episode, or null when nothing follows. */
+    val nextUp: NextUp? = null,
     /** True while what is playing can be made a favourite at all. */
     val canFavorite: Boolean = false,
     val isFavorite: Boolean = false,
@@ -157,6 +169,7 @@ class PlayerViewModel @Inject constructor(
     private var reconnectJob: Job? = null
     private var favoritesJob: Job? = null
     private var browseJob: Job? = null
+    private var nextUpJob: Job? = null
     private var reconnects = 0
 
     /** Where the arrows have walked to, kept out of the state so it can lead it. */
@@ -296,6 +309,7 @@ class PlayerViewModel @Inject constructor(
             loading = false,
             error = null,
             errorDetail = null,
+            nextUp = null,
             channelIndex = index,
             channelCount = channelIds.size,
             reconnectAttempt = 0
@@ -436,6 +450,10 @@ class PlayerViewModel @Inject constructor(
                 playing = false
             )
             examineFailure(error)
+        }
+
+        override fun onPlaybackStateChanged(playbackState: Int) {
+            if (playbackState == Player.STATE_ENDED) offerNextEpisode()
         }
 
         // The new channel is on screen, so the picture is worth keeping again if
@@ -851,6 +869,54 @@ class PlayerViewModel @Inject constructor(
     fun openStrip() {
         val index = _state.value.channelIndex
         if (index >= 0) browseTo(index) else loadStripWindow(0)
+    }
+
+    /**
+     * Queues whatever follows the episode that just ended.
+     *
+     * With a few seconds of grace and a way out: rolling straight into the next
+     * one is what somebody watching a series wants, and is also the last thing
+     * somebody who has just finished for the night wants.
+     */
+    private fun offerNextEpisode() {
+        val playable = _state.value.playable ?: return
+        if (playable.kind != ContentKind.SERIES) return
+        val current = source ?: return
+
+        nextUpJob?.cancel()
+        nextUpJob = viewModelScope.launch {
+            val episode = content.episode(current.id, playable.itemId) ?: return@launch
+            val next = content.episodeAfter(episode) ?: return@launch
+            val label = next.title.ifBlank { "T${next.season}E${next.number}" }
+            for (left in NEXT_UP_SECONDS downTo 1) {
+                _state.value = _state.value.copy(nextUp = NextUp(next.episodeId, label, left))
+                delay(1_000)
+            }
+            startEpisode(next.episodeId)
+        }
+    }
+
+    fun playNextNow() {
+        val queued = _state.value.nextUp ?: return
+        nextUpJob?.cancel()
+        nextUpJob = viewModelScope.launch { startEpisode(queued.episodeId) }
+    }
+
+    fun cancelNextUp() {
+        nextUpJob?.cancel()
+        _state.value = _state.value.copy(nextUp = null)
+    }
+
+    private suspend fun startEpisode(episodeId: String) {
+        val current = source ?: return
+        val episode = content.episode(current.id, episodeId) ?: return
+        val series = content.seriesById(current.id, episode.seriesId)
+        val playable = playback.forEpisode(current, episode, series?.name.orEmpty())
+        // Kept in step with load(), or coming back to this screen would decide
+        // nothing had changed and leave the previous episode on.
+        loadedKey = "SERIES/$episodeId/0"
+        _state.value = _state.value.copy(nextUp = null, error = null, buffering = true)
+        start(playable)
     }
 
     /** Gives up on the browsed channel and goes back to reporting the current one. */

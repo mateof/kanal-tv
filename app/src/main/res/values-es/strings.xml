@@ -377,4 +377,6 @@
     <string name="player_fullscreen">Pantalla completa</string>
     <string name="player_leave_fullscreen">Salir de pantalla completa</string>
     <string name="player_channels">Canales</string>
+    <string name="player_next_up">Siguiente episodio en %d s</string>
+    <string name="player_watch_now">Ver ahora</string>
 </resources>

@@ -748,6 +748,26 @@ fun PlayerScreen(
             )
         }
 
+        // Offered wherever the player happens to be: an episode ending is not
+        // something the user asked for at that moment, so it has to interrupt.
+        state.nextUp?.takeIf { !inPip }?.let { queued ->
+            ActionMenu(
+                title = stringResource(R.string.player_next_up, queued.secondsLeft),
+                subtitle = queued.title,
+                onDismiss = { vm.cancelNextUp() },
+                actions = listOf(
+                    MenuAction(
+                        stringResource(R.string.player_watch_now),
+                        Icons.Outlined.PlayArrow
+                    ) { vm.playNextNow() },
+                    MenuAction(
+                        stringResource(R.string.common_cancel),
+                        Icons.Outlined.Pause
+                    ) { vm.cancelNextUp() }
+                )
+            )
+        }
+
         // Presets only: the point of reaching for this mid-film is not to do
         // arithmetic. The exact minute lives in Ajustes for whoever wants it.
         if (mode == Mode.Sleep && !inPip) {

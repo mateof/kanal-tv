@@ -120,6 +120,15 @@ class ContentRepository @Inject constructor(
     suspend fun episode(sourceId: String, episodeId: String): EpisodeEntity? =
         db.episodes().byId(sourceId, episodeId)
 
+    /** What follows [episode] in its series, or null when it was the last. */
+    suspend fun episodeAfter(episode: EpisodeEntity): EpisodeEntity? =
+        db.episodes().following(
+            episode.sourceId,
+            episode.seriesId,
+            episode.season,
+            episode.number
+        )
+
     fun episodes(sourceId: String, seriesId: String): Flow<List<EpisodeEntity>> =
         db.episodes().observe(sourceId, seriesId)
 

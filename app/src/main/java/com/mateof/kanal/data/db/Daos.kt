@@ -240,6 +240,22 @@ interface EpisodeDao {
     @Query("SELECT * FROM episodes WHERE sourceId = :sourceId AND episodeId = :episodeId")
     suspend fun byId(sourceId: String, episodeId: String): EpisodeEntity?
 
+    /** The next one in the series' own order, across a season boundary. */
+    @Query(
+        """
+        SELECT * FROM episodes
+        WHERE sourceId = :sourceId AND seriesId = :seriesId
+          AND (season > :season OR (season = :season AND number > :number))
+        ORDER BY season, number LIMIT 1
+        """
+    )
+    suspend fun following(
+        sourceId: String,
+        seriesId: String,
+        season: Int,
+        number: Int
+    ): EpisodeEntity?
+
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insertAll(items: List<EpisodeEntity>)
 
