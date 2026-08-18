@@ -140,4 +140,8 @@ class SettingsViewModel @Inject constructor(
     }
 
     fun cancelSleepTimer() = sleepTimer.cancel()
+
+    fun setFillMissingLogos(value: Boolean) = viewModelScope.launch {
+        prefs.setFillMissingLogos(value)
+    }
 }

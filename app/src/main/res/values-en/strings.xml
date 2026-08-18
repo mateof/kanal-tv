@@ -379,4 +379,6 @@
     <string name="player_channels">Channels</string>
     <string name="player_next_up">Next episode in %d s</string>
     <string name="player_watch_now">Watch now</string>
+    <string name="settings_fill_logos">Fill in missing logos</string>
+    <string name="settings_fill_logos_desc">Channels the playlist sends without a logo are looked up by name in a public catalogue of station logos. Nothing from your playlist is sent: only your country’s folder is read.</string>
 </resources>

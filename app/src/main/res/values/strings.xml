@@ -386,4 +386,6 @@
     <string name="player_channels">Canles</string>
     <string name="player_next_up">Seguinte episodio en %d s</string>
     <string name="player_watch_now">Ver agora</string>
+    <string name="settings_fill_logos">Completar logotipos que falten</string>
+    <string name="settings_fill_logos_desc">As canles que a listaxe manda sen logotipo búscanse por nome nun catálogo público de logotipos de televisión. Non se envía nada da túa listaxe: só se le a carpeta do teu país.</string>
 </resources>

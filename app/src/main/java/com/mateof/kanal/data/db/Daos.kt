@@ -102,6 +102,10 @@ interface ChannelDao {
         limit: Int
     ): List<ChannelEntity>
 
+    /** Channels the playlist gave no logo for, to be matched by name. */
+    @Query("SELECT * FROM channels WHERE sourceId = :sourceId AND logo = ''")
+    suspend fun withoutLogo(sourceId: String): List<ChannelEntity>
+
     /** Channels the playlist gave no `tvg-id` for, to be matched by name. */
     @Query("SELECT * FROM channels WHERE sourceId = :sourceId AND epgChannelId = ''")
     suspend fun withoutEpgId(sourceId: String): List<ChannelEntity>

@@ -288,6 +288,14 @@ fun SettingsScreen(
         }
         item {
             SettingSwitchRow(
+                title = stringResource(R.string.settings_fill_logos),
+                description = stringResource(R.string.settings_fill_logos_desc),
+                checked = settings.fillMissingLogos,
+                onCheckedChange = vm::setFillMissingLogos
+            )
+        }
+        item {
+            SettingSwitchRow(
                 title = stringResource(R.string.settings_hide_adult),
                 description = stringResource(R.string.settings_hide_adult_desc),
                 checked = settings.hideAdult,

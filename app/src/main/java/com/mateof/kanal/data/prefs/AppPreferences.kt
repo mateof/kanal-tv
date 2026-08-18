@@ -64,7 +64,8 @@ data class Settings(
     val autoSyncHours: Int = 12,
     val sleepTimerMinutes: Int = SleepTimer.DEFAULT_MINUTES,
     val stillWatching: Boolean = true,
-    val subtitlesEnabled: Boolean = false
+    val subtitlesEnabled: Boolean = false,
+    val fillMissingLogos: Boolean = true
 )
 
 const val DEFAULT_USER_AGENT = "VLC/3.0.20 LibVLC/3.0.20"
@@ -80,6 +81,7 @@ class AppPreferences @Inject constructor(
         val ACTIVE_SOURCE = stringPreferencesKey("active_source")
         val FAVORITES = stringPreferencesKey("favorites")
         val STREAM_CHOICES = stringPreferencesKey("stream_choices")
+        val FILL_LOGOS = booleanPreferencesKey("fill_logos")
         val HISTORY = stringPreferencesKey("history")
 
         val STREAM_FORMAT = stringPreferencesKey("stream_format")
@@ -245,7 +247,8 @@ class AppPreferences @Inject constructor(
             autoSyncHours = prefs[Keys.AUTO_SYNC_HOURS] ?: 12,
             sleepTimerMinutes = prefs[Keys.SLEEP_MINUTES] ?: SleepTimer.DEFAULT_MINUTES,
             stillWatching = prefs[Keys.STILL_WATCHING] ?: true,
-            subtitlesEnabled = prefs[Keys.SUBTITLES] ?: false
+            subtitlesEnabled = prefs[Keys.SUBTITLES] ?: false,
+            fillMissingLogos = prefs[Keys.FILL_LOGOS] ?: true
         )
     }
 
@@ -271,6 +274,8 @@ class AppPreferences @Inject constructor(
     suspend fun setSleepTimerMinutes(value: Int) = edit { it[Keys.SLEEP_MINUTES] = value }
     suspend fun setStillWatching(value: Boolean) = edit { it[Keys.STILL_WATCHING] = value }
     suspend fun setSubtitlesEnabled(value: Boolean) = edit { it[Keys.SUBTITLES] = value }
+
+    suspend fun setFillMissingLogos(value: Boolean) = edit { it[Keys.FILL_LOGOS] = value }
 
     /**
      * Televisions added by hand, kept between sessions: the ones that need it

@@ -379,4 +379,6 @@
     <string name="player_channels">Canales</string>
     <string name="player_next_up">Siguiente episodio en %d s</string>
     <string name="player_watch_now">Ver ahora</string>
+    <string name="settings_fill_logos">Completar logotipos que falten</string>
+    <string name="settings_fill_logos_desc">Los canales que la lista manda sin logotipo se buscan por nombre en un catálogo público de logotipos de televisión. No se envía nada de tu lista: sólo se lee la carpeta de tu país.</string>
 </resources>

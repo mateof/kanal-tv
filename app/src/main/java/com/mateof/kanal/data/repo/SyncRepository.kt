@@ -8,6 +8,7 @@ import com.mateof.kanal.core.bool
 import com.mateof.kanal.core.double
 import com.mateof.kanal.core.firstStr
 import com.mateof.kanal.core.int
+import android.content.Context
 import com.mateof.kanal.core.log.FileLogger
 import com.mateof.kanal.core.long
 import com.mateof.kanal.core.normalizedForSearch
@@ -28,6 +29,7 @@ import com.mateof.kanal.data.model.Source
 import com.mateof.kanal.data.model.SourceType
 import com.mateof.kanal.data.net.HttpProvider
 import com.mateof.kanal.data.net.redactUrl
+import com.mateof.kanal.data.logos.LogoCatalog
 import com.mateof.kanal.data.prefs.AppPreferences
 import com.mateof.kanal.data.xtream.XtreamCatalog
 import com.mateof.kanal.data.xtream.XtreamClient
@@ -44,6 +46,8 @@ import kotlinx.serialization.json.JsonObject
 import okhttp3.Request
 import java.io.BufferedReader
 import java.io.InputStreamReader
+import java.util.Locale
+import dagger.hilt.android.qualifiers.ApplicationContext
 import javax.inject.Inject
 import javax.inject.Singleton
 import kotlin.math.abs
@@ -70,10 +74,12 @@ sealed interface SyncState {
  */
 @Singleton
 class SyncRepository @Inject constructor(
+    @ApplicationContext private val context: Context,
     private val db: KanalDatabase,
     private val xtream: XtreamClient,
     private val http: HttpProvider,
     private val prefs: AppPreferences,
+    private val logos: LogoCatalog,
     private val logger: FileLogger
 ) {
     private val _state = MutableStateFlow<SyncState>(SyncState.Idle)
@@ -519,6 +525,36 @@ class SyncRepository @Inject constructor(
     private suspend fun replaceChannels(sourceId: String, items: List<ChannelEntity>) {
         db.channels().clear(sourceId)
         items.chunked(BATCH).forEach { db.channels().insertAll(it) }
+        fillMissingLogos(sourceId)
+    }
+
+    /**
+     * Gives a logo to the channels the playlist left without one.
+     *
+     * Only ever fills blanks: whatever the provider sent is what the user
+     * expects to see, and is usually the right artwork for that exact feed.
+     */
+    private suspend fun fillMissingLogos(sourceId: String) {
+        if (!prefs.settings.first().fillMissingLogos) return
+        val blanks = db.channels().withoutLogo(sourceId)
+        if (blanks.isEmpty()) return
+
+        // The device's country, not the language the interface is set to: a
+        // Galician interface on a Spanish television still wants Spanish logos.
+        val country = context.resources.configuration.locales[0].country
+            .ifBlank { Locale.getDefault().country }
+        val catalogue = logos.forCountry(country)
+        if (catalogue.isEmpty()) return
+
+        val filled = blanks.mapNotNull { channel ->
+            logos.match(catalogue, channel.name)?.let { channel.copy(logo = it) }
+        }
+        if (filled.isEmpty()) {
+            logger.i("Logos", "Ningún nombre coincidió con el catálogo de '$country'")
+            return
+        }
+        filled.chunked(BATCH).forEach { db.channels().insertAll(it) }
+        logger.i("Logos", "Logotipos añadidos: ${filled.size} de ${blanks.size} sin él")
     }
 
     private suspend fun replaceMovies(sourceId: String, items: List<MovieEntity>) {
