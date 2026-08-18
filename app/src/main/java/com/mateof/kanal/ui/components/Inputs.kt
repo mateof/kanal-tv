@@ -1,5 +1,7 @@
 package com.mateof.kanal.ui.components
 
+import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.interaction.PressInteraction
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.isImeVisible
@@ -59,6 +61,8 @@ import com.mateof.kanal.ui.theme.KanalColors
  */
 private class Typing(
     val editing: Boolean,
+    /** Presses on the field itself, which only a finger or a mouse produces. */
+    val interactions: MutableInteractionSource,
     val begin: () -> Unit,
     val end: () -> Unit,
     val onFocusChanged: (Boolean) -> Unit
@@ -68,6 +72,17 @@ private class Typing(
 private fun rememberTyping(): Typing {
     val keyboard = LocalSoftwareKeyboardController.current
     var editing by remember { mutableStateOf(false) }
+    val interactions = remember { MutableInteractionSource() }
+
+    // A tap is already the request. A finger has no OK key, and nobody lands on
+    // a text field by accident the way a D-pad does on its way past. Taking it
+    // from the field's own interactions rather than a gesture detector of our
+    // own, because its internals see the press first and would swallow ours.
+    LaunchedEffect(interactions) {
+        interactions.interactions.collect { interaction ->
+            if (interaction is PressInteraction.Release) editing = true
+        }
+    }
 
     // Asked for after the recomposition that lifts read-only, never before: a
     // field that is still read-only gets no keyboard on some devices.
@@ -80,6 +95,7 @@ private fun rememberTyping(): Typing {
 
     return Typing(
         editing = editing,
+        interactions = interactions,
         begin = { editing = true },
         end = {
             editing = false
@@ -157,6 +173,7 @@ fun KanalTextField(
         singleLine = true,
         visualTransformation = if (isPassword) PasswordVisualTransformation() else VisualTransformation.None,
         keyboardOptions = KeyboardOptions(keyboardType = keyboardType, imeAction = imeAction),
+        interactionSource = typing.interactions,
         keyboardActions = KeyboardActions(
             onDone = { typing.end() },
             onGo = { typing.end() },
@@ -200,6 +217,7 @@ fun SearchField(
         },
         singleLine = true,
         keyboardOptions = KeyboardOptions(imeAction = ImeAction.Search),
+        interactionSource = typing.interactions,
         keyboardActions = KeyboardActions(onSearch = { typing.end() }),
         colors = OutlinedTextFieldDefaults.colors(
             focusedBorderColor = KanalColors.Accent,
