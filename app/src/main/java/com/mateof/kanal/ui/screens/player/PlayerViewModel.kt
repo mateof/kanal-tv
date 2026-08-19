@@ -185,6 +185,10 @@ class PlayerViewModel @Inject constructor(
     private var streamKey = ""
     private var signature = ""
 
+    /** Set while the app is away, with where to come back to for a film. */
+    private var standing = false
+    private var standbyPositionMs = 0L
+
     /** Mirrors "recordar el último canal": without it there is nobody to hand to. */
     private var keepChannelOnExit = false
     private var resilient = false
@@ -289,7 +293,13 @@ class PlayerViewModel @Inject constructor(
         // left the previous channel running: it carried on until it happened to
         // fail, and only then did the retry pick up the new url, which is what
         // made a change of channel take seconds and sound like the old one.
-        val alreadyPlayingThis = adoptedFromPreview || (!fresh && previousKey == playable.url)
+        // A player taken over from the preview is only worth keeping if it is
+        // still running one. After standby the preview is stopped, and adopting
+        // it without giving it the url again left the screen with a player that
+        // had nothing to play — the picture never arrived and nothing said why.
+        val idle = adopted?.playbackState == Player.STATE_IDLE
+        val alreadyPlayingThis =
+            (adoptedFromPreview && !idle) || (!fresh && previousKey == playable.url && !idle)
         if (!alreadyPlayingThis) {
             // Stopped first and on purpose: a channel change should cut, not
             // fade. It also frees the provider's connection slot before the
@@ -786,6 +796,56 @@ class PlayerViewModel @Inject constructor(
         val exo = player ?: return
         exo.prepare()
         if (positionMs > 0 && _state.value.playable?.isLive == false) exo.seekTo(positionMs)
+        exo.playWhenReady = true
+    }
+
+    /**
+     * Lets go of the stream when the screen goes off.
+     *
+     * Leaving it paused is what produced the report this comes from: the
+     * television was switched off mid-channel and, a day later, came back to
+     * the moment it stopped — audio from the previous evening over a picture
+     * that never arrived, because the connection behind it had been dead for
+     * hours. A live stream cannot be paused; it can only be abandoned and asked
+     * for again.
+     *
+     * It also gives the provider its connection back. An account with a single
+     * slot spends the night unable to use it otherwise.
+     */
+    fun onStandby() {
+        if (standing) return
+        val playable = _state.value.playable ?: return
+        val exo = player ?: return
+        standing = true
+        recordProgress()
+        standbyPositionMs = if (playable.isLive) 0L else exo.currentPosition.coerceAtLeast(0)
+        reconnectJob?.cancel()
+        exo.stop()
+        exo.clearMediaItems()
+    }
+
+    /** Asks for the stream again: live comes back as *now*, a film where it was. */
+    fun onReturn() {
+        if (!standing) return
+        standing = false
+        val exo = player ?: return
+        val playable = _state.value.playable ?: return
+        val url = candidates.getOrNull(candidateIndex) ?: playable.url
+
+        reconnects = 0
+        // switching clears the held frame, so the last thing seen before the
+        // screen went dark is not left sitting there while this loads.
+        _state.value = _state.value.copy(
+            error = null,
+            errorDetail = null,
+            buffering = true,
+            switching = true,
+            reconnectAttempt = 0
+        )
+        startedAt = System.currentTimeMillis()
+        exo.setMediaItem(playerFactory.mediaItem(url, playable.title))
+        exo.prepare()
+        if (!playable.isLive && standbyPositionMs > 0) exo.seekTo(standbyPositionMs)
         exo.playWhenReady = true
     }
 

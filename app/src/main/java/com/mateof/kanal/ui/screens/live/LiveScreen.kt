@@ -47,6 +47,8 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.hilt.navigation.compose.hiltViewModel
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.compose.LifecycleEventEffect
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.media3.ui.AspectRatioFrameLayout
 import androidx.media3.ui.PlayerView
@@ -151,6 +153,15 @@ fun LiveScreen(
     val showingFavorites = selectedCategory == CATEGORY_FAVORITES
 
     DisposableEffect(Unit) { onDispose { vm.stopPreview() } }
+
+    // The preview is a second player, and it went stale over a night in standby
+    // exactly like the main one — worse, because opening its channel hands it
+    // over to the player. Dropped when the app leaves the screen, asked for
+    // again when it comes back.
+    LifecycleEventEffect(Lifecycle.Event.ON_STOP) { vm.stopPreview() }
+    LifecycleEventEffect(Lifecycle.Event.ON_START) {
+        focused?.let { channel -> vm.resumeChannel(channel.streamId) }
+    }
 
     if (isCompact) {
         // Upright there is room for one column only: categories become a strip
