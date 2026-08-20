@@ -22,6 +22,15 @@ eliminación requiere confirmación y borra también el contenido cacheado de es
 Los campos de cada tipo de fuente se describen en
 [Primeros pasos](primeros-pasos.md#alta-de-la-fuente).
 
+### Estado de la cuenta
+
+Bajo las fuentes se muestra cuántas conexiones simultáneas tiene la cuenta en uso, con un botón
+para volver a preguntárselo al panel.
+
+Importa más de lo que parece: muchas cuentas permiten una sola conexión, y cuando esa plaza
+está cogida **todos** los canales fallan de una forma que parece un canal roto. Cuando eso
+ocurre, la pantalla de error lo dice con todas las letras en vez de dejar el mensaje genérico.
+
 ## Reproducción
 
 ### Formato de emisión
@@ -77,6 +86,14 @@ Mantiene la emisión en la vista previa al salir de un canal con ATRÁS. Descrit
 Algunos proveedores sólo responden a agentes concretos. El valor predeterminado corresponde a
 VLC. Puede definirse un agente distinto por fuente durante el alta.
 
+### Aspecto de los subtítulos
+
+Tamaño —de pequeños a muy grandes— y estilo: simples, con borde, sobre fondo o amarillos. El
+borde y el fondo son lo que los hace legibles sobre una imagen clara; el tamaño por sí solo no.
+
+Se ignora la configuración de subtítulos del sistema a propósito: en un televisor está
+enterrada donde nadie la encuentra y la mitad de los aparatos vienen sin ella.
+
 ## Guía y contenido
 
 - **Días de guía a descargar** — 1, 2, 3, 5 o 7. Un intervalo mayor prolonga la
@@ -84,6 +101,20 @@ VLC. Puede definirse un agente distinto por fuente durante el alta.
 - **Sincronización automática** — periodicidad con la que se refresca el catálogo al abrir la
   aplicación.
 - **Ocultar contenido para adultos** — excluye las categorías marcadas como XXX o +18.
+
+### Ocultar y ordenar
+
+Cada categoría de televisión tiene su interruptor, y el contador dice cuántos canales y
+categorías están escondidos. **Volver a mostrar todo** los recupera de una vez.
+
+El orden de la lista de canales se elige aquí: el del proveedor, por número o por nombre.
+
+### PIN parental
+
+Con un PIN puesto, **apagar** el filtro de contenido para adultos lo pide. Sólo en esa
+dirección: volver a ponerlo puede hacerlo cualquiera.
+
+Se guarda el resumen criptográfico del código, nunca los dígitos.
 
 ## Apagado y ahorro
 
@@ -117,6 +148,14 @@ Cualquier pulsación del mando se interpreta como respuesta afirmativa.
   durante la investigación de un fallo.
 - **Versión instalada**, con acceso a **Buscar actualizaciones**, **Descargar e instalar** y
   **Ver registro**.
+
+### Qué tarda una sincronización
+
+Los catálogos que no han cambiado no se vuelven a escribir. La descarga es inevitable —el panel
+no ofrece forma de preguntar si algo cambió— pero vaciar y reinsertar decenas de miles de filas
+sí, y es la parte que más pesa en una actualización sin novedades.
+
+El registro anota el tiempo total y qué catálogos se saltaron.
 
 ### Borrar historial
 

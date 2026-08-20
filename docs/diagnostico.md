@@ -89,6 +89,21 @@ El búfer y el agente de usuario se aplican al crear el reproductor. La vista pr
 lista de canales se reconstruye al cambiar estos ajustes, pero una reproducción ya iniciada
 mantiene los valores con los que empezó. Al abrir el canal de nuevo se aplican los nuevos.
 
+### La emisión va a trompicones
+
+Abre **Estadísticas** en el menú del reproductor y mira dos cifras a la vez:
+
+- El **búfer** cae mientras el **caudal de red** se mantiene bajo: la conexión no da abasto.
+  Prueba un perfil de búfer mayor.
+- Los **fotogramas perdidos** suben con el búfer lleno: el aparato no puede con el formato.
+  Suele pasar con canales HEVC en aparatos modestos.
+
+### El canal no va, pero sólo a veces
+
+Mira el **estado de la cuenta** en Ajustes. Con una sola conexión disponible, basta que Kanal
+siga abierto en otro aparato —o que una sesión anterior no se haya cerrado— para que todos los
+canales fallen a la vez.
+
 ## Recoger información para un informe de error
 
 1. Activar **Registro detallado de red** en Ajustes.

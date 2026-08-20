@@ -67,5 +67,8 @@ afectados.
 
 ## Múltiples fuentes
 
+Con más de una configurada, la portada muestra un botón para pasar de una a otra sin entrar en
+los ajustes.
+
 Es posible dar de alta varias fuentes y alternar entre ellas desde Ajustes mediante **Usar**.
 Sólo una permanece activa, y el contenido mostrado corresponde siempre a esa fuente.

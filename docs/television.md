@@ -37,6 +37,17 @@ del listado.
 
 Lo mismo puede hacerse desde el propio reproductor, en el menú descrito más abajo.
 
+### Ocultar y ordenar
+
+Una pulsación larga sobre un canal ofrece **Ocultar este canal**. Las categorías se apagan
+desde [Ajustes](ajustes.md#ocultar-y-ordenar), y desde ahí también se recupera todo lo
+escondido.
+
+Lo oculto desaparece a la vez de la lista, del recorrido con las flechas, de la tira de
+logotipos y de la parrilla de la guía: el filtro se aplica al consultar, no al dibujar.
+
+La lista puede ordenarse **como la manda el proveedor**, **por número** o **por nombre**.
+
 ## Reproductor
 
 ![Reproductor](img/reproductor.png)
@@ -152,6 +163,27 @@ En películas y series se añaden la pausa y los saltos de 10 segundos.
 Los subtítulos permanecen **desactivados** hasta que se seleccionan de forma explícita, aunque
 la emisión los incluya. La elección se conserva entre reproducciones y entre sesiones: una vez
 activados siguen activos hasta que se elija **Sin subtítulos**.
+
+### Estadísticas de la emisión
+
+El menú puede superponer lo que está haciendo la emisión: resolución, códecs, caudal de red
+medido, segundos de búfer y fotogramas perdidos.
+
+Sirve para distinguir dos averías que desde el sofá se ven igual. Un búfer que se vacía
+mientras el caudal se mantiene es una conexión que no da abasto. Fotogramas acumulándose en el
+contador con el búfer lleno es un aparato que no puede descodificar lo que le mandan.
+
+El caudal es el **medido**, no el que declara la emisión: un transporte crudo no declara
+ninguno, y aun declarándolo diría lo que el canal pretende enviar, no lo que llega.
+
+### Avisos de programas
+
+En la ficha de un programa que todavía no ha empezado, **Avisarme** deja una notificación
+programada un minuto antes de su comienzo; al tocarla se abre el canal.
+
+El aviso no usa una alarma exacta a propósito: la exactitud exige un permiso que hay que
+conceder a mano en los Android recientes, y un minuto arriba o abajo no cambia nada en
+televisión. Los avisos se rearman solos tras un reinicio del aparato.
 
 ### Ventana pequeña
 
