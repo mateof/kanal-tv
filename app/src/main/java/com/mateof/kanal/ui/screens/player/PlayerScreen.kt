@@ -567,6 +567,19 @@ fun PlayerScreen(
                 // What the server actually answered, once it has been asked.
                 // "No recognisable format" alone leaves the user with nothing to
                 // act on; "answered 403" or "sent text instead of video" does.
+                state.errorAccount?.let { account ->
+                    Spacer(Modifier.height(10.dp))
+                    Text(
+                        stringResource(
+                            R.string.error_account_busy,
+                            account.activeConnections,
+                            account.maxConnections
+                        ),
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = KanalColors.OnSurfaceMuted,
+                        textAlign = TextAlign.Center
+                    )
+                }
                 state.errorDetail?.let { detail ->
                     Spacer(Modifier.height(10.dp))
                     Text(

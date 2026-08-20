@@ -80,6 +80,7 @@ fun SettingsScreen(
     val message by vm.message.collectAsStateWithLifecycle()
     val updateState by updateVm.state.collectAsStateWithLifecycle()
     val sleepRemaining by vm.sleepRemaining.collectAsStateWithLifecycle()
+    val account by vm.account.collectAsStateWithLifecycle()
 
     var userAgentDraft by remember(settings.userAgent) { mutableStateOf(settings.userAgent) }
     var sleepDraft by remember(settings.sleepTimerMinutes) {
@@ -201,6 +202,29 @@ fun SettingsScreen(
             }
         }
 
+        item {
+            Column {
+                Text(
+                    stringResource(R.string.settings_account),
+                    style = MaterialTheme.typography.titleSmall,
+                    color = KanalColors.OnBackground
+                )
+                Spacer(Modifier.height(6.dp))
+                Text(
+                    account?.let {
+                        stringResource(
+                            R.string.settings_account_slots,
+                            it.activeConnections,
+                            it.maxConnections
+                        )
+                    } ?: stringResource(R.string.settings_account_unknown),
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = if (account?.full == true) KanalColors.Warning else KanalColors.OnSurfaceMuted
+                )
+                Spacer(Modifier.height(12.dp))
+                KanalButton(stringResource(R.string.settings_account_check), vm::checkAccount)
+            }
+        }
         }
 
         if (section == 2) {

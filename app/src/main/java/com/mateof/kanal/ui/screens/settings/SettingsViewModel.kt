@@ -12,6 +12,8 @@ import com.mateof.kanal.data.db.KanalDatabase
 import com.mateof.kanal.data.model.Source
 import com.mateof.kanal.data.prefs.SubtitleLook
 import com.mateof.kanal.data.prefs.SubtitleSize
+import com.mateof.kanal.data.repo.AccountRepository
+import com.mateof.kanal.data.repo.AccountStatus
 import com.mateof.kanal.data.prefs.AppPreferences
 import com.mateof.kanal.data.prefs.BufferProfile
 import com.mateof.kanal.data.prefs.Settings
@@ -36,7 +38,8 @@ class SettingsViewModel @Inject constructor(
     private val sync: SyncRepository,
     private val db: KanalDatabase,
     private val logger: FileLogger,
-    private val sleepTimer: SleepTimer
+    private val sleepTimer: SleepTimer,
+    private val accounts: AccountRepository
 ) : ViewModel() {
 
     val settings: StateFlow<Settings> =
@@ -142,6 +145,14 @@ class SettingsViewModel @Inject constructor(
     }
 
     fun cancelSleepTimer() = sleepTimer.cancel()
+
+    /** What the panel last said about the account's connections. */
+    val account: StateFlow<AccountStatus?> = accounts.status
+
+    fun checkAccount() = viewModelScope.launch {
+        val source = prefs.activeSource.first() ?: return@launch
+        accounts.refresh(source)
+    }
 
     fun setSubtitleSize(value: SubtitleSize) = viewModelScope.launch { prefs.setSubtitleSize(value) }
 

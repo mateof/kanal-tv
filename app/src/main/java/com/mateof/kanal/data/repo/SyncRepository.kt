@@ -80,6 +80,7 @@ class SyncRepository @Inject constructor(
     private val http: HttpProvider,
     private val prefs: AppPreferences,
     private val logos: LogoCatalog,
+    private val accounts: AccountRepository,
     private val logger: FileLogger
 ) {
     private val _state = MutableStateFlow<SyncState>(SyncState.Idle)
@@ -133,6 +134,18 @@ class SyncRepository @Inject constructor(
             "Sync",
             "Cuenta ${account.username}: ${account.status}, " +
                 "${account.activeConnections}/${account.maxConnections} conexiones"
+        )
+        accounts.remember(
+            AccountStatus(
+                sourceId = source.id,
+                username = account.username,
+                status = account.status,
+                isActive = account.isActive,
+                activeConnections = account.activeConnections,
+                maxConnections = account.maxConnections,
+                expiresAt = account.expiresAt,
+                checkedAt = System.currentTimeMillis()
+            )
         )
 
         step(UiText(R.string.sync_categories), 0.05f)

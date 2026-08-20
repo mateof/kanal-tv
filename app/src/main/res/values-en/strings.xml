@@ -397,4 +397,9 @@
     <string name="player_stats_buffer">Buffer %d s</string>
     <string name="player_stats_dropped">Dropped frames: %d</string>
     <string name="player_stats_measured">Network: %d kbps</string>
+    <string name="error_account_busy">The account has all its connections in use (%1$d of %2$d). Close Kanal on another device or wait a moment.</string>
+    <string name="settings_account">Account status</string>
+    <string name="settings_account_slots">%1$d of %2$d connections in use</string>
+    <string name="settings_account_check">Check the account</string>
+    <string name="settings_account_unknown">Not checked yet.</string>
 </resources>

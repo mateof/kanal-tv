@@ -25,6 +25,8 @@ import com.mateof.kanal.data.prefs.AppPreferences
 import com.mateof.kanal.data.prefs.SubtitleLook
 import com.mateof.kanal.data.prefs.SubtitleSize
 import com.mateof.kanal.data.prefs.Settings
+import com.mateof.kanal.data.repo.AccountRepository
+import com.mateof.kanal.data.repo.AccountStatus
 import com.mateof.kanal.data.repo.ContentRepository
 import com.mateof.kanal.data.repo.EpgRepository
 import com.mateof.kanal.data.repo.Playable
@@ -148,6 +150,8 @@ data class PlayerUiState(
     val castHint: UiText? = null,
     /** What the server actually answered, when a stream would not play. */
     val errorDetail: String? = null,
+    /** Set when the reason is simply that the account has no free connection. */
+    val errorAccount: AccountStatus? = null,
     /** Counting down to the next episode, or null when nothing follows. */
     val nextUp: NextUp? = null,
     /** Non-null while the stats overlay is on. */
@@ -174,6 +178,7 @@ class PlayerViewModel @Inject constructor(
     private val pip: PipController,
     private val sleepTimer: SleepTimer,
     private val probe: StreamProbe,
+    private val accounts: AccountRepository,
     private val upnp: UpnpClient,
     private val logger: FileLogger
 ) : ViewModel() {
@@ -360,6 +365,7 @@ class PlayerViewModel @Inject constructor(
             loading = false,
             error = null,
             errorDetail = null,
+            errorAccount = null,
             nextUp = null,
             channelIndex = index,
             channelCount = channelIds.size,
@@ -557,6 +563,17 @@ class PlayerViewModel @Inject constructor(
         val url = candidates.getOrNull(candidateIndex) ?: return
         val userAgent = _state.value.playable?.userAgent ?: return
         viewModelScope.launch {
+            // The account first: when the panel says every connection is taken,
+            // that is the answer, and no amount of looking at the stream will
+            // say so. It is also the one the user can do something about.
+            val current = source
+            if (current != null) {
+                val account = accounts.refresh(current)
+                if (account?.full == true) {
+                    _state.value = _state.value.copy(errorAccount = account)
+                    return@launch
+                }
+            }
             val detail = probe.describe(url, userAgent)
             if (detail != null) _state.value = _state.value.copy(errorDetail = detail)
         }
@@ -1086,6 +1103,7 @@ class PlayerViewModel @Inject constructor(
         _state.value = _state.value.copy(
             error = null,
             errorDetail = null,
+            errorAccount = null,
             buffering = true,
             reconnectAttempt = 0
         )

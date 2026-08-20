@@ -397,4 +397,9 @@
     <string name="player_stats_buffer">Búfer %d s</string>
     <string name="player_stats_dropped">Fotogramas perdidos: %d</string>
     <string name="player_stats_measured">Red: %d kbps</string>
+    <string name="error_account_busy">La cuenta tiene sus conexiones ocupadas (%1$d de %2$d). Cierra Kanal en otro aparato o espera un momento.</string>
+    <string name="settings_account">Estado de la cuenta</string>
+    <string name="settings_account_slots">%1$d de %2$d conexiones en uso</string>
+    <string name="settings_account_check">Comprobar la cuenta</string>
+    <string name="settings_account_unknown">Aún sin consultar.</string>
 </resources>

@@ -404,4 +404,9 @@
     <string name="player_stats_buffer">Búfer %d s</string>
     <string name="player_stats_dropped">Fotogramas perdidos: %d</string>
     <string name="player_stats_measured">Rede: %d kbps</string>
+    <string name="error_account_busy">A conta ten as súas conexións ocupadas (%1$d de %2$d). Pecha Kanal noutro aparello ou agarda un intre.</string>
+    <string name="settings_account">Estado da conta</string>
+    <string name="settings_account_slots">%1$d de %2$d conexións en uso</string>
+    <string name="settings_account_check">Comprobar a conta</string>
+    <string name="settings_account_unknown">Aínda sen consultar.</string>
 </resources>
