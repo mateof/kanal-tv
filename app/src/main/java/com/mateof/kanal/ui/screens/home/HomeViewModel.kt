@@ -55,6 +55,12 @@ class HomeViewModel @Inject constructor(
 
     private val activeSource = prefs.activeSource
 
+    /** Every source configured, for switching without going into the settings. */
+    val sources: StateFlow<List<Source>> = prefs.sources
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
+
+    fun useSource(id: String) = viewModelScope.launch { prefs.setActiveSource(id) }
+
     val syncState: StateFlow<SyncState> = sync.state
 
     private val _refreshing = MutableStateFlow(false)

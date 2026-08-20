@@ -15,10 +15,14 @@ import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.LiveTv
+import androidx.compose.material.icons.outlined.SwapHoriz
 import androidx.compose.material.icons.outlined.Refresh
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.setValue
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
@@ -39,6 +43,9 @@ import com.mateof.kanal.ui.isCompact
 import com.mateof.kanal.ui.components.ButtonTone
 import com.mateof.kanal.ui.components.ChannelCard
 import com.mateof.kanal.ui.components.ContinueCard
+import com.mateof.kanal.ui.components.ActionMenu
+import com.mateof.kanal.ui.components.MenuAction
+import com.mateof.kanal.data.model.Source
 import com.mateof.kanal.ui.components.KanalButton
 import com.mateof.kanal.ui.components.LoadingState
 import com.mateof.kanal.ui.components.MessageState
@@ -65,6 +72,8 @@ fun HomeScreen(
     val syncState by vm.syncState.collectAsStateWithLifecycle()
     val refreshing by vm.refreshing.collectAsStateWithLifecycle()
     val updateState by updateVm.state.collectAsStateWithLifecycle()
+    val sources by vm.sources.collectAsStateWithLifecycle()
+    var pickingSource by remember { mutableStateOf(false) }
 
     LaunchedEffect(Unit) {
         vm.refreshIfStale()
@@ -93,6 +102,8 @@ fun HomeScreen(
                 movies = state.movies,
                 series = state.series,
                 refreshing = refreshing,
+                sources = sources,
+                onPickSource = { pickingSource = true },
                 onRefresh = vm::refresh
             )
         }
@@ -230,6 +241,24 @@ fun HomeScreen(
             }
         }
     }
+    // After the list, never before: composed first it ends up underneath,
+    // with the buttons of the screen behind showing through the card.
+    if (pickingSource) {
+        ActionMenu(
+            title = stringResource(R.string.home_change_source),
+            onDismiss = { pickingSource = false },
+            actions = sources.map { source ->
+                MenuAction(
+                    label = source.name,
+                    icon = Icons.Outlined.SwapHoriz,
+                    active = source.id == state.source?.id
+                ) {
+                    vm.useSource(source.id)
+                    pickingSource = false
+                }
+            }
+        )
+    }
 }
 
 @Composable
@@ -239,6 +268,8 @@ private fun HomeHeader(
     movies: Int,
     series: Int,
     refreshing: Boolean,
+    sources: List<Source>,
+    onPickSource: () -> Unit,
     onRefresh: () -> Unit
 ) {
     val tally = listOf(
@@ -248,12 +279,22 @@ private fun HomeHeader(
     ).joinToString(" · ")
     val counts = if (sourceName.isNotBlank()) "$sourceName · $tally" else tally
     val refreshButton: @Composable () -> Unit = {
-        KanalButton(
-            text = if (refreshing) stringResource(R.string.home_syncing) else stringResource(R.string.home_refresh),
-            onClick = onRefresh,
-            icon = Icons.Outlined.Refresh,
-            enabled = !refreshing
-        )
+        Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+            KanalButton(
+                text = if (refreshing) stringResource(R.string.home_syncing) else stringResource(R.string.home_refresh),
+                onClick = onRefresh,
+                icon = Icons.Outlined.Refresh,
+                enabled = !refreshing
+            )
+            // Only worth a button when there is somewhere to switch to.
+            if (sources.size > 1) {
+                KanalButton(
+                    text = stringResource(R.string.home_change_source),
+                    onClick = onPickSource,
+                    icon = Icons.Outlined.SwapHoriz
+                )
+            }
+        }
     }
 
     if (isCompact) {

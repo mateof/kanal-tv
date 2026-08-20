@@ -409,4 +409,5 @@
     <string name="settings_account_slots">%1$d de %2$d conexións en uso</string>
     <string name="settings_account_check">Comprobar a conta</string>
     <string name="settings_account_unknown">Aínda sen consultar.</string>
+    <string name="home_change_source">Cambiar de fonte</string>
 </resources>
