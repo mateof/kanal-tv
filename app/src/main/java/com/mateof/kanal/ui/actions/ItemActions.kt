@@ -2,6 +2,8 @@ package com.mateof.kanal.ui.actions
 
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Star
+import androidx.compose.material.icons.outlined.Visibility
+import androidx.compose.material.icons.outlined.VisibilityOff
 import androidx.compose.material.icons.outlined.Cast
 import androidx.compose.material.icons.outlined.StarOutline
 import androidx.compose.runtime.Composable
@@ -73,6 +75,25 @@ class ItemActionsViewModel @Inject constructor(
         _request.value = null
     }
 
+    /** Whether the item the menu is open on is one of the hidden ones. */
+    val isHidden: StateFlow<Boolean> =
+        combine(_request, prefs.hiddenChannels, prefs.activeSource) { request, hidden, source ->
+            if (request == null || source == null) {
+                false
+            } else {
+                hidden.contains("${source.id}:${request.itemId}")
+            }
+        }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), false)
+
+    fun toggleHidden() {
+        val request = _request.value ?: return
+        if (request.kind != ContentKind.LIVE) return
+        viewModelScope.launch {
+            val source = prefs.activeSource.first() ?: return@launch
+            prefs.toggleHiddenChannel(source.id, request.itemId)
+        }
+    }
+
     fun toggleFavorite() {
         val request = _request.value ?: return
         viewModelScope.launch {
@@ -93,6 +114,7 @@ fun ItemActionsSheet(
 ) {
     val request by vm.request.collectAsStateWithLifecycle()
     val isFavorite by vm.isFavorite.collectAsStateWithLifecycle()
+    val isHidden by vm.isHidden.collectAsStateWithLifecycle()
     val open = request ?: return
 
     ActionMenu(
@@ -115,6 +137,21 @@ fun ItemActionsSheet(
                 icon = Icons.Outlined.Cast,
                 onClick = {
                     onCast(open)
+                    vm.close()
+                }
+            ),
+            MenuAction(
+                label = if (isHidden) {
+                    stringResource(R.string.live_show_channel)
+                } else {
+                    stringResource(R.string.live_hide_channel)
+                },
+                icon = if (isHidden) Icons.Outlined.Visibility else Icons.Outlined.VisibilityOff,
+                active = isHidden,
+                // Closes: the row is about to leave the list under the cursor,
+                // and a menu left open on something no longer there is a puzzle.
+                onClick = {
+                    vm.toggleHidden()
                     vm.close()
                 }
             )

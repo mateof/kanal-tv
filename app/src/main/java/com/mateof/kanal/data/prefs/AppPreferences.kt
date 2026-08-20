@@ -35,6 +35,13 @@ enum class StreamFormat(@StringRes val labelRes: Int, val extension: String) {
     HLS(R.string.stream_format_hls, "m3u8")
 }
 
+/** The order the channel list is shown in. */
+enum class ChannelSort(@StringRes val labelRes: Int, val key: String) {
+    PROVIDER(R.string.sort_provider, "provider"),
+    NUMBER(R.string.sort_number, "number"),
+    NAME(R.string.sort_name, "name")
+}
+
 /** How big the subtitles are, from a sofa away. */
 enum class SubtitleSize(@StringRes val labelRes: Int, val sp: Float) {
     SMALL(R.string.subtitle_size_small, 16f),
@@ -83,7 +90,8 @@ data class Settings(
     val subtitlesEnabled: Boolean = false,
     val fillMissingLogos: Boolean = true,
     val subtitleSize: SubtitleSize = SubtitleSize.NORMAL,
-    val subtitleLook: SubtitleLook = SubtitleLook.OUTLINED
+    val subtitleLook: SubtitleLook = SubtitleLook.OUTLINED,
+    val channelSort: ChannelSort = ChannelSort.PROVIDER
 )
 
 const val DEFAULT_USER_AGENT = "VLC/3.0.20 LibVLC/3.0.20"
@@ -100,6 +108,9 @@ class AppPreferences @Inject constructor(
         val FAVORITES = stringPreferencesKey("favorites")
         val STREAM_CHOICES = stringPreferencesKey("stream_choices")
         val FILL_LOGOS = booleanPreferencesKey("fill_logos")
+        val CHANNEL_SORT = stringPreferencesKey("channel_sort")
+        val HIDDEN_CHANNELS = stringPreferencesKey("hidden_channels")
+        val HIDDEN_CATEGORIES = stringPreferencesKey("hidden_categories")
         val SUBTITLE_SIZE = stringPreferencesKey("subtitle_size")
         val SUBTITLE_LOOK = stringPreferencesKey("subtitle_look")
         val HISTORY = stringPreferencesKey("history")
@@ -274,7 +285,10 @@ class AppPreferences @Inject constructor(
             } ?: SubtitleSize.NORMAL,
             subtitleLook = prefs[Keys.SUBTITLE_LOOK]?.let { name ->
                 SubtitleLook.entries.firstOrNull { it.name == name }
-            } ?: SubtitleLook.OUTLINED
+            } ?: SubtitleLook.OUTLINED,
+            channelSort = prefs[Keys.CHANNEL_SORT]?.let { name ->
+                ChannelSort.entries.firstOrNull { it.name == name }
+            } ?: ChannelSort.PROVIDER
         )
     }
 
@@ -302,6 +316,37 @@ class AppPreferences @Inject constructor(
     suspend fun setSubtitlesEnabled(value: Boolean) = edit { it[Keys.SUBTITLES] = value }
 
     suspend fun setFillMissingLogos(value: Boolean) = edit { it[Keys.FILL_LOGOS] = value }
+
+    suspend fun setChannelSort(value: ChannelSort) = edit { it[Keys.CHANNEL_SORT] = value.name }
+
+    // --- What the user does not want to see -----------------------------------
+
+    val hiddenChannels: Flow<Set<String>> = context.dataStore.data.map { prefs ->
+        decode<List<String>>(prefs[Keys.HIDDEN_CHANNELS], emptyList()).toSet()
+    }
+
+    val hiddenCategories: Flow<Set<String>> = context.dataStore.data.map { prefs ->
+        decode<List<String>>(prefs[Keys.HIDDEN_CATEGORIES], emptyList()).toSet()
+    }
+
+    suspend fun toggleHiddenChannel(sourceId: String, streamId: String) =
+        toggleIn(Keys.HIDDEN_CHANNELS, "$sourceId:$streamId")
+
+    suspend fun toggleHiddenCategory(sourceId: String, categoryId: String) =
+        toggleIn(Keys.HIDDEN_CATEGORIES, "$sourceId:$categoryId")
+
+    suspend fun showEverything() = edit {
+        it[Keys.HIDDEN_CHANNELS] = json.encodeToString(emptyList<String>())
+        it[Keys.HIDDEN_CATEGORIES] = json.encodeToString(emptyList<String>())
+    }
+
+    private suspend fun toggleIn(key: Preferences.Key<String>, value: String) {
+        context.dataStore.edit { prefs ->
+            val all = decode<List<String>>(prefs[key], emptyList()).toMutableSet()
+            if (!all.add(value)) all.remove(value)
+            prefs[key] = json.encodeToString(all.toList())
+        }
+    }
 
     suspend fun setSubtitleSize(value: SubtitleSize) = edit { it[Keys.SUBTITLE_SIZE] = value.name }
 

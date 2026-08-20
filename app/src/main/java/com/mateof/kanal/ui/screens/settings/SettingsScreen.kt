@@ -49,6 +49,7 @@ import com.mateof.kanal.data.model.Source
 import com.mateof.kanal.data.prefs.BufferProfile
 import com.mateof.kanal.data.prefs.StreamFormat
 import com.mateof.kanal.data.repo.SyncState
+import com.mateof.kanal.data.prefs.ChannelSort
 import com.mateof.kanal.data.prefs.SubtitleLook
 import com.mateof.kanal.data.prefs.SubtitleSize
 import com.mateof.kanal.ui.components.ButtonTone
@@ -81,6 +82,9 @@ fun SettingsScreen(
     val updateState by updateVm.state.collectAsStateWithLifecycle()
     val sleepRemaining by vm.sleepRemaining.collectAsStateWithLifecycle()
     val account by vm.account.collectAsStateWithLifecycle()
+    val liveCategories by vm.liveCategories.collectAsStateWithLifecycle()
+    val hiddenChannels by vm.hiddenChannels.collectAsStateWithLifecycle()
+    val hiddenCategories by vm.hiddenCategories.collectAsStateWithLifecycle()
 
     var userAgentDraft by remember(settings.userAgent) { mutableStateOf(settings.userAgent) }
     var sleepDraft by remember(settings.sleepTimerMinutes) {
@@ -329,6 +333,52 @@ fun SettingsScreen(
                 selectedIndex = SYNC_HOURS.indexOf(settings.autoSyncHours).coerceAtLeast(0),
                 onSelect = { vm.setAutoSyncHours(SYNC_HOURS[it]) }
             )
+        }
+        item {
+            OptionRow(
+                title = stringResource(R.string.settings_channel_sort),
+                description = stringResource(R.string.settings_channel_sort_desc),
+                options = ChannelSort.entries.map { stringResource(it.labelRes) },
+                selectedIndex = ChannelSort.entries.indexOf(settings.channelSort),
+                onSelect = { vm.setChannelSort(ChannelSort.entries[it]) }
+            )
+        }
+        item {
+            Column {
+                Text(
+                    stringResource(R.string.settings_categories_hide),
+                    style = MaterialTheme.typography.titleSmall,
+                    color = KanalColors.OnBackground
+                )
+                Text(
+                    stringResource(R.string.settings_categories_hide_desc),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = KanalColors.OnSurfaceFaint
+                )
+                Spacer(Modifier.height(10.dp))
+                val prefix = activeId.orEmpty() + ":"
+                liveCategories.forEach { category ->
+                    SettingSwitchRow(
+                        title = category.name,
+                        description = "",
+                        checked = !hiddenCategories.contains(prefix + category.categoryId),
+                        onCheckedChange = { vm.toggleCategory(category.categoryId) }
+                    )
+                    Spacer(Modifier.height(6.dp))
+                }
+                Spacer(Modifier.height(6.dp))
+                Text(
+                    stringResource(
+                        R.string.settings_hidden_count,
+                        hiddenChannels.size,
+                        hiddenCategories.size
+                    ),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = KanalColors.OnSurfaceMuted
+                )
+                Spacer(Modifier.height(10.dp))
+                KanalButton(stringResource(R.string.settings_show_all), vm::showEverything)
+            }
         }
         item {
             SettingSwitchRow(

@@ -410,4 +410,15 @@
     <string name="settings_account_check">Comprobar a conta</string>
     <string name="settings_account_unknown">Aínda sen consultar.</string>
     <string name="home_change_source">Cambiar de fonte</string>
+    <string name="sort_provider">Do provedor</string>
+    <string name="sort_number">Por número</string>
+    <string name="live_hide_channel">Agochar esta canle</string>
+    <string name="live_show_channel">Volver a amosala</string>
+    <string name="settings_channel_sort">Orde das canles</string>
+    <string name="settings_channel_sort_desc">A do provedor é a que trae a listaxe.</string>
+    <string name="settings_hidden">Agochados</string>
+    <string name="settings_hidden_count">%1$d canles e %2$d categorías agochadas</string>
+    <string name="settings_show_all">Volver a amosar todo</string>
+    <string name="settings_categories_hide">Categorías</string>
+    <string name="settings_categories_hide_desc">Apaga as que non queiras ver na lista nin na guía.</string>
 </resources>

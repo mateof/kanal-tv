@@ -12,8 +12,12 @@ import com.mateof.kanal.data.db.KanalDatabase
 import com.mateof.kanal.data.model.Source
 import com.mateof.kanal.data.prefs.SubtitleLook
 import com.mateof.kanal.data.prefs.SubtitleSize
+import com.mateof.kanal.data.repo.ContentRepository
 import com.mateof.kanal.data.repo.AccountRepository
 import com.mateof.kanal.data.repo.AccountStatus
+import com.mateof.kanal.data.db.CategoryEntity
+import com.mateof.kanal.data.model.ContentKind
+import com.mateof.kanal.data.prefs.ChannelSort
 import com.mateof.kanal.data.prefs.AppPreferences
 import com.mateof.kanal.data.prefs.BufferProfile
 import com.mateof.kanal.data.prefs.Settings
@@ -28,6 +32,9 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.stateIn
+import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.flow.flatMapLatest
+import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import javax.inject.Inject
@@ -39,7 +46,8 @@ class SettingsViewModel @Inject constructor(
     private val db: KanalDatabase,
     private val logger: FileLogger,
     private val sleepTimer: SleepTimer,
-    private val accounts: AccountRepository
+    private val accounts: AccountRepository,
+    private val content: ContentRepository
 ) : ViewModel() {
 
     val settings: StateFlow<Settings> =
@@ -153,6 +161,30 @@ class SettingsViewModel @Inject constructor(
         val source = prefs.activeSource.first() ?: return@launch
         accounts.refresh(source)
     }
+
+    /** Live categories of the active source, for switching them off. */
+    @OptIn(ExperimentalCoroutinesApi::class)
+    val liveCategories: StateFlow<List<CategoryEntity>> = prefs.activeSource
+        .flatMapLatest { source ->
+            if (source == null) flowOf(emptyList())
+            else content.categories(source.id, ContentKind.LIVE)
+        }
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
+
+    val hiddenChannels: StateFlow<Set<String>> = prefs.hiddenChannels
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptySet())
+
+    val hiddenCategories: StateFlow<Set<String>> = prefs.hiddenCategories
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptySet())
+
+    fun setChannelSort(value: ChannelSort) = viewModelScope.launch { prefs.setChannelSort(value) }
+
+    fun toggleCategory(categoryId: String) = viewModelScope.launch {
+        val source = prefs.activeSource.first() ?: return@launch
+        prefs.toggleHiddenCategory(source.id, categoryId)
+    }
+
+    fun showEverything() = viewModelScope.launch { prefs.showEverything() }
 
     fun setSubtitleSize(value: SubtitleSize) = viewModelScope.launch { prefs.setSubtitleSize(value) }
 

@@ -403,4 +403,15 @@
     <string name="settings_account_check">Check the account</string>
     <string name="settings_account_unknown">Not checked yet.</string>
     <string name="home_change_source">Change source</string>
+    <string name="sort_provider">Provider order</string>
+    <string name="sort_number">By number</string>
+    <string name="live_hide_channel">Hide this channel</string>
+    <string name="live_show_channel">Show it again</string>
+    <string name="settings_channel_sort">Channel order</string>
+    <string name="settings_channel_sort_desc">The provider’s is the one the playlist brings.</string>
+    <string name="settings_hidden">Hidden</string>
+    <string name="settings_hidden_count">%1$d channels and %2$d categories hidden</string>
+    <string name="settings_show_all">Show everything again</string>
+    <string name="settings_categories_hide">Categories</string>
+    <string name="settings_categories_hide_desc">Switch off the ones you do not want in the list or the guide.</string>
 </resources>

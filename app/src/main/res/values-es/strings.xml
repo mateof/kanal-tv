@@ -403,4 +403,15 @@
     <string name="settings_account_check">Comprobar la cuenta</string>
     <string name="settings_account_unknown">Aún sin consultar.</string>
     <string name="home_change_source">Cambiar de fuente</string>
+    <string name="sort_provider">Del proveedor</string>
+    <string name="sort_number">Por número</string>
+    <string name="live_hide_channel">Ocultar este canal</string>
+    <string name="live_show_channel">Volver a mostrarlo</string>
+    <string name="settings_channel_sort">Orden de los canales</string>
+    <string name="settings_channel_sort_desc">La del proveedor es la que trae la lista.</string>
+    <string name="settings_hidden">Ocultos</string>
+    <string name="settings_hidden_count">%1$d canales y %2$d categorías ocultas</string>
+    <string name="settings_show_all">Volver a mostrar todo</string>
+    <string name="settings_categories_hide">Categorías</string>
+    <string name="settings_categories_hide_desc">Apaga las que no quieras ver en la lista ni en la guía.</string>
 </resources>

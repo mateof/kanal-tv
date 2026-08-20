@@ -53,15 +53,53 @@ class ContentRepository @Inject constructor(
 
     private val includeAdult: Flow<Boolean> = prefs.settings.map { !it.hideAdult }
 
+    /**
+     * What to leave out, already narrowed to one source and stripped of its
+     * prefix, with an empty string always present.
+     *
+     * SQLite has no way to write `NOT IN ()`, and Room passes an empty list
+     * through as exactly that, so a filter that is switched off would take the
+     * whole query down with it. No channel has an empty id, so the placeholder
+     * changes nothing else.
+     */
+    private suspend fun hiddenFor(sourceId: String): Pair<List<String>, List<String>> {
+        val prefix = "$sourceId:"
+        val channels = prefs.hiddenChannels.first()
+            .filter { it.startsWith(prefix) }.map { it.removePrefix(prefix) }
+        val categories = prefs.hiddenCategories.first()
+            .filter { it.startsWith(prefix) }.map { it.removePrefix(prefix) }
+        return (channels + "") to (categories + "")
+    }
+
+    /** Re-read on every change so hiding a channel takes effect at once. */
+    private val listShape: Flow<Triple<Boolean, Set<String>, Set<String>>> = combine(
+        includeAdult,
+        prefs.hiddenChannels,
+        prefs.hiddenCategories
+    ) { adult, channels, categories -> Triple(adult, channels, categories) }
+
     fun categories(sourceId: String, kind: ContentKind): Flow<List<CategoryEntity>> =
         db.categories().observe(sourceId, kind.name.toDbKind())
 
     fun channels(sourceId: String, categoryId: String, query: String): Flow<PagingData<ChannelEntity>> =
-        includeAdult.flatMapLatest { adult ->
-            Pager(pagingConfig()) {
-                db.channels().paged(sourceId, categoryId, query.normalizedForSearch(), adult)
-            }.flow
-        }
+        combine(listShape, prefs.settings.map { it.channelSort }) { shape, sort -> shape to sort }
+            .flatMapLatest { (shape, sort) ->
+                val (adult, hiddenChannels, hiddenCategories) = shape
+                val prefix = "$sourceId:"
+                Pager(pagingConfig()) {
+                    db.channels().paged(
+                        sourceId = sourceId,
+                        categoryId = categoryId,
+                        query = query.normalizedForSearch(),
+                        includeAdult = adult,
+                        hiddenChannels = hiddenChannels
+                            .filter { it.startsWith(prefix) }.map { it.removePrefix(prefix) } + "",
+                        hiddenCategories = hiddenCategories
+                            .filter { it.startsWith(prefix) }.map { it.removePrefix(prefix) } + "",
+                        sort = sort.key
+                    )
+                }.flow
+            }
 
     fun movies(
         sourceId: String,
@@ -86,8 +124,19 @@ class ContentRepository @Inject constructor(
     }
 
     /** Ordered ids of the current channel selection, used to zap up/down. */
-    suspend fun channelIds(sourceId: String, categoryId: String, query: String): List<String> =
-        db.channels().idsFor(sourceId, categoryId, query.normalizedForSearch(), !prefs.settings.first().hideAdult)
+    suspend fun channelIds(sourceId: String, categoryId: String, query: String): List<String> {
+        val (channels, categories) = hiddenFor(sourceId)
+        val settings = prefs.settings.first()
+        return db.channels().idsFor(
+            sourceId = sourceId,
+            categoryId = categoryId,
+            query = query.normalizedForSearch(),
+            includeAdult = !settings.hideAdult,
+            hiddenChannels = channels,
+            hiddenCategories = categories,
+            sort = settings.channelSort.key
+        )
+    }
 
     suspend fun channel(sourceId: String, streamId: String): ChannelEntity? =
         db.channels().byId(sourceId, streamId)
@@ -108,8 +157,17 @@ class ContentRepository @Inject constructor(
         sourceId: String,
         categoryId: String,
         limit: Int = 150
-    ): List<ChannelEntity> =
-        db.channels().listFor(sourceId, categoryId, !prefs.settings.first().hideAdult, limit)
+    ): List<ChannelEntity> {
+        val (channels, categories) = hiddenFor(sourceId)
+        return db.channels().listFor(
+            sourceId = sourceId,
+            categoryId = categoryId,
+            includeAdult = !prefs.settings.first().hideAdult,
+            hiddenChannels = channels,
+            hiddenCategories = categories,
+            limit = limit
+        )
+    }
 
     suspend fun movie(sourceId: String, streamId: String): MovieEntity? =
         db.movies().byId(sourceId, streamId)

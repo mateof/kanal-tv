@@ -35,14 +35,22 @@ interface ChannelDao {
           AND (:categoryId = '' OR categoryId = :categoryId)
           AND (:query = '' OR sortName LIKE '%' || :query || '%')
           AND (:includeAdult = 1 OR adult = 0)
-        ORDER BY position
+          AND streamId NOT IN (:hiddenChannels)
+          AND categoryId NOT IN (:hiddenCategories)
+        ORDER BY
+          CASE WHEN :sort = 'name' THEN sortName END ASC,
+          CASE WHEN :sort = 'number' THEN number END ASC,
+          position
         """
     )
     fun paged(
         sourceId: String,
         categoryId: String,
         query: String,
-        includeAdult: Boolean
+        includeAdult: Boolean,
+        hiddenChannels: List<String>,
+        hiddenCategories: List<String>,
+        sort: String
     ): PagingSource<Int, ChannelEntity>
 
     @Query(
@@ -52,14 +60,22 @@ interface ChannelDao {
           AND (:categoryId = '' OR categoryId = :categoryId)
           AND (:query = '' OR sortName LIKE '%' || :query || '%')
           AND (:includeAdult = 1 OR adult = 0)
-        ORDER BY position
+          AND streamId NOT IN (:hiddenChannels)
+          AND categoryId NOT IN (:hiddenCategories)
+        ORDER BY
+          CASE WHEN :sort = 'name' THEN sortName END ASC,
+          CASE WHEN :sort = 'number' THEN number END ASC,
+          position
         """
     )
     suspend fun idsFor(
         sourceId: String,
         categoryId: String,
         query: String,
-        includeAdult: Boolean
+        includeAdult: Boolean,
+        hiddenChannels: List<String>,
+        hiddenCategories: List<String>,
+        sort: String
     ): List<String>
 
     @Query(
@@ -92,6 +108,8 @@ interface ChannelDao {
         WHERE sourceId = :sourceId
           AND (:categoryId = '' OR categoryId = :categoryId)
           AND (:includeAdult = 1 OR adult = 0)
+          AND streamId NOT IN (:hiddenChannels)
+          AND categoryId NOT IN (:hiddenCategories)
         ORDER BY position LIMIT :limit
         """
     )
@@ -99,6 +117,8 @@ interface ChannelDao {
         sourceId: String,
         categoryId: String,
         includeAdult: Boolean,
+        hiddenChannels: List<String>,
+        hiddenCategories: List<String>,
         limit: Int
     ): List<ChannelEntity>
 
