@@ -7,6 +7,7 @@ import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxHeight
@@ -24,6 +25,7 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.LiveTv
 import androidx.compose.material.icons.outlined.PlayArrow
+import androidx.compose.material.icons.outlined.NotificationsActive
 import androidx.compose.material.icons.outlined.Replay
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
@@ -74,7 +76,10 @@ fun ProgrammeDialog(
     onDismiss: () -> Unit,
     modifier: Modifier = Modifier,
     onGoToChannel: (() -> Unit)? = null,
-    onReplay: (() -> Unit)? = null
+    onReplay: (() -> Unit)? = null,
+    /** Only offered for something that has not started yet. */
+    onRemind: (() -> Unit)? = null,
+    reminded: Boolean = false
 ) {
     val focus = remember { FocusRequester() }
     val programme = detail.programme
@@ -203,7 +208,12 @@ fun ProgrammeDialog(
             }
 
             Spacer(Modifier.height(22.dp))
-            Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+            // Wraps: with a third button the last one used to be squeezed into a
+            // column one letter wide rather than moving to the next line.
+            FlowRow(
+                horizontalArrangement = Arrangement.spacedBy(12.dp),
+                verticalArrangement = Arrangement.spacedBy(10.dp)
+            ) {
                 if (onGoToChannel != null) {
                     KanalButton(
                         text = stringResource(R.string.programme_watch_channel),
@@ -214,6 +224,16 @@ fun ProgrammeDialog(
                 }
                 if (detail.canReplay && onReplay != null) {
                     KanalButton(stringResource(R.string.guide_replay), onReplay, icon = Icons.Outlined.Replay)
+                }
+                if (onRemind != null && programme.start > nowMillis) {
+                    KanalButton(
+                        text = stringResource(
+                            if (reminded) R.string.reminder_remove else R.string.reminder_add
+                        ),
+                        onClick = onRemind,
+                        icon = Icons.Outlined.NotificationsActive,
+                        tone = if (reminded) ButtonTone.Primary else ButtonTone.Neutral
+                    )
                 }
                 KanalButton(stringResource(R.string.common_close), onDismiss, modifier = Modifier.focusRequester(focus))
             }

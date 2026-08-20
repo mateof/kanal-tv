@@ -17,6 +17,7 @@ import com.mateof.kanal.core.log.Klog
 import com.mateof.kanal.data.model.ContentKind
 import com.mateof.kanal.data.model.HistoryItem
 import com.mateof.kanal.data.model.Source
+import com.mateof.kanal.reminders.Reminder
 import com.mateof.kanal.data.model.favoriteKey
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.flow.Flow
@@ -111,6 +112,7 @@ class AppPreferences @Inject constructor(
         val FILL_LOGOS = booleanPreferencesKey("fill_logos")
         val PARENTAL_PIN = stringPreferencesKey("parental_pin")
         val CATALOG_MARKS = stringPreferencesKey("catalog_marks")
+        val REMINDERS = stringPreferencesKey("reminders")
         val CHANNEL_SORT = stringPreferencesKey("channel_sort")
         val HIDDEN_CHANNELS = stringPreferencesKey("hidden_channels")
         val HIDDEN_CATEGORIES = stringPreferencesKey("hidden_categories")
@@ -341,6 +343,33 @@ class AppPreferences @Inject constructor(
     }
 
     suspend fun forgetCatalogMarks() = edit { it.remove(Keys.CATALOG_MARKS) }
+
+    // --- Programme reminders --------------------------------------------------
+
+    val reminders: Flow<List<Reminder>> = context.dataStore.data.map { prefs ->
+        decode<List<Reminder>>(prefs[Keys.REMINDERS], emptyList())
+            .sortedBy { it.startMillis }
+    }
+
+    suspend fun addReminder(reminder: Reminder) = editReminders { all ->
+        all.removeAll { it.id == reminder.id }
+        all += reminder
+    }
+
+    suspend fun removeReminder(reminder: Reminder) = editReminders { all ->
+        all.removeAll { it.id == reminder.id }
+    }
+
+    private suspend fun editReminders(change: (MutableList<Reminder>) -> Unit) {
+        context.dataStore.edit { prefs ->
+            val all = decode<List<Reminder>>(prefs[Keys.REMINDERS], emptyList()).toMutableList()
+            change(all)
+            // Yesterday's reminders are of no use to anybody and would pile up.
+            val cutoff = System.currentTimeMillis() - 6 * 60 * 60 * 1000L
+            prefs[Keys.REMINDERS] =
+                json.encodeToString(all.filter { it.startMillis > cutoff })
+        }
+    }
 
     // --- Parental pin ---------------------------------------------------------
     //

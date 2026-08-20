@@ -47,6 +47,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.hilt.navigation.compose.hiltViewModel
+import com.mateof.kanal.ui.reminders.RemindersViewModel
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.compose.LifecycleEventEffect
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -90,6 +91,7 @@ fun LiveScreen(
     onBack: () -> Unit = {}
 ) {
     val vm: LiveViewModel = hiltViewModel()
+    val remindersVm: RemindersViewModel = hiltViewModel()
     val castVm: CastViewModel = hiltViewModel()
     val castState by castVm.state.collectAsStateWithLifecycle()
     val actionsVm: ItemActionsViewModel = hiltViewModel()
@@ -326,8 +328,22 @@ fun LiveScreen(
     }
 
     detail?.let { open ->
+        val reminders by remindersVm.reminders.collectAsStateWithLifecycle()
         ProgrammeDialog(
             detail = open,
+            reminded = reminders.any {
+                it.channelId == open.channelStreamId &&
+                    it.title == open.programme.title &&
+                    it.startMillis == open.programme.start
+            },
+            onRemind = {
+                remindersVm.toggle(
+                    open.channelStreamId,
+                    open.channelName,
+                    open.programme.title,
+                    open.programme.start
+                )
+            },
             onDismiss = { detail = null },
             onReplay = if (open.canReplay) {
                 {

@@ -428,4 +428,9 @@
     <string name="settings_pin_remove">Quitar PIN</string>
     <string name="settings_pin_asked">Escribe o PIN</string>
     <string name="common_accept">Aceptar</string>
+    <string name="reminder_channel">Avisos de programas</string>
+    <string name="reminder_starting">Comeza agora en %s</string>
+    <string name="reminder_add">Avisarme</string>
+    <string name="reminder_added">Avisarase</string>
+    <string name="reminder_remove">Non avisar</string>
 </resources>

@@ -421,4 +421,9 @@
     <string name="settings_pin_remove">Remove PIN</string>
     <string name="settings_pin_asked">Enter the PIN</string>
     <string name="common_accept">Accept</string>
+    <string name="reminder_channel">Programme reminders</string>
+    <string name="reminder_starting">Starting now on %s</string>
+    <string name="reminder_add">Remind me</string>
+    <string name="reminder_added">Will remind you</string>
+    <string name="reminder_remove">Do not remind</string>
 </resources>

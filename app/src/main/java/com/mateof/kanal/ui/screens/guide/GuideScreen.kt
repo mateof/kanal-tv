@@ -39,6 +39,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
+import com.mateof.kanal.ui.reminders.RemindersViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.compose.ui.res.stringResource
 import com.mateof.kanal.R
@@ -68,6 +69,7 @@ import com.mateof.kanal.ui.theme.KanalColors
 @Composable
 fun GuideScreen(onPlay: (String) -> Unit) {
     val vm: GuideViewModel = hiltViewModel()
+    val remindersVm: RemindersViewModel = hiltViewModel()
     val state by vm.state.collectAsStateWithLifecycle()
     val categories by vm.categories.collectAsStateWithLifecycle()
     val category by vm.category.collectAsStateWithLifecycle()
@@ -215,8 +217,22 @@ fun GuideScreen(onPlay: (String) -> Unit) {
     }
 
     detail?.let { open ->
+        val reminders by remindersVm.reminders.collectAsStateWithLifecycle()
         ProgrammeDialog(
             detail = open,
+            reminded = reminders.any {
+                it.channelId == open.channelStreamId &&
+                    it.title == open.programme.title &&
+                    it.startMillis == open.programme.start
+            },
+            onRemind = {
+                remindersVm.toggle(
+                    open.channelStreamId,
+                    open.channelName,
+                    open.programme.title,
+                    open.programme.start
+                )
+            },
             onDismiss = { detail = null },
             onGoToChannel = {
                 detail = null
