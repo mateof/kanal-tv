@@ -421,4 +421,11 @@
     <string name="settings_show_all">Volver a amosar todo</string>
     <string name="settings_categories_hide">Categorías</string>
     <string name="settings_categories_hide_desc">Apaga as que non queiras ver na lista nin na guía.</string>
+    <string name="settings_pin">PIN parental</string>
+    <string name="settings_pin_set">Hai un PIN posto. Fai falta para amosar o contido para adultos.</string>
+    <string name="settings_pin_none">Sen PIN. Calquera pode amosar o contido para adultos.</string>
+    <string name="settings_pin_save">Gardar PIN</string>
+    <string name="settings_pin_remove">Quitar PIN</string>
+    <string name="settings_pin_asked">Escribe o PIN</string>
+    <string name="common_accept">Aceptar</string>
 </resources>

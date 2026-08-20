@@ -414,4 +414,11 @@
     <string name="settings_show_all">Volver a mostrar todo</string>
     <string name="settings_categories_hide">Categorías</string>
     <string name="settings_categories_hide_desc">Apaga las que no quieras ver en la lista ni en la guía.</string>
+    <string name="settings_pin">PIN parental</string>
+    <string name="settings_pin_set">Hay un PIN puesto. Hace falta para mostrar el contenido para adultos.</string>
+    <string name="settings_pin_none">Sin PIN. Cualquiera puede mostrar el contenido para adultos.</string>
+    <string name="settings_pin_save">Guardar PIN</string>
+    <string name="settings_pin_remove">Quitar PIN</string>
+    <string name="settings_pin_asked">Escribe el PIN</string>
+    <string name="common_accept">Aceptar</string>
 </resources>

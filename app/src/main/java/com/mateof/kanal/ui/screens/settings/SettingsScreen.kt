@@ -1,5 +1,10 @@
 package com.mateof.kanal.ui.screens.settings
 
+import androidx.activity.compose.BackHandler
+import androidx.compose.foundation.background
+import androidx.compose.foundation.gestures.detectTapGestures
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.FlowRow
@@ -10,6 +15,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
@@ -31,6 +37,9 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
@@ -85,6 +94,9 @@ fun SettingsScreen(
     val liveCategories by vm.liveCategories.collectAsStateWithLifecycle()
     val hiddenChannels by vm.hiddenChannels.collectAsStateWithLifecycle()
     val hiddenCategories by vm.hiddenCategories.collectAsStateWithLifecycle()
+    val hasPin by vm.hasParentalPin.collectAsStateWithLifecycle()
+    val askingPin by vm.pinPrompt.collectAsStateWithLifecycle()
+    var pinDraft by remember { mutableStateOf("") }
 
     var userAgentDraft by remember(settings.userAgent) { mutableStateOf(settings.userAgent) }
     var sleepDraft by remember(settings.sleepTimerMinutes) {
@@ -389,11 +401,51 @@ fun SettingsScreen(
             )
         }
         item {
+            Column {
+                Text(
+                    stringResource(R.string.settings_pin),
+                    style = MaterialTheme.typography.titleSmall,
+                    color = KanalColors.OnBackground
+                )
+                Text(
+                    stringResource(
+                        if (hasPin) R.string.settings_pin_set else R.string.settings_pin_none
+                    ),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = KanalColors.OnSurfaceFaint
+                )
+                Spacer(Modifier.height(10.dp))
+                KanalTextField(
+                    value = pinDraft,
+                    onValueChange = { pinDraft = it.filter(Char::isDigit).take(6) },
+                    label = stringResource(R.string.settings_pin),
+                    isPassword = true,
+                    keyboardType = KeyboardType.NumberPassword,
+                    modifier = Modifier.width(240.dp)
+                )
+                Spacer(Modifier.height(10.dp))
+                FlowRow(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                    KanalButton(
+                        stringResource(R.string.settings_pin_save),
+                        { vm.setParentalPin(pinDraft); pinDraft = "" },
+                        enabled = pinDraft.length >= 4
+                    )
+                    if (hasPin) {
+                        KanalButton(
+                            stringResource(R.string.settings_pin_remove),
+                            { vm.setParentalPin(null); pinDraft = "" },
+                            tone = ButtonTone.Danger
+                        )
+                    }
+                }
+            }
+        }
+        item {
             SettingSwitchRow(
                 title = stringResource(R.string.settings_hide_adult),
                 description = stringResource(R.string.settings_hide_adult_desc),
                 checked = settings.hideAdult,
-                onCheckedChange = vm::setHideAdult
+                onCheckedChange = vm::requestHideAdult
             )
         }
 
@@ -552,6 +604,65 @@ fun SettingsScreen(
         }
         }
     }
+    }
+
+    // Last, so it is drawn over the settings rather than under them.
+    if (askingPin) {
+        PinPrompt(onSubmit = { vm.submitPin(it) }, onDismiss = vm::dismissPin)
+    }
+}
+
+/**
+ * Asks for the code before the adult filter comes down.
+ *
+ * Only in that direction: putting the filter back up is something anybody
+ * should be able to do, and asking for a code to be more careful would be a
+ * strange thing to insist on.
+ */
+@Composable
+private fun PinPrompt(onSubmit: (String) -> Unit, onDismiss: () -> Unit) {
+    var pin by remember { mutableStateOf("") }
+    BackHandler { onDismiss() }
+    Box(
+        modifier = Modifier
+            .fillMaxSize()
+            .background(Color(0xE0040609))
+            .pointerInput(Unit) { detectTapGestures { onDismiss() } },
+        contentAlignment = Alignment.Center
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth(if (isCompact) 0.9f else 0.4f)
+                .widthIn(max = 460.dp)
+                .clip(RoundedCornerShape(22.dp))
+                .background(KanalColors.BackgroundElevated)
+                .pointerInput(Unit) { detectTapGestures { } }
+                .padding(26.dp)
+        ) {
+            Text(
+                stringResource(R.string.settings_pin_asked),
+                style = MaterialTheme.typography.titleLarge,
+                color = KanalColors.OnBackground
+            )
+            Spacer(Modifier.height(16.dp))
+            KanalTextField(
+                value = pin,
+                onValueChange = { pin = it.filter(Char::isDigit).take(6) },
+                label = stringResource(R.string.settings_pin),
+                isPassword = true,
+                keyboardType = KeyboardType.NumberPassword
+            )
+            Spacer(Modifier.height(16.dp))
+            FlowRow(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                KanalButton(
+                    stringResource(R.string.common_accept),
+                    { onSubmit(pin) },
+                    tone = ButtonTone.Primary,
+                    enabled = pin.length >= 4
+                )
+                KanalButton(stringResource(R.string.common_cancel), onDismiss)
+            }
+        }
     }
 }
 

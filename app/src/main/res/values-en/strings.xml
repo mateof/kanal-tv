@@ -414,4 +414,11 @@
     <string name="settings_show_all">Show everything again</string>
     <string name="settings_categories_hide">Categories</string>
     <string name="settings_categories_hide_desc">Switch off the ones you do not want in the list or the guide.</string>
+    <string name="settings_pin">Parental PIN</string>
+    <string name="settings_pin_set">A PIN is set. It is needed to show adult content.</string>
+    <string name="settings_pin_none">No PIN. Anyone can show adult content.</string>
+    <string name="settings_pin_save">Save PIN</string>
+    <string name="settings_pin_remove">Remove PIN</string>
+    <string name="settings_pin_asked">Enter the PIN</string>
+    <string name="common_accept">Accept</string>
 </resources>

@@ -25,6 +25,7 @@ import kotlinx.coroutines.flow.map
 import kotlinx.serialization.decodeFromString
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
+import java.security.MessageDigest
 import javax.inject.Inject
 import javax.inject.Singleton
 
@@ -108,6 +109,7 @@ class AppPreferences @Inject constructor(
         val FAVORITES = stringPreferencesKey("favorites")
         val STREAM_CHOICES = stringPreferencesKey("stream_choices")
         val FILL_LOGOS = booleanPreferencesKey("fill_logos")
+        val PARENTAL_PIN = stringPreferencesKey("parental_pin")
         val CHANNEL_SORT = stringPreferencesKey("channel_sort")
         val HIDDEN_CHANNELS = stringPreferencesKey("hidden_channels")
         val HIDDEN_CATEGORIES = stringPreferencesKey("hidden_categories")
@@ -316,6 +318,33 @@ class AppPreferences @Inject constructor(
     suspend fun setSubtitlesEnabled(value: Boolean) = edit { it[Keys.SUBTITLES] = value }
 
     suspend fun setFillMissingLogos(value: Boolean) = edit { it[Keys.FILL_LOGOS] = value }
+
+    // --- Parental pin ---------------------------------------------------------
+    //
+    // Kept as a digest and never as the digits themselves. It guards nothing
+    // valuable, but a four-digit code sitting in plain text in the preferences
+    // is the sort of thing that ends up being the same four digits as something
+    // that does matter.
+
+    val hasParentalPin: Flow<Boolean> = context.dataStore.data.map {
+        !it[Keys.PARENTAL_PIN].isNullOrBlank()
+    }
+
+    suspend fun setParentalPin(pin: String?) = edit { prefs ->
+        if (pin.isNullOrBlank()) prefs.remove(Keys.PARENTAL_PIN)
+        else prefs[Keys.PARENTAL_PIN] = digestOf(pin)
+    }
+
+    /** @return true when there is no pin set, or when [pin] is the right one. */
+    suspend fun parentalPinAccepts(pin: String): Boolean {
+        val stored = context.dataStore.data.first()[Keys.PARENTAL_PIN]
+        return stored.isNullOrBlank() || stored == digestOf(pin)
+    }
+
+    private fun digestOf(pin: String): String =
+        MessageDigest.getInstance("SHA-256")
+            .digest(pin.trim().toByteArray())
+            .joinToString("") { "%02x".format(it) }
 
     suspend fun setChannelSort(value: ChannelSort) = edit { it[Keys.CHANNEL_SORT] = value.name }
 

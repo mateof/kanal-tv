@@ -177,6 +177,39 @@ class SettingsViewModel @Inject constructor(
     val hiddenCategories: StateFlow<Set<String>> = prefs.hiddenCategories
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptySet())
 
+    val hasParentalPin: StateFlow<Boolean> = prefs.hasParentalPin
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), false)
+
+    private val _pinPrompt = MutableStateFlow(false)
+
+    /** True while the pin is being asked for before revealing adult content. */
+    val pinPrompt: StateFlow<Boolean> = _pinPrompt.asStateFlow()
+
+    fun setParentalPin(pin: String?) = viewModelScope.launch { prefs.setParentalPin(pin) }
+
+    /**
+     * Turning the adult filter *off* is the direction that needs the pin. Turning
+     * it on is something anyone should be able to do.
+     */
+    fun requestHideAdult(hide: Boolean) = viewModelScope.launch {
+        if (!hide && prefs.hasParentalPin.first()) {
+            _pinPrompt.value = true
+            return@launch
+        }
+        prefs.setHideAdult(hide)
+    }
+
+    fun submitPin(pin: String) = viewModelScope.launch {
+        if (prefs.parentalPinAccepts(pin)) {
+            _pinPrompt.value = false
+            prefs.setHideAdult(false)
+        }
+    }
+
+    fun dismissPin() {
+        _pinPrompt.value = false
+    }
+
     fun setChannelSort(value: ChannelSort) = viewModelScope.launch { prefs.setChannelSort(value) }
 
     fun toggleCategory(categoryId: String) = viewModelScope.launch {
