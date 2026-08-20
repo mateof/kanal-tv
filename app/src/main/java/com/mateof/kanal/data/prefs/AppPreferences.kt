@@ -110,6 +110,7 @@ class AppPreferences @Inject constructor(
         val STREAM_CHOICES = stringPreferencesKey("stream_choices")
         val FILL_LOGOS = booleanPreferencesKey("fill_logos")
         val PARENTAL_PIN = stringPreferencesKey("parental_pin")
+        val CATALOG_MARKS = stringPreferencesKey("catalog_marks")
         val CHANNEL_SORT = stringPreferencesKey("channel_sort")
         val HIDDEN_CHANNELS = stringPreferencesKey("hidden_channels")
         val HIDDEN_CATEGORIES = stringPreferencesKey("hidden_categories")
@@ -318,6 +319,28 @@ class AppPreferences @Inject constructor(
     suspend fun setSubtitlesEnabled(value: Boolean) = edit { it[Keys.SUBTITLES] = value }
 
     suspend fun setFillMissingLogos(value: Boolean) = edit { it[Keys.FILL_LOGOS] = value }
+
+    // --- What each catalogue looked like last time ----------------------------
+    //
+    // A panel has no way of saying "nothing changed", so the app works it out:
+    // it keeps a fingerprint of what came back and, when the new one matches,
+    // leaves the stored rows alone. The fetch still happens — there is no
+    // avoiding that — but rewriting tens of thousands of rows does not.
+
+    val catalogMarks: Flow<Map<String, String>> = context.dataStore.data.map { prefs ->
+        decode<Map<String, String>>(prefs[Keys.CATALOG_MARKS], emptyMap())
+    }
+
+    suspend fun markCatalog(key: String, fingerprint: String) {
+        context.dataStore.edit { prefs ->
+            val all = decode<Map<String, String>>(prefs[Keys.CATALOG_MARKS], emptyMap())
+                .toMutableMap()
+            all[key] = fingerprint
+            prefs[Keys.CATALOG_MARKS] = json.encodeToString(all.toMap())
+        }
+    }
+
+    suspend fun forgetCatalogMarks() = edit { it.remove(Keys.CATALOG_MARKS) }
 
     // --- Parental pin ---------------------------------------------------------
     //

@@ -48,6 +48,7 @@ import java.io.BufferedReader
 import java.io.InputStreamReader
 import java.util.Locale
 import dagger.hilt.android.qualifiers.ApplicationContext
+import java.security.MessageDigest
 import javax.inject.Inject
 import javax.inject.Singleton
 import kotlin.math.abs
@@ -93,6 +94,7 @@ class SyncRepository @Inject constructor(
         withContext(Dispatchers.IO) {
             try {
                 logger.i("Sync", "Sincronizando '${source.name}' (${source.type})")
+                val startedAt = System.currentTimeMillis()
                 val content = when (source.type) {
                     SourceType.XTREAM -> syncXtream(source)
                     SourceType.M3U -> syncM3u(source)
@@ -112,7 +114,8 @@ class SyncRepository @Inject constructor(
 
                 logger.i(
                     "Sync",
-                    "Listo: ${summary.channels} canales, ${summary.movies} películas, " +
+                    "Listo en ${System.currentTimeMillis() - startedAt} ms: " +
+                        "${summary.channels} canales, ${summary.movies} películas, " +
                         "${summary.series} series, ${summary.programmes} programas"
                 )
                 SyncState.Done(System.currentTimeMillis(), summary).also { _state.value = it }
@@ -176,7 +179,9 @@ class SyncRepository @Inject constructor(
                     position = index
                 )
             }
-        replaceChannels(source.id, channels)
+        if (changed(source.id, "live", channels.map { it.streamId to it.name })) {
+            replaceChannels(source.id, channels)
+        }
 
         step(UiText(R.string.sync_movies), 0.45f)
         val movies = xtream.items(source, XtreamCatalog.VOD, vodNames.keys.toList())
@@ -201,7 +206,9 @@ class SyncRepository @Inject constructor(
                     position = index
                 )
             }
-        replaceMovies(source.id, movies)
+        if (changed(source.id, "vod", movies.map { it.streamId to it.name })) {
+            replaceMovies(source.id, movies)
+        }
 
         step(UiText(R.string.sync_series), 0.75f)
         val series = xtream.items(source, XtreamCatalog.SERIES, seriesNames.keys.toList())
@@ -230,7 +237,9 @@ class SyncRepository @Inject constructor(
                     position = index
                 )
             }
-        replaceSeries(source.id, series)
+        if (changed(source.id, "series", series.map { it.seriesId to it.name })) {
+            replaceSeries(source.id, series)
+        }
         db.episodes().clear(source.id)
 
         return SyncSummary(channels.size, movies.size, series.size)
@@ -345,8 +354,12 @@ class SyncRepository @Inject constructor(
         db.categories().replace(
             source.id, "MOVIE", categoriesOf(source.id, "MOVIE", movies.map { it.categoryName })
         )
-        replaceChannels(source.id, channels)
-        replaceMovies(source.id, movies)
+        if (changed(source.id, "live", channels.map { it.streamId to it.name })) {
+            replaceChannels(source.id, channels)
+        }
+        if (changed(source.id, "vod", movies.map { it.streamId to it.name })) {
+            replaceMovies(source.id, movies)
+        }
 
         val series = ArrayList<SeriesEntity>()
         val episodes = ArrayList<EpisodeEntity>()
@@ -531,6 +544,44 @@ class SyncRepository @Inject constructor(
         prefs.markSynced(source.id, epgAt = System.currentTimeMillis())
         logger.i("Epg", "Guía de '${source.name}': $stored programas")
         stored
+    }
+
+    /**
+     * Whether a catalogue is worth writing to the database again.
+     *
+     * Sixteen thousand films arrive on every sync and almost never differ. The
+     * fetch cannot be avoided — the panel offers no way to ask "has anything
+     * changed?" — but clearing and reinserting the lot can be, and that is the
+     * part that makes an idle sync take the best part of a minute.
+     *
+     * The fingerprint is over ids and names, which is what the app shows and
+     * searches. A film whose rating moved will not force a rewrite, and that is
+     * the intended bargain.
+     */
+    private suspend fun changed(
+        sourceId: String,
+        catalogue: String,
+        items: List<Pair<String, String>>
+    ): Boolean {
+        val fingerprint = fingerprintOf(items)
+        val key = "$sourceId:$catalogue"
+        val previous = prefs.catalogMarks.first()[key]
+        if (previous == fingerprint) {
+            logger.i("Sync", "'$catalogue' sin cambios (${items.size}), no se reescribe")
+            return false
+        }
+        prefs.markCatalog(key, fingerprint)
+        return true
+    }
+
+    private fun fingerprintOf(items: List<Pair<String, String>>): String {
+        val digest = MessageDigest.getInstance("SHA-256")
+        items.forEach { (id, name) ->
+            digest.update(id.toByteArray())
+            digest.update(name.toByteArray())
+        }
+        return items.size.toString() + ":" +
+            digest.digest().joinToString("") { "%02x".format(it) }
     }
 
     // --- Shared --------------------------------------------------------------
