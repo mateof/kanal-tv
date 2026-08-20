@@ -18,6 +18,7 @@ import androidx.activity.compose.BackHandler
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
+import android.util.TypedValue
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.spring
 import androidx.compose.foundation.BorderStroke
@@ -48,6 +49,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Star
 import androidx.compose.material.icons.outlined.StarOutline
+import androidx.compose.material.icons.outlined.Analytics
 import androidx.compose.material.icons.outlined.AspectRatio
 import androidx.compose.material.icons.outlined.Bedtime
 import androidx.compose.material.icons.outlined.Fullscreen
@@ -100,6 +102,8 @@ import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.compose.LifecycleEventEffect
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.media3.ui.AspectRatioFrameLayout
+import androidx.media3.ui.CaptionStyleCompat
+import androidx.media3.ui.SubtitleView
 import androidx.media3.ui.PlayerView
 import androidx.compose.ui.res.stringResource
 import com.mateof.kanal.R
@@ -108,6 +112,8 @@ import com.mateof.kanal.data.db.ChannelEntity
 import com.mateof.kanal.core.resolve
 import com.mateof.kanal.core.formatClock
 import com.mateof.kanal.core.formatDuration
+import com.mateof.kanal.data.prefs.SubtitleLook
+import com.mateof.kanal.data.prefs.SubtitleSize
 import com.mateof.kanal.ui.components.ActionMenu
 import com.mateof.kanal.ui.components.ArtworkImage
 import com.mateof.kanal.ui.components.ChannelGuide
@@ -511,6 +517,7 @@ fun PlayerScreen(
                 update = { view ->
                     view.player = player
                     view.resizeMode = resizeMode
+                    view.subtitleView?.applyLook(state.subtitleSize, state.subtitleLook)
                     // Holding the last frame is right for a stumble mid-channel,
                     // where the picture returns in a moment. On a change of
                     // channel it is wrong: it would leave the previous channel
@@ -575,6 +582,10 @@ fun PlayerScreen(
                     KanalButton(stringResource(R.string.common_back), { onBack(liveChannelId()) })
                 }
             }
+        }
+
+        state.stats?.takeIf { !inPip }?.let { stats ->
+            StatsOverlay(stats, Modifier.align(Alignment.TopStart))
         }
 
         // Band and strip stack at the foot of the picture: the band says what
@@ -710,6 +721,13 @@ fun PlayerScreen(
                         MenuAction(stringResource(R.string.player_audio_subtitles), Icons.Outlined.Tune) {
                             mode = Mode.Tracks
                         }
+                    )
+                    add(
+                        MenuAction(
+                            stringResource(R.string.player_stats),
+                            Icons.Outlined.Analytics,
+                            active = state.stats != null
+                        ) { vm.toggleStats() }
                     )
                     add(
                         MenuAction(stringResource(R.string.cast_send), Icons.Outlined.Cast) {
@@ -1483,6 +1501,99 @@ private fun resizeLabel(mode: Int): String = when (mode) {
     AspectRatioFrameLayout.RESIZE_MODE_ZOOM -> stringResource(R.string.player_zoom)
     AspectRatioFrameLayout.RESIZE_MODE_FILL -> stringResource(R.string.player_stretch)
     else -> stringResource(R.string.player_adjust)
+}
+
+/**
+ * Bitrate, buffer and dropped frames over the picture.
+ *
+ * Turns "va a trompicones" into something with numbers in it. A buffer that
+ * empties while the bitrate holds up is a connection that cannot keep the pace;
+ * frames piling up in the dropped counter with the buffer full is a device that
+ * cannot decode what it is being sent. They need very different answers, and
+ * from the sofa they look identical.
+ */
+@Composable
+private fun StatsOverlay(stats: PlaybackStats, modifier: Modifier = Modifier) {
+    Column(
+        modifier = modifier
+            .padding(start = 40.dp, top = 40.dp)
+            .clip(RoundedCornerShape(12.dp))
+            .background(Color(0xCC05070C))
+            .padding(horizontal = 16.dp, vertical = 12.dp)
+    ) {
+        val lines = buildList {
+            if (stats.resolution.isNotBlank()) {
+                add(
+                    buildString {
+                        append(stats.resolution)
+                        if (stats.frameRate > 0) append("  ·  %.0f fps".format(stats.frameRate))
+                        if (stats.videoCodec.isNotBlank()) append("  ·  ").append(stats.videoCodec)
+                    }
+                )
+            }
+            if (stats.bitrateKbps > 0) {
+                add(
+                    if (stats.measuredBitrate) {
+                        stringResource(R.string.player_stats_measured, stats.bitrateKbps)
+                    } else {
+                        "${stats.bitrateKbps} kbps"
+                    }
+                )
+            }
+            if (stats.audioCodec.isNotBlank()) {
+                add("${stats.audioCodec}  ·  ${stats.audioChannels}ch")
+            }
+            add(stringResource(R.string.player_stats_buffer, stats.bufferedMs / 1000))
+            add(stringResource(R.string.player_stats_dropped, stats.droppedFrames))
+        }
+        lines.forEach { line ->
+            Text(
+                line,
+                style = MaterialTheme.typography.labelMedium,
+                color = KanalColors.OnSurfaceMuted
+            )
+        }
+    }
+}
+
+/**
+ * Subtitles as chosen in the settings.
+ *
+ * The platform's own caption settings are ignored on purpose: on a television
+ * they are buried where nobody finds them, and half the sticks ship with them
+ * unset. The edge and the box are what make a subtitle readable over a bright
+ * picture — size alone does not.
+ */
+private fun SubtitleView.applyLook(size: SubtitleSize, look: SubtitleLook) {
+    setApplyEmbeddedStyles(false)
+    setApplyEmbeddedFontSizes(false)
+    setFixedTextSize(TypedValue.COMPLEX_UNIT_SP, size.sp)
+    val white = android.graphics.Color.WHITE
+    val yellow = android.graphics.Color.rgb(255, 222, 89)
+    val black = android.graphics.Color.BLACK
+    setStyle(
+        when (look) {
+            SubtitleLook.PLAIN -> CaptionStyleCompat(
+                white, android.graphics.Color.TRANSPARENT, android.graphics.Color.TRANSPARENT,
+                CaptionStyleCompat.EDGE_TYPE_NONE, black, null
+            )
+
+            SubtitleLook.OUTLINED -> CaptionStyleCompat(
+                white, android.graphics.Color.TRANSPARENT, android.graphics.Color.TRANSPARENT,
+                CaptionStyleCompat.EDGE_TYPE_OUTLINE, black, null
+            )
+
+            SubtitleLook.BOXED -> CaptionStyleCompat(
+                white, android.graphics.Color.argb(160, 0, 0, 0), android.graphics.Color.TRANSPARENT,
+                CaptionStyleCompat.EDGE_TYPE_NONE, black, null
+            )
+
+            SubtitleLook.YELLOW -> CaptionStyleCompat(
+                yellow, android.graphics.Color.TRANSPARENT, android.graphics.Color.TRANSPARENT,
+                CaptionStyleCompat.EDGE_TYPE_OUTLINE, black, null
+            )
+        }
+    )
 }
 
 /**

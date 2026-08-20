@@ -381,4 +381,20 @@
     <string name="player_watch_now">Watch now</string>
     <string name="settings_fill_logos">Fill in missing logos</string>
     <string name="settings_fill_logos_desc">Channels the playlist sends without a logo are looked up by name in a public catalogue of station logos. Nothing from your playlist is sent: only your country’s folder is read.</string>
+    <string name="subtitle_size_small">Small</string>
+    <string name="subtitle_size_normal">Normal</string>
+    <string name="subtitle_size_large">Large</string>
+    <string name="subtitle_size_huge">Very large</string>
+    <string name="subtitle_look_plain">Plain</string>
+    <string name="subtitle_look_outlined">Outlined</string>
+    <string name="subtitle_look_boxed">On a box</string>
+    <string name="subtitle_look_yellow">Yellow</string>
+    <string name="settings_subtitle_size">Subtitle size</string>
+    <string name="settings_subtitle_size_desc">Three metres from the sofa, normal is usually too small.</string>
+    <string name="settings_subtitle_look">Subtitle look</string>
+    <string name="settings_subtitle_look_desc">The outline and the box are what make them readable over a bright picture.</string>
+    <string name="player_stats">Statistics</string>
+    <string name="player_stats_buffer">Buffer %d s</string>
+    <string name="player_stats_dropped">Dropped frames: %d</string>
+    <string name="player_stats_measured">Network: %d kbps</string>
 </resources>

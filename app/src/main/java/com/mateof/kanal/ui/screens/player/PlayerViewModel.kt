@@ -22,6 +22,8 @@ import com.mateof.kanal.data.model.Source
 import com.mateof.kanal.data.model.favoriteKey
 import com.mateof.kanal.data.net.redactUrl
 import com.mateof.kanal.data.prefs.AppPreferences
+import com.mateof.kanal.data.prefs.SubtitleLook
+import com.mateof.kanal.data.prefs.SubtitleSize
 import com.mateof.kanal.data.prefs.Settings
 import com.mateof.kanal.data.repo.ContentRepository
 import com.mateof.kanal.data.repo.EpgRepository
@@ -85,6 +87,26 @@ data class BrowseInfo(
     val next: EpgEntity? = null
 )
 
+/**
+ * What the stream is actually doing, for when "va a trompicones" needs a number.
+ *
+ * Read straight off the player rather than measured here: the decoder counters
+ * and the buffer are the ones that tell a weak connection apart from a picture
+ * the device cannot keep up with.
+ */
+data class PlaybackStats(
+    val resolution: String,
+    val videoCodec: String,
+    val bitrateKbps: Int,
+    /** True when the figure is the measured throughput, not a declared one. */
+    val measuredBitrate: Boolean,
+    val frameRate: Float,
+    val audioCodec: String,
+    val audioChannels: Int,
+    val bufferedMs: Long,
+    val droppedFrames: Int
+)
+
 /** The episode queued up behind the one that just finished. */
 data class NextUp(
     val episodeId: String,
@@ -128,6 +150,10 @@ data class PlayerUiState(
     val errorDetail: String? = null,
     /** Counting down to the next episode, or null when nothing follows. */
     val nextUp: NextUp? = null,
+    /** Non-null while the stats overlay is on. */
+    val stats: PlaybackStats? = null,
+    val subtitleSize: SubtitleSize = SubtitleSize.NORMAL,
+    val subtitleLook: SubtitleLook = SubtitleLook.OUTLINED,
     /** True while what is playing can be made a favourite at all. */
     val canFavorite: Boolean = false,
     val isFavorite: Boolean = false,
@@ -172,6 +198,8 @@ class PlayerViewModel @Inject constructor(
     private var nextUpJob: Job? = null
     private var reconnects = 0
 
+    private var statsOn = false
+
     /** Where the arrows have walked to, kept out of the state so it can lead it. */
     private var browseIndex: Int? = null
 
@@ -192,6 +220,19 @@ class PlayerViewModel @Inject constructor(
     /** Mirrors "recordar el último canal": without it there is nobody to hand to. */
     private var keepChannelOnExit = false
     private var resilient = false
+
+    init {
+        // Followed rather than read once: changing them in the settings while a
+        // film is paused behind should land without reopening anything.
+        viewModelScope.launch {
+            prefs.settings.collect { settings ->
+                _state.value = _state.value.copy(
+                    subtitleSize = settings.subtitleSize,
+                    subtitleLook = settings.subtitleLook
+                )
+            }
+        }
+    }
 
     fun load(kind: String, itemId: String, startMillis: Long) {
         val key = "$kind/$itemId/$startMillis"
@@ -440,7 +481,8 @@ class PlayerViewModel @Inject constructor(
                         positionMs = exo.currentPosition.coerceAtLeast(0),
                         durationMs = exo.duration.takeIf { it > 0 } ?: 0L,
                         playing = exo.isPlaying,
-                        buffering = exo.playbackState == Player.STATE_BUFFERING
+                        buffering = exo.playbackState == Player.STATE_BUFFERING,
+                        stats = if (statsOn) readStats(exo) else null
                     )
                 }
                 delay(500)
@@ -672,6 +714,36 @@ class PlayerViewModel @Inject constructor(
     /** Subtitles are off until asked for, and the answer outlives the channel. */
     private fun rememberSubtitles(enabled: Boolean) = viewModelScope.launch {
         prefs.setSubtitlesEnabled(enabled)
+    }
+
+    fun toggleStats() {
+        statsOn = !statsOn
+        if (!statsOn) _state.value = _state.value.copy(stats = null)
+    }
+
+    val statsVisible: Boolean get() = statsOn
+
+    private fun readStats(exo: ExoPlayer): PlaybackStats {
+        val video = exo.videoFormat
+        val audio = exo.audioFormat
+        val counters = exo.videoDecoderCounters
+        // The container's own figure when the stream declares one, and the
+        // player's running estimate when it does not, which is the usual case
+        // for a raw transport stream.
+        val declared = video?.bitrate?.takeIf { it > 0 }
+            ?: video?.averageBitrate?.takeIf { it > 0 }
+        val bitrate = declared?.toLong() ?: playerFactory.networkBitrate()
+        return PlaybackStats(
+            resolution = video?.let { "${it.width}×${it.height}" }.orEmpty(),
+            videoCodec = video?.sampleMimeType?.substringAfter('/').orEmpty(),
+            bitrateKbps = (bitrate / 1000).toInt(),
+            measuredBitrate = declared == null,
+            frameRate = video?.frameRate ?: 0f,
+            audioCodec = audio?.sampleMimeType?.substringAfter('/').orEmpty(),
+            audioChannels = audio?.channelCount ?: 0,
+            bufferedMs = exo.totalBufferedDuration,
+            droppedFrames = counters?.droppedBufferCount ?: 0
+        )
     }
 
     fun togglePlayPause() {

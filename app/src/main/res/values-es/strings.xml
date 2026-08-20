@@ -381,4 +381,20 @@
     <string name="player_watch_now">Ver ahora</string>
     <string name="settings_fill_logos">Completar logotipos que falten</string>
     <string name="settings_fill_logos_desc">Los canales que la lista manda sin logotipo se buscan por nombre en un catálogo público de logotipos de televisión. No se envía nada de tu lista: sólo se lee la carpeta de tu país.</string>
+    <string name="subtitle_size_small">Pequeños</string>
+    <string name="subtitle_size_normal">Normales</string>
+    <string name="subtitle_size_large">Grandes</string>
+    <string name="subtitle_size_huge">Muy grandes</string>
+    <string name="subtitle_look_plain">Simples</string>
+    <string name="subtitle_look_outlined">Con borde</string>
+    <string name="subtitle_look_boxed">Sobre fondo</string>
+    <string name="subtitle_look_yellow">Amarillos</string>
+    <string name="settings_subtitle_size">Tamaño de los subtítulos</string>
+    <string name="settings_subtitle_size_desc">A tres metros del sofá lo normal suele quedarse corto.</string>
+    <string name="settings_subtitle_look">Aspecto de los subtítulos</string>
+    <string name="settings_subtitle_look_desc">El borde y el fondo son lo que los hace legibles sobre una imagen clara.</string>
+    <string name="player_stats">Estadísticas</string>
+    <string name="player_stats_buffer">Búfer %d s</string>
+    <string name="player_stats_dropped">Fotogramas perdidos: %d</string>
+    <string name="player_stats_measured">Red: %d kbps</string>
 </resources>

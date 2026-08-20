@@ -35,6 +35,22 @@ enum class StreamFormat(@StringRes val labelRes: Int, val extension: String) {
     HLS(R.string.stream_format_hls, "m3u8")
 }
 
+/** How big the subtitles are, from a sofa away. */
+enum class SubtitleSize(@StringRes val labelRes: Int, val sp: Float) {
+    SMALL(R.string.subtitle_size_small, 16f),
+    NORMAL(R.string.subtitle_size_normal, 22f),
+    LARGE(R.string.subtitle_size_large, 30f),
+    HUGE(R.string.subtitle_size_huge, 40f)
+}
+
+/** How they are drawn, which matters more over a bright picture than size does. */
+enum class SubtitleLook(@StringRes val labelRes: Int) {
+    PLAIN(R.string.subtitle_look_plain),
+    OUTLINED(R.string.subtitle_look_outlined),
+    BOXED(R.string.subtitle_look_boxed),
+    YELLOW(R.string.subtitle_look_yellow)
+}
+
 enum class BufferProfile(
     @StringRes val labelRes: Int,
     val minBufferMs: Int,
@@ -65,7 +81,9 @@ data class Settings(
     val sleepTimerMinutes: Int = SleepTimer.DEFAULT_MINUTES,
     val stillWatching: Boolean = true,
     val subtitlesEnabled: Boolean = false,
-    val fillMissingLogos: Boolean = true
+    val fillMissingLogos: Boolean = true,
+    val subtitleSize: SubtitleSize = SubtitleSize.NORMAL,
+    val subtitleLook: SubtitleLook = SubtitleLook.OUTLINED
 )
 
 const val DEFAULT_USER_AGENT = "VLC/3.0.20 LibVLC/3.0.20"
@@ -82,6 +100,8 @@ class AppPreferences @Inject constructor(
         val FAVORITES = stringPreferencesKey("favorites")
         val STREAM_CHOICES = stringPreferencesKey("stream_choices")
         val FILL_LOGOS = booleanPreferencesKey("fill_logos")
+        val SUBTITLE_SIZE = stringPreferencesKey("subtitle_size")
+        val SUBTITLE_LOOK = stringPreferencesKey("subtitle_look")
         val HISTORY = stringPreferencesKey("history")
 
         val STREAM_FORMAT = stringPreferencesKey("stream_format")
@@ -248,7 +268,13 @@ class AppPreferences @Inject constructor(
             sleepTimerMinutes = prefs[Keys.SLEEP_MINUTES] ?: SleepTimer.DEFAULT_MINUTES,
             stillWatching = prefs[Keys.STILL_WATCHING] ?: true,
             subtitlesEnabled = prefs[Keys.SUBTITLES] ?: false,
-            fillMissingLogos = prefs[Keys.FILL_LOGOS] ?: true
+            fillMissingLogos = prefs[Keys.FILL_LOGOS] ?: true,
+            subtitleSize = prefs[Keys.SUBTITLE_SIZE]?.let { name ->
+                SubtitleSize.entries.firstOrNull { it.name == name }
+            } ?: SubtitleSize.NORMAL,
+            subtitleLook = prefs[Keys.SUBTITLE_LOOK]?.let { name ->
+                SubtitleLook.entries.firstOrNull { it.name == name }
+            } ?: SubtitleLook.OUTLINED
         )
     }
 
@@ -276,6 +302,10 @@ class AppPreferences @Inject constructor(
     suspend fun setSubtitlesEnabled(value: Boolean) = edit { it[Keys.SUBTITLES] = value }
 
     suspend fun setFillMissingLogos(value: Boolean) = edit { it[Keys.FILL_LOGOS] = value }
+
+    suspend fun setSubtitleSize(value: SubtitleSize) = edit { it[Keys.SUBTITLE_SIZE] = value.name }
+
+    suspend fun setSubtitleLook(value: SubtitleLook) = edit { it[Keys.SUBTITLE_LOOK] = value.name }
 
     /**
      * Televisions added by hand, kept between sessions: the ones that need it

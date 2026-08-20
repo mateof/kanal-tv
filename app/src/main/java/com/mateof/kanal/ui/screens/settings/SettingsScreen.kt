@@ -49,6 +49,8 @@ import com.mateof.kanal.data.model.Source
 import com.mateof.kanal.data.prefs.BufferProfile
 import com.mateof.kanal.data.prefs.StreamFormat
 import com.mateof.kanal.data.repo.SyncState
+import com.mateof.kanal.data.prefs.SubtitleLook
+import com.mateof.kanal.data.prefs.SubtitleSize
 import com.mateof.kanal.ui.components.ButtonTone
 import com.mateof.kanal.ui.components.KanalButton
 import com.mateof.kanal.ui.components.KanalChip
@@ -235,6 +237,24 @@ fun SettingsScreen(
                 description = stringResource(R.string.settings_resilient_desc),
                 checked = settings.resilientPlayback,
                 onCheckedChange = vm::setResilient
+            )
+        }
+        item {
+            OptionRow(
+                title = stringResource(R.string.settings_subtitle_size),
+                description = stringResource(R.string.settings_subtitle_size_desc),
+                options = SubtitleSize.entries.map { stringResource(it.labelRes) },
+                selectedIndex = SubtitleSize.entries.indexOf(settings.subtitleSize),
+                onSelect = { vm.setSubtitleSize(SubtitleSize.entries[it]) }
+            )
+        }
+        item {
+            OptionRow(
+                title = stringResource(R.string.settings_subtitle_look),
+                description = stringResource(R.string.settings_subtitle_look_desc),
+                options = SubtitleLook.entries.map { stringResource(it.labelRes) },
+                selectedIndex = SubtitleLook.entries.indexOf(settings.subtitleLook),
+                onSelect = { vm.setSubtitleLook(SubtitleLook.entries[it]) }
             )
         }
         item {

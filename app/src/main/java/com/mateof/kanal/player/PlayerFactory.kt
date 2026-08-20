@@ -19,6 +19,7 @@ import androidx.media3.extractor.ExtractorsFactory
 import androidx.media3.extractor.ts.TsExtractor
 import com.mateof.kanal.core.log.FileLogger
 import com.mateof.kanal.data.net.HttpProvider
+import androidx.media3.exoplayer.upstream.DefaultBandwidthMeter
 import androidx.media3.exoplayer.upstream.DefaultLoadErrorHandlingPolicy
 import androidx.media3.exoplayer.upstream.LoadErrorHandlingPolicy
 import com.mateof.kanal.data.prefs.BufferProfile
@@ -120,6 +121,17 @@ class PlayerFactory @Inject constructor(
                 )
             }
     }
+
+    /**
+     * What the network is actually delivering, in bits per second.
+     *
+     * The stream's declared bitrate is missing from most raw transport streams,
+     * and it would only say what the channel *intends* to send anyway. This is
+     * the measured throughput, which is the figure that falls when a picture
+     * starts breaking up.
+     */
+    fun networkBitrate(): Long =
+        DefaultBandwidthMeter.getSingletonInstance(context).bitrateEstimate
 
     /**
      * Hints the container so ExoPlayer does not have to sniff it. Xtream live

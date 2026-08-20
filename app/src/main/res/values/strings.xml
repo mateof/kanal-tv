@@ -388,4 +388,20 @@
     <string name="player_watch_now">Ver agora</string>
     <string name="settings_fill_logos">Completar logotipos que falten</string>
     <string name="settings_fill_logos_desc">As canles que a listaxe manda sen logotipo búscanse por nome nun catálogo público de logotipos de televisión. Non se envía nada da túa listaxe: só se le a carpeta do teu país.</string>
+    <string name="subtitle_size_small">Pequenos</string>
+    <string name="subtitle_size_normal">Normais</string>
+    <string name="subtitle_size_large">Grandes</string>
+    <string name="subtitle_size_huge">Moi grandes</string>
+    <string name="subtitle_look_plain">Simples</string>
+    <string name="subtitle_look_outlined">Con bordo</string>
+    <string name="subtitle_look_boxed">Sobre fondo</string>
+    <string name="subtitle_look_yellow">Amarelos</string>
+    <string name="settings_subtitle_size">Tamaño dos subtítulos</string>
+    <string name="settings_subtitle_size_desc">A tres metros do sofá o normal adoita quedar curto.</string>
+    <string name="settings_subtitle_look">Aspecto dos subtítulos</string>
+    <string name="settings_subtitle_look_desc">O bordo e o fondo son o que os fai lexibles sobre unha imaxe clara.</string>
+    <string name="player_stats">Estatísticas</string>
+    <string name="player_stats_buffer">Búfer %d s</string>
+    <string name="player_stats_dropped">Fotogramas perdidos: %d</string>
+    <string name="player_stats_measured">Rede: %d kbps</string>
 </resources>

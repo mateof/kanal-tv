@@ -10,6 +10,8 @@ import com.mateof.kanal.core.UiText
 import com.mateof.kanal.core.log.FileLogger
 import com.mateof.kanal.data.db.KanalDatabase
 import com.mateof.kanal.data.model.Source
+import com.mateof.kanal.data.prefs.SubtitleLook
+import com.mateof.kanal.data.prefs.SubtitleSize
 import com.mateof.kanal.data.prefs.AppPreferences
 import com.mateof.kanal.data.prefs.BufferProfile
 import com.mateof.kanal.data.prefs.Settings
@@ -140,6 +142,10 @@ class SettingsViewModel @Inject constructor(
     }
 
     fun cancelSleepTimer() = sleepTimer.cancel()
+
+    fun setSubtitleSize(value: SubtitleSize) = viewModelScope.launch { prefs.setSubtitleSize(value) }
+
+    fun setSubtitleLook(value: SubtitleLook) = viewModelScope.launch { prefs.setSubtitleLook(value) }
 
     fun setFillMissingLogos(value: Boolean) = viewModelScope.launch {
         prefs.setFillMissingLogos(value)
