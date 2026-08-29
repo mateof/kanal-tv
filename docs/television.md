@@ -120,13 +120,22 @@ En móvil y tablet, sobre la imagen:
 | Tocar | Muestra el rótulo y la programación; con algo visible, lo oculta |
 | Mantener pulsado | Abre el menú de opciones |
 | Deslizar a izquierda o derecha | Cierra el vídeo y vuelve a la lista |
-| Deslizar hacia arriba | Pantalla completa en horizontal, sin barras del sistema |
+| Deslizar hacia arriba | Gira a horizontal y ocupa toda la pantalla |
 | Deslizar hacia abajo | Reduce a ventana flotante |
 
-En pantalla completa se ocultan tanto la barra de estado como la de navegación; se recuperan
-momentáneamente deslizando desde el borde. El menú incluye **Pantalla completa** y **Salir de
-pantalla completa** para quien prefiera un botón al gesto; no aparecen en televisores, donde
-no hay más que una orientación posible.
+Los gestos se ven mientras se hacen. La imagen sigue al dedo —se desplaza al arrastrar a un
+lado, encoge hacia la ventana flotante al bajar, crece un poco al subir— y sobre ella aparece
+una etiqueta con el nombre de lo que va a ocurrir, que se enciende en cuanto el recorrido es
+suficiente. Soltando antes, la imagen vuelve a su sitio y no ocurre nada.
+
+Los gestos sólo responden sobre la imagen. Con el menú, la lista de canales o la guía
+abiertos, el dedo es para ellos.
+
+Mientras hay vídeo en pantalla se ocultan tanto la barra de estado como la de navegación, sin
+esperar a ningún gesto; se recuperan momentáneamente deslizando desde el borde. El menú
+incluye **Pantalla completa** y **Salir de pantalla completa** para quien prefiera un botón al
+gesto de girar; no aparecen en televisores, donde no hay más que una orientación posible. El
+gesto tampoco se ofrece con el aparato ya en horizontal: no habría nada que girar.
 
 La orientación horizontal se impone durante unos segundos y después el acelerómetro recupera
 el mando, de modo que girar el aparato vuelve a surtir efecto. Si el sistema tiene el giro

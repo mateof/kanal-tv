@@ -5,6 +5,8 @@ import android.content.Context
 import android.content.ContextWrapper
 import android.content.pm.ActivityInfo
 import android.provider.Settings
+import androidx.compose.animation.core.Animatable
+import androidx.compose.animation.core.Spring
 import androidx.compose.foundation.gestures.detectDragGestures
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.ui.geometry.Offset
@@ -13,7 +15,6 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
 import androidx.core.view.WindowInsetsCompat
 import androidx.core.view.WindowInsetsControllerCompat
-import kotlin.math.abs
 import androidx.activity.compose.BackHandler
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.fadeIn
@@ -71,6 +72,8 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.derivedStateOf
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
@@ -132,6 +135,7 @@ import com.mateof.kanal.ui.isCompact
 import com.mateof.kanal.ui.isTelevision
 import com.mateof.kanal.ui.theme.KanalColors
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
 
 private const val OSD_TIMEOUT_MS = 6_000L
 
@@ -185,28 +189,46 @@ fun PlayerScreen(
     val context = LocalContext.current
     val activity = remember(context) { context.findActivity() }
     val swipeThreshold = with(LocalDensity.current) { 110.dp.toPx() }
+    val hintThreshold = with(LocalDensity.current) { PlayerGestures.HintTravelDp.toPx() }
+    val scope = rememberCoroutineScope()
 
-    var immersive by remember { mutableStateOf(false) }
+    // How far the finger has travelled, and how much of that is still applied:
+    // [settle] is 1 while the finger is down and animates to 0 to spring the
+    // picture back. Kept apart so the drag itself writes a plain state and does
+    // not have to start a coroutine for every one of the moves a finger makes.
+    var dragTravel by remember { mutableStateOf(Offset.Zero) }
+    val settle = remember { Animatable(1f) }
+    // A television has no orientation to change, a picture already lying on its
+    // side has nothing to gain from being turned, and old Androids have no small
+    // window: none of the three is hinted at where it cannot happen.
+    val canPip = android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.O
+
+    var forcedLandscape by remember { mutableStateOf(false) }
     // Bumped every time landscape is asked for, to re-arm the release below.
     var orientationHold by remember { mutableIntStateOf(0) }
+    // Bumped whenever the bars may have come back by themselves, to hide them again.
+    var barsTick by remember { mutableIntStateOf(0) }
     val configuration = LocalConfiguration.current
+    val canGoFullscreen = !onTelevision &&
+        configuration.orientation != android.content.res.Configuration.ORIENTATION_LANDSCAPE
 
     /**
-     * Re-applied whenever the configuration changes, not once when asked for.
-     * Requesting landscape *is* a configuration change, and the system restores
-     * the bars across it — which is why the status bar was still sitting over
-     * the picture on a tablet that had to turn to obey.
+     * The picture owns the whole screen for as long as it is up. On a phone or
+     * a tablet the status bar used to stay over it — clock, battery and all —
+     * because the bars were only hidden once fullscreen had been *asked* for.
+     *
+     * Re-applied on every configuration change instead of once on entry:
+     * requesting landscape *is* a configuration change and the system puts the
+     * bars back across one, which is why the bar survived on a tablet that had
+     * to turn to obey. Coming back from the small window or from another app
+     * restores them too, hence [barsTick].
      */
-    LaunchedEffect(immersive, configuration) {
+    LaunchedEffect(configuration, inPip, barsTick) {
         val window = activity?.window ?: return@LaunchedEffect
         WindowInsetsControllerCompat(window, window.decorView).apply {
-            if (immersive) {
-                systemBarsBehavior =
-                    WindowInsetsControllerCompat.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE
-                hide(WindowInsetsCompat.Type.systemBars())
-            } else {
-                show(WindowInsetsCompat.Type.systemBars())
-            }
+            systemBarsBehavior =
+                WindowInsetsControllerCompat.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE
+            hide(WindowInsetsCompat.Type.systemBars())
         }
     }
 
@@ -234,12 +256,12 @@ fun PlayerScreen(
     fun goFullscreenLandscape() {
         activity?.requestedOrientation = ActivityInfo.SCREEN_ORIENTATION_SENSOR_LANDSCAPE
         orientationHold++
-        immersive = true
+        forcedLandscape = true
     }
 
     fun leaveFullscreen() {
         activity?.requestedOrientation = ActivityInfo.SCREEN_ORIENTATION_UNSPECIFIED
-        immersive = false
+        forcedLandscape = false
     }
 
     // Whatever the gestures did to the screen belongs to the player, so it is
@@ -275,7 +297,7 @@ fun PlayerScreen(
     // ON_STOP and not ON_PAUSE: in a floating window the app is paused but still
     // on screen, and cutting the stream there would defeat the whole point of it.
     LifecycleEventEffect(Lifecycle.Event.ON_STOP) { vm.onStandby() }
-    LifecycleEventEffect(Lifecycle.Event.ON_START) { vm.onReturn() }
+    LifecycleEventEffect(Lifecycle.Event.ON_START) { vm.onReturn(); barsTick++ }
 
     // A window that small has room for the picture and nothing else, so any
     // panel still open is put away as it shrinks.
@@ -356,6 +378,25 @@ fun PlayerScreen(
         }
     }
 
+    val gesturesEnabled = mode == Mode.Watching && detail == null && !inPip
+
+    // derivedStateOf so a drag only recomposes when the answer changes, not on
+    // every one of the sixty offsets a second the finger produces.
+    val pendingGesture by remember(canGoFullscreen, canPip, hintThreshold) {
+        derivedStateOf {
+            (dragTravel * settle.value)
+                .takeIf { it.getDistance() > hintThreshold }
+                ?.let { PlayerGestures.pending(it, canGoFullscreen, canPip) }
+        }
+    }
+    val gestureArmed by remember(canGoFullscreen, canPip, swipeThreshold) {
+        derivedStateOf {
+            val travelled = dragTravel * settle.value
+            val gesture = PlayerGestures.pending(travelled, canGoFullscreen, canPip)
+            PlayerGestures.progress(travelled, gesture, swipeThreshold) >= 1f
+        }
+    }
+
     Box(
         Modifier
             .fillMaxSize()
@@ -381,22 +422,46 @@ fun PlayerScreen(
                 )
             }
             // Gestures for the hand, mirroring what the remote does with keys.
-            .pointerInput(swipeThreshold) {
-                var travelled = Offset.Zero
+            // Only while watching: with a panel open the drag belongs to the
+            // panel, and firing a gesture from under it would be a surprise.
+            .pointerInput(swipeThreshold, gesturesEnabled) {
+                if (!gesturesEnabled) return@pointerInput
                 detectDragGestures(
-                    onDragStart = { travelled = Offset.Zero },
+                    onDragStart = {
+                        dragTravel = Offset.Zero
+                        scope.launch { settle.snapTo(1f) }
+                    },
                     onDragEnd = {
-                        val (dx, dy) = travelled
-                        when {
-                            abs(dx) > abs(dy) && abs(dx) > swipeThreshold ->
-                                onBack(liveChannelId())
-
-                            dy < -swipeThreshold -> goFullscreenLandscape()
-                            dy > swipeThreshold -> vm.enterPip()
+                        val travelled = dragTravel
+                        val fired = PlayerGestures
+                            .pending(travelled, canGoFullscreen, canPip)
+                            ?.takeIf {
+                                PlayerGestures.progress(travelled, it, swipeThreshold) >= 1f
+                            }
+                        // Sprung back whatever happens: when the gesture does
+                        // not take — a small window the system refuses, say —
+                        // the picture has to return rather than stay askew.
+                        scope.launch {
+                            settle.animateTo(0f, spring(stiffness = Spring.StiffnessMediumLow))
+                            dragTravel = Offset.Zero
+                            settle.snapTo(1f)
+                        }
+                        when (fired) {
+                            PlayerGesture.Back -> onBack(liveChannelId())
+                            PlayerGesture.Fullscreen -> goFullscreenLandscape()
+                            PlayerGesture.Pip -> vm.enterPip()
+                            null -> Unit
+                        }
+                    },
+                    onDragCancel = {
+                        scope.launch {
+                            settle.animateTo(0f, spring())
+                            dragTravel = Offset.Zero
+                            settle.snapTo(1f)
                         }
                     }
                 ) { change, drag ->
-                    travelled += drag
+                    dragTravel += drag
                     change.consume()
                 }
             }
@@ -524,7 +589,34 @@ fun PlayerScreen(
                     // on screen for as long as the new one takes to arrive.
                     view.setKeepContentOnPlayerReset(!state.switching)
                 },
-                modifier = Modifier.fillMaxSize()
+                // Read inside the layer block on purpose: the picture can then
+                // follow the finger frame by frame without recomposing the
+                // whole player around it.
+                modifier = Modifier
+                    .fillMaxSize()
+                    .graphicsLayer {
+                        val travelled = dragTravel * settle.value
+                        val transform = gestureTransform(
+                            travelled,
+                            PlayerGestures.pending(travelled, canGoFullscreen, canPip),
+                            swipeThreshold
+                        )
+                        translationX = transform.translationX
+                        translationY = transform.translationY
+                        scaleX = transform.scale
+                        scaleY = transform.scale
+                        alpha = transform.alpha
+                    }
+            )
+        }
+
+        // Says what letting go would do, and lights up once it would actually
+        // do it: a gesture can then be started, seen and taken back.
+        if (!inPip) {
+            GestureHint(
+                gesture = pendingGesture,
+                armed = gestureArmed,
+                modifier = Modifier.align(Alignment.Center)
             )
         }
 
@@ -752,7 +844,7 @@ fun PlayerScreen(
                     // offering to turn the picture there would be nonsense.
                     if (!onTelevision) {
                         add(
-                            if (immersive) {
+                            if (forcedLandscape) {
                                 MenuAction(
                                     stringResource(R.string.player_leave_fullscreen),
                                     Icons.Outlined.FullscreenExit
