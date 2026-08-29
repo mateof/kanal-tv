@@ -57,6 +57,10 @@
         <item quantity="one">%d programa</item>
         <item quantity="other">%d programas</item>
     </plurals>
+    <plurals name="watching_devices">
+        <item quantity="one">%d aparato</item>
+        <item quantity="other">%d aparatos</item>
+    </plurals>
 
     <!-- Inicio -->
     <string name="home_morning">Buenos días</string>
@@ -72,6 +76,7 @@
     <string name="home_continue">Continuar viendo</string>
     <string name="home_recent">Vistos hace poco</string>
     <string name="home_favorite_channels">Canales favoritos</string>
+    <string name="home_watching_now">Se está viendo ahora</string>
     <string name="home_new_movies">Películas añadidas</string>
     <string name="home_new_series">Series añadidas</string>
     <string name="home_see_all">Ver todas</string>
@@ -82,6 +87,9 @@
 
     <!-- TV en directo -->
     <string name="live_all_channels">Todos los canales</string>
+    <string name="live_watching_now">Viéndose ahora</string>
+    <string name="live_no_watching">Nadie está viendo nada</string>
+    <string name="live_no_watching_body">Cuando alguien de casa ponga un canal, aparecerá aquí y podrás verlo tú también.</string>
     <string name="live_no_channels">No hay canales</string>
     <string name="live_sync_hint">Sincroniza la fuente desde Ajustes.</string>
     <string name="live_pick_channel">Elige un canal</string>
@@ -196,6 +204,8 @@
     <string name="setup_epg_url_m3u_hint">Si la lista anuncia url-tvg, Kanal la coge de ahí.</string>
     <string name="setup_user_agent">User-Agent (opcional)</string>
     <string name="setup_user_agent_hint">Algunos proveedores sólo responden a un agente concreto.</string>
+    <string name="setup_api_key">Clave de API de Dispatcharr (opcional)</string>
+    <string name="setup_api_key_hint">Sólo Dispatcharr. Muestra lo que se está viendo en casa y deja saltar a ese canal.</string>
     <string name="setup_save_start">Guardar y empezar</string>
     <string name="setup_save_sync">Guardar y sincronizar</string>
     <string name="setup_test">Probar conexión</string>

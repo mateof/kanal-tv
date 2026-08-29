@@ -64,6 +64,10 @@
         <item quantity="one">%d programa</item>
         <item quantity="other">%d programas</item>
     </plurals>
+    <plurals name="watching_devices">
+        <item quantity="one">%d aparello</item>
+        <item quantity="other">%d aparellos</item>
+    </plurals>
 
     <!-- Inicio -->
     <string name="home_morning">Bo día</string>
@@ -79,6 +83,7 @@
     <string name="home_continue">Continuar vendo</string>
     <string name="home_recent">Vistos hai pouco</string>
     <string name="home_favorite_channels">Canles favoritas</string>
+    <string name="home_watching_now">Estase a ver agora</string>
     <string name="home_new_movies">Películas engadidas</string>
     <string name="home_new_series">Series engadidas</string>
     <string name="home_see_all">Ver todas</string>
@@ -89,6 +94,9 @@
 
     <!-- TV en directo -->
     <string name="live_all_channels">Todas as canles</string>
+    <string name="live_watching_now">Vendose agora</string>
+    <string name="live_no_watching">Ninguén está a ver nada</string>
+    <string name="live_no_watching_body">Cando alguén da casa poña unha canle, aparecerá aquí e poderás velo ti tamén.</string>
     <string name="live_no_channels">Non hai canles</string>
     <string name="live_sync_hint">Sincroniza a fonte desde Axustes.</string>
     <string name="live_pick_channel">Escolle unha canle</string>
@@ -203,6 +211,8 @@
     <string name="setup_epg_url_m3u_hint">Se a lista anuncia url-tvg, Kanal cóllea de aí.</string>
     <string name="setup_user_agent">User-Agent (opcional)</string>
     <string name="setup_user_agent_hint">Algúns provedores só responden a un axente concreto.</string>
+    <string name="setup_api_key">Clave de API de Dispatcharr (opcional)</string>
+    <string name="setup_api_key_hint">Só Dispatcharr. Amosa o que se está a ver na casa e deixa saltar a ese canal.</string>
     <string name="setup_save_start">Gardar e empezar</string>
     <string name="setup_save_sync">Gardar e sincronizar</string>
     <string name="setup_test">Probar conexión</string>

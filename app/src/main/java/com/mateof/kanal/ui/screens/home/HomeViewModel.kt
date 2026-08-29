@@ -12,6 +12,8 @@ import com.mateof.kanal.data.repo.ContentRepository
 import com.mateof.kanal.data.repo.EpgRepository
 import com.mateof.kanal.data.repo.SyncRepository
 import com.mateof.kanal.data.repo.SyncState
+import com.mateof.kanal.data.repo.WatchedNow
+import com.mateof.kanal.data.repo.WatchingRepository
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -50,7 +52,8 @@ class HomeViewModel @Inject constructor(
     private val prefs: AppPreferences,
     private val content: ContentRepository,
     private val epg: EpgRepository,
-    private val sync: SyncRepository
+    private val sync: SyncRepository,
+    private val watching: WatchingRepository
 ) : ViewModel() {
 
     private val activeSource = prefs.activeSource
@@ -99,6 +102,17 @@ class HomeViewModel @Inject constructor(
             }
         }
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), HomeState())
+
+    /**
+     * What the server is serving to the rest of the house right now.
+     *
+     * Its own flow rather than part of [state]: it is polled while the screen is
+     * up and would otherwise drag the whole home screen through a recomposition
+     * every few seconds. Empty unless the source carries a Dispatcharr key.
+     */
+    val watchingNow: StateFlow<List<WatchedNow>> = activeSource
+        .flatMapLatest { watching.watching(it) }
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
 
     /** Channels the user watched recently, resolved from the history entries. */
     val recentChannels: StateFlow<List<ChannelEntity>> = combine(

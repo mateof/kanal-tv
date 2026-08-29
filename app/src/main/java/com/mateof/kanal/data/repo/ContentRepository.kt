@@ -152,6 +152,10 @@ class ContentRepository @Inject constructor(
     suspend fun channelsByIds(sourceId: String, ids: List<String>): List<ChannelEntity> =
         if (ids.isEmpty()) emptyList() else db.channels().rowsByIds(sourceId, ids)
 
+    /** Same, by exact name: what another server reports is a name, not an id. */
+    suspend fun channelsByNames(sourceId: String, names: List<String>): List<ChannelEntity> =
+        if (names.isEmpty()) emptyList() else db.channels().rowsByNames(sourceId, names)
+
     /** Whole rows for the guide wall, capped so a 40k playlist cannot drown it. */
     suspend fun channelList(
         sourceId: String,

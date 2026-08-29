@@ -21,6 +21,8 @@ import com.mateof.kanal.data.prefs.Settings
 import com.mateof.kanal.data.repo.ContentRepository
 import com.mateof.kanal.data.repo.EpgRepository
 import com.mateof.kanal.data.repo.PlaybackRepository
+import com.mateof.kanal.data.repo.WatchedNow
+import com.mateof.kanal.data.repo.WatchingRepository
 import com.mateof.kanal.player.PlayerFactory
 import com.mateof.kanal.player.PlayerHandover
 import dagger.hilt.android.lifecycle.HiltViewModel
@@ -43,6 +45,7 @@ import javax.inject.Inject
 /** Pseudo-categories that sit above the provider's own list. */
 const val CATEGORY_ALL = ""
 const val CATEGORY_FAVORITES = "__favorites__"
+const val CATEGORY_WATCHING = "__watching__"
 
 @OptIn(ExperimentalCoroutinesApi::class)
 @HiltViewModel
@@ -53,6 +56,7 @@ class LiveViewModel @Inject constructor(
     private val playback: PlaybackRepository,
     private val playerFactory: PlayerFactory,
     private val handover: PlayerHandover,
+    private val watching: WatchingRepository,
     private val logger: FileLogger
 ) : ViewModel() {
 
@@ -128,6 +132,7 @@ class LiveViewModel @Inject constructor(
                 when {
                     source == null -> flowOf(PagingData.empty())
                     category == CATEGORY_FAVORITES -> flowOf(PagingData.empty())
+                    category == CATEGORY_WATCHING -> flowOf(PagingData.empty())
                     else -> content.channels(source.id, category, "")
                 }
             }
@@ -136,6 +141,16 @@ class LiveViewModel @Inject constructor(
     val favoriteChannels: StateFlow<List<ChannelEntity>> = activeSource.flatMapLatest { source ->
         if (source == null) flowOf(emptyList()) else content.favoriteChannels(source.id)
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
+
+    /**
+     * What the house is watching, polled while this screen is on. Doubles as
+     * the marker on the list: a channel someone else already has on is worth
+     * knowing about before choosing it, because joining it costs the provider
+     * nothing.
+     */
+    val watchingNow: StateFlow<List<WatchedNow>> = activeSource
+        .flatMapLatest { watching.watching(it) }
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
 
     val nowPlaying: StateFlow<Map<String, EpgEntity>> = activeSource.flatMapLatest { source ->
         if (source == null) flowOf(emptyMap()) else epg.nowPlaying(source.id)

@@ -134,6 +134,8 @@ fun ChannelCard(
     nowTitle: String = "",
     nowProgress: Float = 0f,
     isFavorite: Boolean = false,
+    /** Devices already on this channel elsewhere in the house. 0 hides the mark. */
+    watchers: Int = 0,
     width: Dp = 230.dp,
     onClick: () -> Unit,
     onFocusState: (Boolean) -> Unit = {}
@@ -164,16 +166,24 @@ fun ChannelCard(
                             .padding(8.dp)
                     )
                 }
-                if (isFavorite) {
-                    Icon(
-                        Icons.Filled.Star,
-                        contentDescription = stringResource(R.string.common_favorite),
-                        tint = KanalColors.Warning,
-                        modifier = Modifier
-                            .align(Alignment.TopEnd)
-                            .padding(8.dp)
-                            .size(16.dp)
-                    )
+                // Both marks share the corner, in a row, so a favourite channel
+                // that someone is watching does not stack one over the other.
+                Row(
+                    modifier = Modifier
+                        .align(Alignment.TopEnd)
+                        .padding(8.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(6.dp)
+                ) {
+                    if (watchers > 0) WatchersMark(watchers)
+                    if (isFavorite) {
+                        Icon(
+                            Icons.Filled.Star,
+                            contentDescription = stringResource(R.string.common_favorite),
+                            tint = KanalColors.Warning,
+                            modifier = Modifier.size(16.dp)
+                        )
+                    }
                 }
                 if (nowProgress > 0f) {
                     ThinProgress(
@@ -201,6 +211,38 @@ fun ChannelCard(
                     overflow = TextOverflow.Ellipsis
                 )
             }
+        }
+    }
+}
+
+/**
+ * "Someone is on this one". A dot rather than an icon: it is the same shape a
+ * television uses for recording and reads as live from across the room, and the
+ * number next to it says how many devices without needing a caption.
+ */
+@Composable
+fun WatchersMark(count: Int, modifier: Modifier = Modifier) {
+    Row(
+        modifier = modifier
+            .clip(RoundedCornerShape(10.dp))
+            .background(Color(0xE60B1F1C))
+            .padding(horizontal = 7.dp, vertical = 3.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(5.dp)
+    ) {
+        Box(
+            Modifier
+                .size(7.dp)
+                .clip(RoundedCornerShape(4.dp))
+                .background(KanalColors.Accent)
+        )
+        if (count > 1) {
+            Text(
+                text = count.toString(),
+                style = MaterialTheme.typography.labelSmall,
+                fontWeight = FontWeight.SemiBold,
+                color = KanalColors.Accent
+            )
         }
     }
 }

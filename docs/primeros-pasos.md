@@ -26,6 +26,7 @@ Al iniciarse por primera vez, Kanal solicita una fuente. Admite dos tipos.
 | Usuario y contraseña | Credenciales del panel |
 | URL de la guía | Opcional. En blanco, se utiliza el `xmltv.php` del propio servidor |
 | User-Agent | Opcional. Algunos proveedores exigen uno concreto |
+| Clave de API de Dispatcharr | Opcional. Sólo Dispatcharr; ver [Se está viendo ahora](television.md#se-está-viendo-ahora) |
 
 No es necesario depurar la URL: si incluye `/player_api.php` o parámetros de consulta, Kanal
 los descarta y conserva la base.
@@ -38,6 +39,7 @@ los descarta y conserva la base.
 | URL de la lista | Dirección del `.m3u` o `.m3u8` |
 | URL de la guía XMLTV | Opcional. Si la lista declara `url-tvg`, se utiliza ese valor |
 | User-Agent | Opcional |
+| Clave de API de Dispatcharr | Opcional. Vale igual si la lista la sirve un Dispatcharr |
 
 De cada entrada `#EXTINF` se leen los atributos `tvg-id`, `tvg-name`, `tvg-logo`,
 `group-title` y `catchup-days`.

@@ -20,6 +20,12 @@ data class Source(
     /** XMLTV url. Empty means "derive it" (xmltv.php for Xtream, url-tvg for M3U). */
     val epgUrl: String = "",
     val userAgent: String = "",
+    /**
+     * Dispatcharr API key, for reading what the server is serving right now.
+     * Optional and unrelated to playback: without it the source works exactly
+     * as before, and no panel other than Dispatcharr offers the endpoint.
+     */
+    val apiKey: String = "",
     val createdAt: Long = 0L,
     val lastSyncAt: Long = 0L,
     val lastEpgSyncAt: Long = 0L

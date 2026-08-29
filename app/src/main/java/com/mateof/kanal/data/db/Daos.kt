@@ -98,6 +98,14 @@ interface ChannelDao {
     @Query("SELECT * FROM channels WHERE sourceId = :sourceId AND streamId IN (:ids)")
     fun observeByIds(sourceId: String, ids: List<String>): Flow<List<ChannelEntity>>
 
+    /**
+     * By name, for matching what another server reports back to this catalogue.
+     * Names are the only thing two catalogues of the same panel always share:
+     * an M3U playlist numbers its channels by url hash, not by the panel's ids.
+     */
+    @Query("SELECT * FROM channels WHERE sourceId = :sourceId AND name IN (:names)")
+    suspend fun rowsByNames(sourceId: String, names: List<String>): List<ChannelEntity>
+
     @Query("SELECT COUNT(*) FROM channels WHERE sourceId = :sourceId")
     fun count(sourceId: String): Flow<Int>
 

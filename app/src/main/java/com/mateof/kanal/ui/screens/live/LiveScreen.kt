@@ -76,6 +76,7 @@ import com.mateof.kanal.ui.components.MessageState
 import com.mateof.kanal.ui.components.ProgrammeDetail
 import com.mateof.kanal.ui.components.ProgrammeDialog
 import com.mateof.kanal.ui.components.ThinProgress
+import com.mateof.kanal.ui.components.WatchersMark
 import com.mateof.kanal.ui.components.scrollingTitle
 import com.mateof.kanal.ui.isCompact
 import com.mateof.kanal.ui.theme.KanalColors
@@ -121,6 +122,7 @@ fun LiveScreen(
     val previewActive by vm.previewActive.collectAsStateWithLifecycle()
     val previewError by vm.previewError.collectAsStateWithLifecycle()
     val favoriteChannels by vm.favoriteChannels.collectAsStateWithLifecycle()
+    val watchingNow by vm.watchingNow.collectAsStateWithLifecycle()
 
     var detail by remember { mutableStateOf<ProgrammeDetail?>(null) }
     val settings by vm.settings.collectAsStateWithLifecycle()
@@ -153,6 +155,12 @@ fun LiveScreen(
         }
     }
     val showingFavorites = selectedCategory == CATEGORY_FAVORITES
+    val showingWatching = selectedCategory == CATEGORY_WATCHING
+    val watchingChannels = watchingNow.map { it.channel }
+    // Every list marks what the house already has on, not just its own tab: it
+    // is worth knowing before choosing, because joining costs no connection.
+    val watchers = watchingNow.associate { it.channel.streamId to it.clients }
+    val canShowWatching = source?.apiKey?.isNotBlank() == true
 
     DisposableEffect(Unit) { onDispose { vm.stopPreview() } }
 
@@ -172,10 +180,16 @@ fun LiveScreen(
         CompactLive(
             categories = categories,
             selectedCategory = selectedCategory,
-            channels = if (showingFavorites) favoriteChannels else null,
+            channels = when {
+                showingFavorites -> favoriteChannels
+                showingWatching -> watchingChannels
+                else -> null
+            },
             paged = paged,
             nowPlaying = nowPlaying,
             favorites = favorites,
+            watchers = watchers,
+            canShowWatching = canShowWatching,
             sourceId = source?.id.orEmpty(),
             onSelectCategory = vm::selectCategory,
             onPlay = { id -> play(id, 0L) },
@@ -220,6 +234,15 @@ fun LiveScreen(
                     onClick = { vm.selectCategory(CATEGORY_FAVORITES) }
                 )
             }
+            if (canShowWatching) {
+                item {
+                    KanalChip(
+                        label = stringResource(R.string.live_watching_now),
+                        selected = showingWatching,
+                        onClick = { vm.selectCategory(CATEGORY_WATCHING) }
+                    )
+                }
+            }
             items(categories, key = { it.categoryId }) { category ->
                 KanalChip(
                     label = category.name,
@@ -237,23 +260,33 @@ fun LiveScreen(
                 .width(420.dp)
                 .fillMaxHeight()
         ) {
-            if (showingFavorites) {
-                if (favoriteChannels.isEmpty()) {
+            if (showingFavorites || showingWatching) {
+                val listed = if (showingWatching) watchingChannels else favoriteChannels
+                if (listed.isEmpty()) {
                     MessageState(
-                        title = stringResource(R.string.live_no_favorites),
-                        description = stringResource(R.string.live_no_favorites_body),
-                        icon = Icons.Filled.Star
+                        title = stringResource(
+                            if (showingWatching) R.string.live_no_watching else R.string.live_no_favorites
+                        ),
+                        description = stringResource(
+                            if (showingWatching) R.string.live_no_watching_body else R.string.live_no_favorites_body
+                        ),
+                        icon = if (showingWatching) Icons.Outlined.LiveTv else Icons.Filled.Star
                     )
                 } else {
                     LazyColumn(
                         contentPadding = PaddingValues(top = 4.dp, bottom = 28.dp, start = 6.dp, end = 6.dp),
                         verticalArrangement = Arrangement.spacedBy(8.dp)
                     ) {
-                        items(favoriteChannels, key = { it.streamId }) { channel ->
+                        items(listed, key = { it.streamId }) { channel ->
                             ChannelListRow(
                                 channel = channel,
                                 now = nowPlaying[channel.epgChannelId],
-                                isFavorite = true,
+                                isFavorite = if (showingWatching) {
+                                    source?.let { favorites.contains("LIVE:${it.id}:${channel.streamId}") } == true
+                                } else {
+                                    true
+                                },
+                                watchers = watchers[channel.streamId] ?: 0,
                                 onFocused = { vm.onChannelFocused(channel) },
                                 onClick = { play(channel.streamId, 0L) },
                                 onLongClick = { openActions(channel) }
@@ -272,6 +305,7 @@ fun LiveScreen(
                             channel = channel,
                             now = nowPlaying[channel.epgChannelId],
                             isFavorite = source?.let { favorites.contains("LIVE:${it.id}:${channel.streamId}") } == true,
+                            watchers = watchers[channel.streamId] ?: 0,
                             onFocused = { vm.onChannelFocused(channel) },
                             onClick = { play(channel.streamId, 0L) },
                             onLongClick = { openActions(channel) }
@@ -380,6 +414,8 @@ private fun CompactLive(
     paged: androidx.paging.compose.LazyPagingItems<ChannelEntity>,
     nowPlaying: Map<String, EpgEntity>,
     favorites: Set<String>,
+    watchers: Map<String, Int>,
+    canShowWatching: Boolean,
     sourceId: String,
     onSelectCategory: (String) -> Unit,
     onPlay: (String) -> Unit,
@@ -410,6 +446,15 @@ private fun CompactLive(
                     onClick = { onSelectCategory(CATEGORY_FAVORITES) }
                 )
             }
+            if (canShowWatching) {
+                item {
+                    KanalChip(
+                        label = stringResource(R.string.live_watching_now),
+                        selected = selectedCategory == CATEGORY_WATCHING,
+                        onClick = { onSelectCategory(CATEGORY_WATCHING) }
+                    )
+                }
+            }
             items(categories, key = { it.categoryId }) { category ->
                 KanalChip(
                     label = category.name,
@@ -421,11 +466,16 @@ private fun CompactLive(
         Spacer(Modifier.height(12.dp))
 
         if (channels != null) {
+            val showingWatching = selectedCategory == CATEGORY_WATCHING
             if (channels.isEmpty()) {
                 MessageState(
-                    title = stringResource(R.string.live_no_favorites),
-                    description = stringResource(R.string.live_no_favorites_body),
-                    icon = Icons.Filled.Star
+                    title = stringResource(
+                        if (showingWatching) R.string.live_no_watching else R.string.live_no_favorites
+                    ),
+                    description = stringResource(
+                        if (showingWatching) R.string.live_no_watching_body else R.string.live_no_favorites_body
+                    ),
+                    icon = if (showingWatching) Icons.Outlined.LiveTv else Icons.Filled.Star
                 )
             } else {
                 LazyColumn(
@@ -436,7 +486,12 @@ private fun CompactLive(
                         ChannelListRow(
                             channel = channel,
                             now = nowPlaying[channel.epgChannelId],
-                            isFavorite = true,
+                            isFavorite = if (showingWatching) {
+                                favorites.contains("LIVE:$sourceId:${channel.streamId}")
+                            } else {
+                                true
+                            },
+                            watchers = watchers[channel.streamId] ?: 0,
                             onFocused = {},
                             onClick = { onPlay(channel.streamId) },
                             onLongClick = { onActions(channel) }
@@ -455,6 +510,7 @@ private fun CompactLive(
                         channel = channel,
                         now = nowPlaying[channel.epgChannelId],
                         isFavorite = favorites.contains("LIVE:$sourceId:${channel.streamId}"),
+                        watchers = watchers[channel.streamId] ?: 0,
                         onFocused = {},
                         onClick = { onPlay(channel.streamId) },
                         onLongClick = { onActions(channel) }
@@ -505,6 +561,8 @@ private fun ChannelListRow(
     channel: ChannelEntity,
     now: EpgEntity?,
     isFavorite: Boolean,
+    /** Devices already on this channel elsewhere in the house. 0 hides the mark. */
+    watchers: Int = 0,
     onFocused: () -> Unit,
     onClick: () -> Unit,
     onLongClick: (() -> Unit)? = null
@@ -559,6 +617,10 @@ private fun ChannelListRow(
                     Spacer(Modifier.height(6.dp))
                     ThinProgress(progressOf(now), Modifier.fillMaxWidth())
                 }
+            }
+            if (watchers > 0) {
+                Spacer(Modifier.width(8.dp))
+                WatchersMark(watchers)
             }
             if (isFavorite) {
                 Spacer(Modifier.width(8.dp))

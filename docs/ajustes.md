@@ -22,6 +22,11 @@ eliminación requiere confirmación y borra también el contenido cacheado de es
 Los campos de cada tipo de fuente se describen en
 [Primeros pasos](primeros-pasos.md#alta-de-la-fuente).
 
+La **clave de API de Dispatcharr** es un campo aparte del usuario y la contraseña, y no tiene
+nada que ver con la reproducción: sirve para
+[ver qué se está viendo en casa](television.md#se-está-viendo-ahora). Sin ella la fuente
+funciona igual que siempre.
+
 ### Estado de la cuenta
 
 Bajo las fuentes se muestra cuántas conexiones simultáneas tiene la cuenta en uso, con un botón

@@ -57,6 +57,10 @@
         <item quantity="one">%d programme</item>
         <item quantity="other">%d programmes</item>
     </plurals>
+    <plurals name="watching_devices">
+        <item quantity="one">%d device</item>
+        <item quantity="other">%d devices</item>
+    </plurals>
 
     <!-- Home -->
     <string name="home_morning">Good morning</string>
@@ -72,6 +76,7 @@
     <string name="home_continue">Carry on watching</string>
     <string name="home_recent">Watched recently</string>
     <string name="home_favorite_channels">Favourite channels</string>
+    <string name="home_watching_now">Being watched now</string>
     <string name="home_new_movies">Films added</string>
     <string name="home_new_series">Series added</string>
     <string name="home_see_all">See all</string>
@@ -82,6 +87,9 @@
 
     <!-- Live TV -->
     <string name="live_all_channels">All channels</string>
+    <string name="live_watching_now">On now</string>
+    <string name="live_no_watching">Nobody is watching anything</string>
+    <string name="live_no_watching_body">When someone at home tunes in, the channel shows up here and you can join it.</string>
     <string name="live_no_channels">No channels</string>
     <string name="live_sync_hint">Sync the source from Settings.</string>
     <string name="live_pick_channel">Pick a channel</string>
@@ -196,6 +204,8 @@
     <string name="setup_epg_url_m3u_hint">If the list advertises url-tvg, Kanal takes it from there.</string>
     <string name="setup_user_agent">User-Agent (optional)</string>
     <string name="setup_user_agent_hint">Some providers only answer a particular agent.</string>
+    <string name="setup_api_key">Dispatcharr API key (optional)</string>
+    <string name="setup_api_key_hint">Dispatcharr only. Shows what the house is watching and lets you join it.</string>
     <string name="setup_save_start">Save and start</string>
     <string name="setup_save_sync">Save and sync</string>
     <string name="setup_test">Test connection</string>

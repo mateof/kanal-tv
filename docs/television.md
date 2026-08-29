@@ -111,6 +111,35 @@ movimiento, de modo que recorrer una película no provoca una recarga por cada p
 Las opciones **Retroceder 10 s** y **Avanzar 10 s** del menú permiten ajustes finos sin
 necesidad de enfocar la barra.
 
+### Se está viendo ahora
+
+Sólo con **Dispatcharr**, y sólo si la fuente lleva una clave de API. Kanal le pregunta al
+panel qué está sirviendo en ese momento y lo muestra en dos sitios: una fila en la portada y
+una pestaña **Viéndose ahora** junto a *Todos* y *Favoritos*. Pulsar un canal lo abre aquí.
+
+Además, en toda la lista de canales aparece un **punto verde** sobre los que ya tiene alguien
+puestos, con el número de aparatos si es más de uno.
+
+No es una curiosidad: en Dispatcharr, varios aparatos en el mismo canal **comparten una sola
+conexión hacia el proveedor**. Unirse a lo que ya se está viendo no consume una plaza más,
+mientras que poner un canal distinto sí. Saber cuál es cuál antes de elegir evita el error
+clásico de tumbarle la emisión a otro.
+
+Para que funcione hacen falta dos cosas en el panel:
+
+- Una **clave de API de un usuario administrador** (`Ajustes → API keys` en Dispatcharr). Las
+  claves de un usuario normal autentican pero no tienen permiso sobre las estadísticas.
+- Un **límite de streams por usuario** mayor que uno, si se quiere que varios aparatos de casa
+  puedan conectarse a la vez. Conviene activar además *ignore same channel connections* en los
+  ajustes de límites: con eso, ver el mismo canal desde varios sitios no gasta cupo.
+
+Se consulta cada diez segundos, y sólo mientras la pantalla está a la vista. Si no hay clave,
+si el panel no es Dispatcharr, si la clave se revoca o si el servidor no responde, no aparece
+nada: la función es un extra y nunca puede estropear el resto.
+
+Lo que está oculto o marcado como adulto sigue oculto aquí, aunque alguien lo esté viendo en
+otro aparato.
+
 ### Gestos táctiles
 
 En móvil y tablet, sobre la imagen:

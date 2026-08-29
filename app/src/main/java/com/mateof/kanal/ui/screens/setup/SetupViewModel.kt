@@ -31,6 +31,7 @@ data class SetupState(
     val password: String = "",
     val epgUrl: String = "",
     val userAgent: String = "",
+    val apiKey: String = "",
     val busy: Boolean = false,
     val busyLabel: UiText? = null,
     val progress: Float = -1f,
@@ -71,7 +72,8 @@ class SetupViewModel @Inject constructor(
                 username = source.username,
                 password = source.password,
                 epgUrl = source.epgUrl,
-                userAgent = source.userAgent
+                userAgent = source.userAgent,
+                apiKey = source.apiKey
             )
         }
     }
@@ -83,6 +85,7 @@ class SetupViewModel @Inject constructor(
     fun setPassword(value: String) = update { it.copy(password = value) }
     fun setEpgUrl(value: String) = update { it.copy(epgUrl = value) }
     fun setUserAgent(value: String) = update { it.copy(userAgent = value) }
+    fun setApiKey(value: String) = update { it.copy(apiKey = value) }
 
     fun test() {
         val current = _state.value
@@ -162,6 +165,7 @@ class SetupViewModel @Inject constructor(
         password = password.trim(),
         epgUrl = epgUrl.trim(),
         userAgent = userAgent.trim(),
+        apiKey = apiKey.trim(),
         createdAt = if (isEditing) 0L else System.currentTimeMillis()
     )
 

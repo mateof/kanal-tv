@@ -200,6 +200,16 @@ private fun SetupForm(
         supportingText = stringResource(R.string.setup_user_agent_hint)
     )
 
+    // Offered for both kinds of source: the same Dispatcharr can be added as a
+    // panel or as a plain playlist, and the key works either way.
+    KanalTextField(
+        value = state.apiKey,
+        onValueChange = vm::setApiKey,
+        label = stringResource(R.string.setup_api_key),
+        supportingText = stringResource(R.string.setup_api_key_hint),
+        isPassword = true
+    )
+
     state.message?.let { messageText ->
         Row(verticalAlignment = Alignment.CenterVertically) {
             Icon(

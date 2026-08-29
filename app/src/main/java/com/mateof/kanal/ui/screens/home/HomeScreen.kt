@@ -69,6 +69,7 @@ fun HomeScreen(
     val updateVm: UpdateViewModel = hiltViewModel()
     val state by vm.state.collectAsStateWithLifecycle()
     val recentChannels by vm.recentChannels.collectAsStateWithLifecycle()
+    val watchingNow by vm.watchingNow.collectAsStateWithLifecycle()
     val syncState by vm.syncState.collectAsStateWithLifecycle()
     val refreshing by vm.refreshing.collectAsStateWithLifecycle()
     val updateState by updateVm.state.collectAsStateWithLifecycle()
@@ -139,6 +140,26 @@ fun HomeScreen(
                     modifier = Modifier.height(360.dp)
                 ) {
                     KanalButton(stringResource(R.string.home_sync_now), vm::refresh, tone = ButtonTone.Primary)
+                }
+            }
+        }
+
+        // First of the rows on purpose: it is the only one that stops being
+        // true if you take too long, and joining costs the provider nothing
+        // because the connection is already open.
+        if (watchingNow.isNotEmpty()) {
+            item {
+                CardRow(title = stringResource(R.string.home_watching_now)) {
+                    items(watchingNow, key = { it.channel.streamId }) { entry ->
+                        ChannelCard(
+                            name = entry.channel.name,
+                            logoUrl = entry.channel.logo,
+                            number = entry.channel.number,
+                            nowTitle = state.nowPlaying[entry.channel.epgChannelId]?.title.orEmpty(),
+                            watchers = entry.clients,
+                            onClick = { onOpenChannel(entry.channel.streamId) }
+                        )
+                    }
                 }
             }
         }
