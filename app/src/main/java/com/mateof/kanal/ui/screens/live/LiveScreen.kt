@@ -76,6 +76,7 @@ import com.mateof.kanal.ui.components.MessageState
 import com.mateof.kanal.ui.components.ProgrammeDetail
 import com.mateof.kanal.ui.components.ProgrammeDialog
 import com.mateof.kanal.ui.components.ThinProgress
+import com.mateof.kanal.ui.components.rememberFocusReturn
 import com.mateof.kanal.ui.components.WatchersMark
 import com.mateof.kanal.ui.components.scrollingTitle
 import com.mateof.kanal.ui.isCompact
@@ -102,10 +103,16 @@ fun LiveScreen(
         actionsVm.open(ContentKind.LIVE, channel.streamId, channel.name)
     }
 
+    // Puts the remote back on the channel that was opened, once the list is on
+    // screen again. The scroll comes back by itself; the focus does not, and
+    // the next arrow press would land on whatever is first on screen.
+    val focusReturn = rememberFocusReturn()
+
     // Every route into the full-screen player goes through here, so the preview
     // is always handed over rather than left to be torn down and rebuilt.
     val play: (String, Long) -> Unit = { id, startAt ->
         vm.handOffPreview()
+        focusReturn.leaveThrough(id)
         onPlay(id, startAt)
     }
     val categories by vm.categories.collectAsStateWithLifecycle()
@@ -161,6 +168,10 @@ fun LiveScreen(
     // is worth knowing before choosing, because joining costs no connection.
     val watchers = watchingNow.associate { it.channel.streamId to it.clients }
     val canShowWatching = source?.apiKey?.isNotBlank() == true
+
+    LaunchedEffect(paged.itemCount, favoriteChannels.size, selectedCategory) {
+        focusReturn.restore()
+    }
 
     DisposableEffect(Unit) { onDispose { vm.stopPreview() } }
 
@@ -280,6 +291,7 @@ fun LiveScreen(
                         items(listed, key = { it.streamId }) { channel ->
                             ChannelListRow(
                                 channel = channel,
+                                modifier = focusReturn.modifierFor(channel.streamId),
                                 now = nowPlaying[channel.epgChannelId],
                                 isFavorite = if (showingWatching) {
                                     source?.let { favorites.contains("LIVE:${it.id}:${channel.streamId}") } == true
@@ -303,6 +315,7 @@ fun LiveScreen(
                         val channel = paged[index] ?: return@items
                         ChannelListRow(
                             channel = channel,
+                            modifier = focusReturn.modifierFor(channel.streamId),
                             now = nowPlaying[channel.epgChannelId],
                             isFavorite = source?.let { favorites.contains("LIVE:${it.id}:${channel.streamId}") } == true,
                             watchers = watchers[channel.streamId] ?: 0,
@@ -559,6 +572,7 @@ private fun CategoryRow(label: String, selected: Boolean, onClick: () -> Unit) {
 @Composable
 private fun ChannelListRow(
     channel: ChannelEntity,
+    modifier: Modifier = Modifier,
     now: EpgEntity?,
     isFavorite: Boolean,
     /** Devices already on this channel elsewhere in the house. 0 hides the mark. */
@@ -569,7 +583,7 @@ private fun ChannelListRow(
 ) {
     FocusableSurface(
         onClick = onClick,
-        modifier = Modifier.fillMaxWidth(),
+        modifier = modifier.fillMaxWidth(),
         shape = RoundedCornerShape(14.dp),
         color = KanalColors.Surface,
         focusedColor = KanalColors.SurfaceVariant,

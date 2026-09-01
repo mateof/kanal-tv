@@ -10,6 +10,9 @@ recientemente o valoración.
 
 Las series disponen de una sección equivalente.
 
+Al volver de una ficha, el catálogo conserva el punto por el que iba y deja el foco sobre la
+película o la serie que se abrió.
+
 ## Fichas
 
 La ficha de una película muestra carátula, sinopsis, año, duración, valoración, dirección y

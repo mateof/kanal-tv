@@ -25,6 +25,7 @@ import androidx.compose.material.icons.outlined.Tv
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
@@ -43,6 +44,7 @@ import com.mateof.kanal.ui.components.KanalButton
 import com.mateof.kanal.ui.components.KanalChip
 import com.mateof.kanal.ui.components.MessageState
 import com.mateof.kanal.ui.components.PosterCard
+import com.mateof.kanal.ui.components.rememberFocusReturn
 import com.mateof.kanal.ui.isCompact
 import com.mateof.kanal.ui.theme.KanalColors
 
@@ -53,6 +55,10 @@ fun MoviesScreen(onOpen: (String) -> Unit) {
     val selected by vm.category.collectAsStateWithLifecycle()
     val sort by vm.sort.collectAsStateWithLifecycle()
     val items = vm.movies.collectAsLazyPagingItems()
+
+    // Coming back from a film should land on that film, not at the top.
+    val focusReturn = rememberFocusReturn()
+    LaunchedEffect(items.itemCount, selected) { focusReturn.restore() }
 
     CatalogLayout(
         title = stringResource(R.string.nav_movies),
@@ -69,10 +75,14 @@ fun MoviesScreen(onOpen: (String) -> Unit) {
             PosterCard(
                 title = movie.name,
                 imageUrl = movie.cover,
+                modifier = focusReturn.modifierFor(movie.streamId),
                 subtitle = movie.categoryName,
                 rating = movie.rating,
                 width = if (isCompact) null else 176.dp,
-                onClick = { onOpen(movie.streamId) }
+                onClick = {
+                    focusReturn.leaveThrough(movie.streamId)
+                    onOpen(movie.streamId)
+                }
             )
         }
     }
@@ -85,6 +95,9 @@ fun SeriesScreen(onOpen: (String) -> Unit) {
     val selected by vm.category.collectAsStateWithLifecycle()
     val sort by vm.sort.collectAsStateWithLifecycle()
     val items = vm.series.collectAsLazyPagingItems()
+
+    val focusReturn = rememberFocusReturn()
+    LaunchedEffect(items.itemCount, selected) { focusReturn.restore() }
 
     CatalogLayout(
         title = stringResource(R.string.nav_series),
@@ -101,10 +114,14 @@ fun SeriesScreen(onOpen: (String) -> Unit) {
             PosterCard(
                 title = serie.name,
                 imageUrl = serie.cover,
+                modifier = focusReturn.modifierFor(serie.seriesId),
                 subtitle = serie.categoryName,
                 rating = serie.rating,
                 width = if (isCompact) null else 176.dp,
-                onClick = { onOpen(serie.seriesId) }
+                onClick = {
+                    focusReturn.leaveThrough(serie.seriesId)
+                    onOpen(serie.seriesId)
+                }
             )
         }
     }

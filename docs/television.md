@@ -19,6 +19,16 @@ Bajo la vista previa aparecen el programa actual con su descripción, el siguien
 botones **Ver ahora** y **Añadir a favoritos**. Más abajo, la programación del día con
 selector de fecha.
 
+### Volver donde estabas
+
+Al salir del reproductor con **ATRÁS**, la lista no sólo conserva el punto por el que iba: el
+foco vuelve al canal que se abrió. Antes la lista se quedaba en su sitio pero sin foco, y la
+siguiente flecha lo colocaba en el primer canal visible, que después de bajar un rato parecía
+haber vuelto al principio.
+
+Vale igual para los catálogos: al volver de la ficha de una película o de una serie, el foco
+está sobre la que se abrió.
+
 ### Recordar el último canal
 
 Con este ajuste activo, al salir de un canal con **ATRÁS** la emisión continúa en la vista
@@ -139,6 +149,20 @@ nada: la función es un extra y nunca puede estropear el resto.
 
 Lo que está oculto o marcado como adulto sigue oculto aquí, aunque alguien lo esté viendo en
 otro aparato.
+
+### Moverse con el mando
+
+La columna de la izquierda y el contenido son dos zonas distintas para las flechas:
+
+- **Derecha** desde cualquier destino del menú entra siempre por el mismo sitio del contenido,
+  y al volver deja el foco donde estaba. Antes la respuesta era geométrica —Compose miraba en
+  línea recta a la derecha, a la altura del destino enfocado— así que desde *Ajustes*, al final
+  de la columna, el foco saltaba a una fila de carátulas del fondo de la página y la arrastraba
+  con él.
+- **Arriba y abajo** dentro del menú no se salen de él; al llegar al último destino se quedan
+  ahí en vez de escaparse al contenido.
+- Cada carrusel de la portada **recuerda su carátula**: bajar a la fila de abajo y volver a
+  subir deja el foco donde se había quedado, no al principio de la fila.
 
 ### Gestos táctiles
 

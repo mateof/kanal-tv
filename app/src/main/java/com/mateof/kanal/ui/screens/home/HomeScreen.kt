@@ -27,6 +27,7 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.focus.focusRestorer
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -390,7 +391,11 @@ fun CardRow(
     Column(Modifier.fillMaxWidth()) {
         SectionHeader(title, Modifier.padding(start = contentInset, end = 8.dp), trailing)
         Spacer(Modifier.height(14.dp))
+        // Each row keeps its own place: leaving a row halfway along and coming
+        // back to it from above or below returns to the same card instead of
+        // jumping to the first one.
         LazyRow(
+            modifier = Modifier.focusRestorer(),
             contentPadding = PaddingValues(horizontal = contentInset, vertical = 8.dp),
             horizontalArrangement = Arrangement.spacedBy(Spacing.item),
             content = content

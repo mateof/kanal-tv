@@ -13,10 +13,15 @@ import androidx.compose.material.icons.outlined.Search
 import androidx.compose.material.icons.outlined.Settings
 import androidx.compose.material.icons.outlined.Star
 import androidx.compose.material.icons.outlined.Tv
+import androidx.compose.foundation.focusGroup
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusProperties
+import androidx.compose.ui.focus.focusRequester
 import androidx.navigation.NavHostController
 import androidx.navigation.NavType
 import androidx.navigation.compose.NavHost
@@ -248,9 +253,31 @@ private fun WithRail(
             BottomNav(RAIL_ITEMS, selected, onSelect)
         }
     } else {
+        // Where the arrow keys land when they leave the rail. Without this,
+        // going right from a destination low down the rail — Ajustes, say —
+        // was answered geometrically: Compose looked straight to the right at
+        // that height, found whatever row happened to be there, and dragged
+        // the page down to it. Handing the whole content area a single entry
+        // point makes right mean "into the content", always at the same place.
+        val contentEntry = remember { FocusRequester() }
         Row(Modifier.fillMaxSize()) {
-            NavRail(items = RAIL_ITEMS, selectedRoute = selected, onSelect = onSelect)
-            Box(Modifier.fillMaxSize()) { content() }
+            NavRail(
+                items = RAIL_ITEMS,
+                selectedRoute = selected,
+                onSelect = onSelect,
+                modifier = Modifier.focusProperties { right = contentEntry }
+            )
+            // A group, but deliberately not a focusRestorer: enter and exit are
+            // inherited by every focus group inside, so a restorer here answers
+            // the move into the channel list with "back to the chip you came
+            // from" and the arrows stop working halfway down the screen.
+            // Remembering the place belongs to each row, not to the whole page.
+            Box(
+                Modifier
+                    .fillMaxSize()
+                    .focusRequester(contentEntry)
+                    .focusGroup()
+            ) { content() }
         }
     }
 }
