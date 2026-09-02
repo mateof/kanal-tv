@@ -19,6 +19,8 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.LazyListState
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -76,6 +78,7 @@ import com.mateof.kanal.ui.components.MessageState
 import com.mateof.kanal.ui.components.ProgrammeDetail
 import com.mateof.kanal.ui.components.ProgrammeDialog
 import com.mateof.kanal.ui.components.ThinProgress
+import com.mateof.kanal.ui.components.FocusReturn
 import com.mateof.kanal.ui.components.rememberFocusReturn
 import com.mateof.kanal.ui.components.WatchersMark
 import com.mateof.kanal.ui.components.scrollingTitle
@@ -107,12 +110,24 @@ fun LiveScreen(
     // screen again. The scroll comes back by itself; the focus does not, and
     // the next arrow press would land on whatever is first on screen.
     val focusReturn = rememberFocusReturn()
+    val channelListState = rememberLazyListState()
 
     // Every route into the full-screen player goes through here, so the preview
     // is always handed over rather than left to be torn down and rebuilt.
-    val play: (String, Long) -> Unit = { id, startAt ->
+    // The row it was opened from travels with it: coming back, the list is
+    // paged and rebuilt from its first page, so the position has to be asked
+    // for again rather than trusted to survive.
+    val play: (String, Long, Boolean) -> Unit = { id, startAt, fromList ->
         vm.handOffPreview()
-        focusReturn.leaveThrough(id)
+        if (fromList) {
+            focusReturn.leaveThrough(
+                id,
+                channelListState.firstVisibleItemIndex,
+                channelListState.firstVisibleItemScrollOffset
+            )
+        } else {
+            focusReturn.leaveThrough(id)
+        }
         onPlay(id, startAt)
     }
     val categories by vm.categories.collectAsStateWithLifecycle()
@@ -158,7 +173,7 @@ fun LiveScreen(
         if (System.currentTimeMillis() - arrivedAt < DOUBLE_BACK_MS || target == null) {
             onBack()
         } else {
-            play(target, 0L)
+            play(target, 0L, false)
         }
     }
     val showingFavorites = selectedCategory == CATEGORY_FAVORITES
@@ -170,7 +185,7 @@ fun LiveScreen(
     val canShowWatching = source?.apiKey?.isNotBlank() == true
 
     LaunchedEffect(paged.itemCount, favoriteChannels.size, selectedCategory) {
-        focusReturn.restore()
+        focusReturn.restore { index, offset -> channelListState.scrollToItem(index, offset) }
     }
 
     DisposableEffect(Unit) { onDispose { vm.stopPreview() } }
@@ -197,13 +212,15 @@ fun LiveScreen(
                 else -> null
             },
             paged = paged,
+            listState = channelListState,
+            focusReturn = focusReturn,
             nowPlaying = nowPlaying,
             favorites = favorites,
             watchers = watchers,
             canShowWatching = canShowWatching,
             sourceId = source?.id.orEmpty(),
             onSelectCategory = vm::selectCategory,
-            onPlay = { id -> play(id, 0L) },
+            onPlay = { id, fromList -> play(id, 0L, fromList) },
             onActions = openActions
         )
         CastSheet(
@@ -300,7 +317,7 @@ fun LiveScreen(
                                 },
                                 watchers = watchers[channel.streamId] ?: 0,
                                 onFocused = { vm.onChannelFocused(channel) },
-                                onClick = { play(channel.streamId, 0L) },
+                                onClick = { play(channel.streamId, 0L, false) },
                                 onLongClick = { openActions(channel) }
                             )
                         }
@@ -308,6 +325,7 @@ fun LiveScreen(
                 }
             } else {
                 LazyColumn(
+                    state = channelListState,
                     contentPadding = PaddingValues(top = 4.dp, bottom = 28.dp, start = 6.dp, end = 6.dp),
                     verticalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
@@ -320,7 +338,7 @@ fun LiveScreen(
                             isFavorite = source?.let { favorites.contains("LIVE:${it.id}:${channel.streamId}") } == true,
                             watchers = watchers[channel.streamId] ?: 0,
                             onFocused = { vm.onChannelFocused(channel) },
-                            onClick = { play(channel.streamId, 0L) },
+                            onClick = { play(channel.streamId, 0L, true) },
                             onLongClick = { openActions(channel) }
                         )
                     }
@@ -354,7 +372,7 @@ fun LiveScreen(
                 source?.let { favorites.contains("LIVE:${it.id}:${channel.streamId}") } == true
             } == true,
             onToggleFavorite = { focused?.let(vm::toggleFavorite) },
-            onPlay = { focused?.let { play(it.streamId, 0L) } },
+            onPlay = { focused?.let { play(it.streamId, 0L, false) } },
             onProgrammeClick = { programme ->
                 focused?.let { channel ->
                     detail = ProgrammeDetail(
@@ -396,7 +414,7 @@ fun LiveScreen(
                 {
                     val programme = open.programme
                     detail = null
-                    play(open.channelStreamId, programme.start)
+                    play(open.channelStreamId, programme.start, false)
                 }
             } else {
                 null
@@ -429,9 +447,11 @@ private fun CompactLive(
     favorites: Set<String>,
     watchers: Map<String, Int>,
     canShowWatching: Boolean,
+    listState: LazyListState,
+    focusReturn: FocusReturn,
     sourceId: String,
     onSelectCategory: (String) -> Unit,
-    onPlay: (String) -> Unit,
+    onPlay: (String, Boolean) -> Unit,
     onActions: (ChannelEntity) -> Unit
 ) {
     Column(Modifier.fillMaxSize()) {
@@ -506,7 +526,7 @@ private fun CompactLive(
                             },
                             watchers = watchers[channel.streamId] ?: 0,
                             onFocused = {},
-                            onClick = { onPlay(channel.streamId) },
+                            onClick = { onPlay(channel.streamId, false) },
                             onLongClick = { onActions(channel) }
                         )
                     }
@@ -514,6 +534,7 @@ private fun CompactLive(
             }
         } else {
             LazyColumn(
+                state = listState,
                 contentPadding = PaddingValues(horizontal = 12.dp, vertical = 4.dp),
                 verticalArrangement = Arrangement.spacedBy(8.dp)
             ) {
@@ -521,11 +542,12 @@ private fun CompactLive(
                     val channel = paged[index] ?: return@items
                     ChannelListRow(
                         channel = channel,
+                        modifier = focusReturn.modifierFor(channel.streamId),
                         now = nowPlaying[channel.epgChannelId],
                         isFavorite = favorites.contains("LIVE:$sourceId:${channel.streamId}"),
                         watchers = watchers[channel.streamId] ?: 0,
                         onFocused = {},
-                        onClick = { onPlay(channel.streamId) },
+                        onClick = { onPlay(channel.streamId, true) },
                         onLongClick = { onActions(channel) }
                     )
                 }

@@ -21,13 +21,18 @@ selector de fecha.
 
 ### Volver donde estabas
 
-Al salir del reproductor con **ATRÁS**, la lista no sólo conserva el punto por el que iba: el
-foco vuelve al canal que se abrió. Antes la lista se quedaba en su sitio pero sin foco, y la
-siguiente flecha lo colocaba en el primer canal visible, que después de bajar un rato parecía
-haber vuelto al principio.
+Al salir del reproductor con **ATRÁS**, la lista vuelve **exactamente** donde estaba: el mismo
+punto de desplazamiento y el foco sobre el canal que se abrió.
 
-Vale igual para los catálogos: al volver de la ficha de una película o de una serie, el foco
-está sobre la que se abrió.
+Hacían falta las dos cosas. El foco no se conserva nunca, así que la siguiente flecha caía en
+el primer canal visible. Y en un catálogo grande tampoco se conservaba el desplazamiento: la
+lista va paginada, al volver se reconstruye desde su primera página, el sitio guardado queda
+fuera de lo que hay cargado y todo se asienta arriba — que es justo lo que se ve como "ha
+vuelto al primer canal". Por eso se guarda la posición de la lista, no sólo el canal, y se
+pide otra vez durante unos fotogramas mientras la paginación termina de cargar hasta allí.
+
+Vale igual para los catálogos: al volver de la ficha de una película o de una serie, la rejilla
+está donde la dejaste y el foco sobre la que abriste.
 
 ### Recordar el último canal
 

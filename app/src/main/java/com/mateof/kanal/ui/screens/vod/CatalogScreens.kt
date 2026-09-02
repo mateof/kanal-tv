@@ -15,7 +15,9 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.grid.GridCells
+import androidx.compose.foundation.lazy.grid.LazyGridState
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
+import androidx.compose.foundation.lazy.grid.rememberLazyGridState
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
@@ -58,7 +60,10 @@ fun MoviesScreen(onOpen: (String) -> Unit) {
 
     // Coming back from a film should land on that film, not at the top.
     val focusReturn = rememberFocusReturn()
-    LaunchedEffect(items.itemCount, selected) { focusReturn.restore() }
+    val gridState = rememberLazyGridState()
+    LaunchedEffect(items.itemCount, selected) {
+        focusReturn.restore { index, offset -> gridState.scrollToItem(index, offset) }
+    }
 
     CatalogLayout(
         title = stringResource(R.string.nav_movies),
@@ -68,7 +73,8 @@ fun MoviesScreen(onOpen: (String) -> Unit) {
         sort = sort,
         onSelectCategory = vm::selectCategory,
         onCycleSort = vm::cycleSort,
-        itemCount = items.itemCount
+        itemCount = items.itemCount,
+        gridState = gridState
     ) {
         items(count = items.itemCount) { index ->
             val movie = items[index] ?: return@items
@@ -80,7 +86,11 @@ fun MoviesScreen(onOpen: (String) -> Unit) {
                 rating = movie.rating,
                 width = if (isCompact) null else 176.dp,
                 onClick = {
-                    focusReturn.leaveThrough(movie.streamId)
+                    focusReturn.leaveThrough(
+                        movie.streamId,
+                        gridState.firstVisibleItemIndex,
+                        gridState.firstVisibleItemScrollOffset
+                    )
                     onOpen(movie.streamId)
                 }
             )
@@ -97,7 +107,10 @@ fun SeriesScreen(onOpen: (String) -> Unit) {
     val items = vm.series.collectAsLazyPagingItems()
 
     val focusReturn = rememberFocusReturn()
-    LaunchedEffect(items.itemCount, selected) { focusReturn.restore() }
+    val gridState = rememberLazyGridState()
+    LaunchedEffect(items.itemCount, selected) {
+        focusReturn.restore { index, offset -> gridState.scrollToItem(index, offset) }
+    }
 
     CatalogLayout(
         title = stringResource(R.string.nav_series),
@@ -107,7 +120,8 @@ fun SeriesScreen(onOpen: (String) -> Unit) {
         sort = sort,
         onSelectCategory = vm::selectCategory,
         onCycleSort = vm::cycleSort,
-        itemCount = items.itemCount
+        itemCount = items.itemCount,
+        gridState = gridState
     ) {
         items(count = items.itemCount) { index ->
             val serie = items[index] ?: return@items
@@ -119,7 +133,11 @@ fun SeriesScreen(onOpen: (String) -> Unit) {
                 rating = serie.rating,
                 width = if (isCompact) null else 176.dp,
                 onClick = {
-                    focusReturn.leaveThrough(serie.seriesId)
+                    focusReturn.leaveThrough(
+                        serie.seriesId,
+                        gridState.firstVisibleItemIndex,
+                        gridState.firstVisibleItemScrollOffset
+                    )
                     onOpen(serie.seriesId)
                 }
             )
@@ -137,6 +155,7 @@ private fun CatalogLayout(
     onSelectCategory: (String) -> Unit,
     onCycleSort: () -> Unit,
     itemCount: Int,
+    gridState: LazyGridState,
     grid: androidx.compose.foundation.lazy.grid.LazyGridScope.() -> Unit
 ) {
     if (isCompact) {
@@ -149,6 +168,7 @@ private fun CatalogLayout(
             onSelectCategory = onSelectCategory,
             onCycleSort = onCycleSort,
             itemCount = itemCount,
+            gridState = gridState,
             grid = grid
         )
         return
@@ -210,6 +230,7 @@ private fun CatalogLayout(
                 )
             } else {
                 LazyVerticalGrid(
+                    state = gridState,
                     columns = GridCells.Adaptive(190.dp),
                     contentPadding = PaddingValues(start = 20.dp, end = 48.dp, top = 8.dp, bottom = 60.dp),
                     horizontalArrangement = Arrangement.spacedBy(18.dp),
@@ -232,6 +253,7 @@ private fun CompactCatalog(
     onSelectCategory: (String) -> Unit,
     onCycleSort: () -> Unit,
     itemCount: Int,
+    gridState: LazyGridState,
     grid: androidx.compose.foundation.lazy.grid.LazyGridScope.() -> Unit
 ) {
     Column(Modifier.fillMaxSize()) {
@@ -281,6 +303,7 @@ private fun CompactCatalog(
             )
         } else {
             LazyVerticalGrid(
+                state = gridState,
                 columns = GridCells.Adaptive(112.dp),
                 contentPadding = PaddingValues(start = 12.dp, end = 12.dp, bottom = 24.dp),
                 horizontalArrangement = Arrangement.spacedBy(10.dp),
