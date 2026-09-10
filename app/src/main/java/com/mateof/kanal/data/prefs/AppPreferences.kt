@@ -14,6 +14,7 @@ import com.mateof.kanal.R
 import com.mateof.kanal.core.AppLanguage
 import com.mateof.kanal.core.SleepTimer
 import com.mateof.kanal.core.log.Klog
+import com.mateof.kanal.data.download.DownloadItem
 import com.mateof.kanal.data.model.ContentKind
 import com.mateof.kanal.data.model.HistoryItem
 import com.mateof.kanal.data.model.Source
@@ -93,7 +94,13 @@ data class Settings(
     val fillMissingLogos: Boolean = true,
     val subtitleSize: SubtitleSize = SubtitleSize.NORMAL,
     val subtitleLook: SubtitleLook = SubtitleLook.OUTLINED,
-    val channelSort: ChannelSort = ChannelSort.PROVIDER
+    val channelSort: ChannelSort = ChannelSort.PROVIDER,
+    /** Downloads wait for Wi-Fi by default: a film over mobile data is a bill. */
+    val downloadWifiOnly: Boolean = true,
+    /** Ceiling for the whole download folder, in GB. 0 means no ceiling. */
+    val downloadLimitGb: Int = 0,
+    /** Removes a download once it has been watched to the end. */
+    val downloadDeleteWatched: Boolean = false
 )
 
 const val DEFAULT_USER_AGENT = "VLC/3.0.20 LibVLC/3.0.20"
@@ -119,6 +126,10 @@ class AppPreferences @Inject constructor(
         val SUBTITLE_SIZE = stringPreferencesKey("subtitle_size")
         val SUBTITLE_LOOK = stringPreferencesKey("subtitle_look")
         val HISTORY = stringPreferencesKey("history")
+        val DOWNLOADS = stringPreferencesKey("downloads")
+        val DOWNLOAD_WIFI_ONLY = booleanPreferencesKey("download_wifi_only")
+        val DOWNLOAD_LIMIT_GB = intPreferencesKey("download_limit_gb")
+        val DOWNLOAD_DELETE_WATCHED = booleanPreferencesKey("download_delete_watched")
 
         val STREAM_FORMAT = stringPreferencesKey("stream_format")
         val PREVIEW_ENABLED = booleanPreferencesKey("preview_enabled")
@@ -293,7 +304,10 @@ class AppPreferences @Inject constructor(
             } ?: SubtitleLook.OUTLINED,
             channelSort = prefs[Keys.CHANNEL_SORT]?.let { name ->
                 ChannelSort.entries.firstOrNull { it.name == name }
-            } ?: ChannelSort.PROVIDER
+            } ?: ChannelSort.PROVIDER,
+            downloadWifiOnly = prefs[Keys.DOWNLOAD_WIFI_ONLY] ?: true,
+            downloadLimitGb = prefs[Keys.DOWNLOAD_LIMIT_GB] ?: 0,
+            downloadDeleteWatched = prefs[Keys.DOWNLOAD_DELETE_WATCHED] ?: false
         )
     }
 
@@ -321,6 +335,38 @@ class AppPreferences @Inject constructor(
     suspend fun setSubtitlesEnabled(value: Boolean) = edit { it[Keys.SUBTITLES] = value }
 
     suspend fun setFillMissingLogos(value: Boolean) = edit { it[Keys.FILL_LOGOS] = value }
+    suspend fun setDownloadWifiOnly(value: Boolean) = edit { it[Keys.DOWNLOAD_WIFI_ONLY] = value }
+    suspend fun setDownloadLimitGb(value: Int) = edit { it[Keys.DOWNLOAD_LIMIT_GB] = value }
+    suspend fun setDownloadDeleteWatched(value: Boolean) =
+        edit { it[Keys.DOWNLOAD_DELETE_WATCHED] = value }
+
+    // --- Downloads -----------------------------------------------------------
+    //
+    // In DataStore and not in Room on purpose: Room is a cache here and is
+    // dropped whole on a schema change, which would leave the files on disk
+    // with nothing in the app knowing they exist.
+
+    val downloads: Flow<List<DownloadItem>> = context.dataStore.data.map { prefs ->
+        decode<List<DownloadItem>>(prefs[Keys.DOWNLOADS], emptyList())
+            .sortedByDescending { it.createdAt }
+    }
+
+    suspend fun downloadsNow(): List<DownloadItem> = downloads.first()
+
+    suspend fun upsertDownload(item: DownloadItem) {
+        context.dataStore.edit { prefs ->
+            val all = decode<List<DownloadItem>>(prefs[Keys.DOWNLOADS], emptyList())
+                .filterNot { it.id == item.id }
+            prefs[Keys.DOWNLOADS] = json.encodeToString(all + item)
+        }
+    }
+
+    suspend fun removeDownload(id: String) {
+        context.dataStore.edit { prefs ->
+            val all = decode<List<DownloadItem>>(prefs[Keys.DOWNLOADS], emptyList())
+            prefs[Keys.DOWNLOADS] = json.encodeToString(all.filterNot { it.id == id })
+        }
+    }
 
     // --- What each catalogue looked like last time ----------------------------
     //

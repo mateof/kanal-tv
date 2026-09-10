@@ -6,6 +6,7 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.CalendarMonth
+import androidx.compose.material.icons.outlined.Download
 import androidx.compose.material.icons.outlined.Home
 import androidx.compose.material.icons.outlined.LiveTv
 import androidx.compose.material.icons.outlined.Movie
@@ -34,6 +35,7 @@ import com.mateof.kanal.ui.components.NavItem
 import com.mateof.kanal.ui.components.NavRail
 import com.mateof.kanal.ui.screens.detail.MovieDetailScreen
 import com.mateof.kanal.ui.screens.detail.SeriesDetailScreen
+import com.mateof.kanal.ui.screens.downloads.DownloadsScreen
 import com.mateof.kanal.ui.screens.favorites.FavoritesScreen
 import com.mateof.kanal.ui.screens.gate.GateScreen
 import com.mateof.kanal.ui.screens.guide.GuideScreen
@@ -56,6 +58,7 @@ object Routes {
     const val MOVIES = "movies"
     const val SERIES = "series"
     const val FAVORITES = "favorites"
+    const val DOWNLOADS = "downloads"
     const val SEARCH = "search"
     const val SETTINGS = "settings"
     const val LOGS = "logs"
@@ -78,6 +81,7 @@ private val RAIL_ITEMS = listOf(
     NavItem(Routes.MOVIES, R.string.nav_movies, Icons.Outlined.Movie),
     NavItem(Routes.SERIES, R.string.nav_series, Icons.Outlined.Tv),
     NavItem(Routes.FAVORITES, R.string.nav_favorites, Icons.Outlined.Star),
+    NavItem(Routes.DOWNLOADS, R.string.nav_downloads, Icons.Outlined.Download),
     NavItem(Routes.SEARCH, R.string.nav_search, Icons.Outlined.Search),
     NavItem(Routes.SETTINGS, R.string.nav_settings, Icons.Outlined.Settings)
 )
@@ -166,6 +170,16 @@ fun KanalNavHost() {
                     onOpenChannel = { id -> nav.navigate(Routes.player("LIVE", id)) },
                     onOpenMovie = { id -> nav.navigate(Routes.movieDetail(id)) },
                     onOpenSeries = { id -> nav.navigate(Routes.seriesDetail(id)) }
+                )
+            }
+        }
+
+        composable(Routes.DOWNLOADS) {
+            WithRail(nav, Routes.DOWNLOADS) {
+                DownloadsScreen(
+                    // Same route as anywhere else: playback finds the local file
+                    // by itself, so nothing here needs to know about files.
+                    onPlay = { kind, id -> nav.navigate(Routes.player(kind, id)) }
                 )
             }
         }

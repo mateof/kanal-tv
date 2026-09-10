@@ -145,6 +145,27 @@ de energía cuando el aparato queda desatendido.
 
 Cualquier pulsación del mando se interpreta como respuesta afirmativa.
 
+## Descargas
+
+Ajustes de lo que se guarda en el dispositivo. El detalle de cómo se descarga está en
+[Películas y series](peliculas-y-series.md#descargas).
+
+### Sólo por Wi-Fi
+
+Activado de fábrica. Con datos móviles las descargas no fallan: quedan **esperando**, y
+arrancan solas en cuanto vuelve la Wi-Fi.
+
+### Borrar al terminar de ver
+
+Desactivado de fábrica. Cuando una película o un episodio se ve hasta el final, el fichero se
+borra solo. Pensado para llevar cosas en un viaje sin acabar con el móvil lleno.
+
+### Espacio para descargas
+
+Un techo para el conjunto: **sin límite** (por defecto), 2, 5, 10, 20 o 50 GB. Al alcanzarlo
+no se aceptan descargas nuevas y se avisa en la ficha. Con independencia de esto, si el
+dispositivo se está quedando sin sitio tampoco se empieza.
+
 ## Aplicación
 
 - **Buscar actualizaciones automáticamente** — consulta las releases del repositorio al

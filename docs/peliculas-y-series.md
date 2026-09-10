@@ -40,6 +40,31 @@ progreso. Los títulos completados dejan de mostrarse.
 El historial se almacena en el aparato y puede borrarse desde
 [Ajustes](ajustes.md#borrar-historial).
 
+## Descargas
+
+En la ficha de una película está **Descargar**, y en la de una serie **Descargar la
+temporada** más una flecha en cada episodio para bajarlos de uno en uno. El botón va contando
+lo que lleva —`Descargando 34 %`— y acaba en **Descargada**.
+
+Los ficheros se guardan en **`Descargas/Kanal`**, con el nombre del contenido, así que se ven
+desde cualquier explorador de ficheros y se pueden copiar o abrir con otro reproductor.
+
+El apartado **Descargas** del menú reúne lo que está en marcha y lo que ya está en el
+dispositivo, con el espacio que ocupa. Al pulsar sobre algo descargado, se reproduce; una
+pulsación larga abre el menú con **Borrar del dispositivo**, **Borrar la serie entera**,
+**Detener** y **Reintentar**.
+
+Una vez descargado, **al darle a reproducir se usa la copia local**, incluso sin conexión. Si
+el fichero desapareció —lo borraste desde el explorador, por ejemplo— la reproducción cae
+sola en el servidor, sin dar error.
+
+Lo que **no** se puede descargar: los canales en directo, que no tienen final, y las listas
+que sirven el contenido en HLS (`.m3u8`), que no es un fichero sino una sucesión de trozos.
+
+Y un detalle que conviene saber: **cada descarga ocupa una conexión de tu cuenta** mientras
+dura, igual que si estuvieras viendo algo. Con un límite de conexiones bajo, descargar y ver
+la tele a la vez puede no caber.
+
 ## Enviar a otro aparato
 
 Las películas ofrecen **Enviar a…** en su ficha, y los episodios responden a una pulsación

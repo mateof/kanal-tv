@@ -112,6 +112,7 @@ fun SettingsScreen(
         stringResource(R.string.settings_playback),
         stringResource(R.string.settings_guide_content),
         stringResource(R.string.settings_saving),
+        stringResource(R.string.settings_downloads),
         stringResource(R.string.settings_app)
     )
     var section by rememberSaveable { mutableStateOf(0) }
@@ -519,6 +520,39 @@ fun SettingsScreen(
         }
 
         if (section == 5) {
+        // --- Downloads --------------------------------------------------------
+        item {
+            SettingSwitchRow(
+                title = stringResource(R.string.settings_downloads_wifi),
+                description = stringResource(R.string.settings_downloads_wifi_hint),
+                checked = settings.downloadWifiOnly,
+                onCheckedChange = vm::setDownloadWifiOnly
+            )
+        }
+        item {
+            SettingSwitchRow(
+                title = stringResource(R.string.settings_downloads_watched),
+                description = stringResource(R.string.settings_downloads_watched_hint),
+                checked = settings.downloadDeleteWatched,
+                onCheckedChange = vm::setDownloadDeleteWatched
+            )
+        }
+        item {
+            val noLimit = stringResource(R.string.settings_downloads_no_limit)
+            OptionRow(
+                title = stringResource(R.string.settings_downloads_limit),
+                description = stringResource(R.string.settings_downloads_limit_hint),
+                options = DOWNLOAD_LIMITS.map { gb ->
+                    if (gb == 0) noLimit else stringResource(R.string.settings_downloads_gb, gb)
+                },
+                selectedIndex = DOWNLOAD_LIMITS.indexOf(settings.downloadLimitGb).coerceAtLeast(0),
+                onSelect = { vm.setDownloadLimitGb(DOWNLOAD_LIMITS[it]) }
+            )
+        }
+
+        }
+
+        if (section == 6) {
         // --- App ------------------------------------------------------------
         item {
             SettingSwitchRow(
@@ -665,6 +699,9 @@ private fun PinPrompt(onSubmit: (String) -> Unit, onDismiss: () -> Unit) {
         }
     }
 }
+
+/** 0 is "no limit"; the rest are what fits on a phone without filling it. */
+private val DOWNLOAD_LIMITS = listOf(0, 2, 5, 10, 20, 50)
 
 private val EPG_DAYS = listOf(1, 2, 3, 5, 7)
 private val SYNC_HOURS = listOf(0, 6, 12, 24, 48)

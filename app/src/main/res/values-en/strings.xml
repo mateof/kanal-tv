@@ -436,4 +436,38 @@
     <string name="reminder_add">Remind me</string>
     <string name="reminder_added">Will remind you</string>
     <string name="reminder_remove">Do not remind</string>
+
+    <!-- Downloads -->
+    <string name="nav_downloads">Downloads</string>
+    <string name="downloads_title">Downloads</string>
+    <string name="downloads_waiting_wifi">Waiting for Wi-Fi</string>
+    <string name="downloads_empty_title">Nothing downloaded yet</string>
+    <string name="downloads_empty_body">The download button is on every film and series page. Files are kept in Downloads/Kanal.</string>
+    <string name="downloads_in_progress">Under way</string>
+    <string name="downloads_ready">On this device</string>
+    <string name="downloads_used">%1$s used</string>
+    <string name="download_action">Download</string>
+    <string name="download_action_season">Download the season</string>
+    <string name="download_downloaded">Downloaded</string>
+    <string name="download_queued">Added to downloads</string>
+    <string name="download_already">Already here</string>
+    <string name="download_no_room">There is not enough room on this device.</string>
+    <string name="download_over_limit">You have reached the %1$d GB you set aside for downloads.</string>
+    <string name="download_season_queued">%1$d episodes added</string>
+    <string name="download_state_queued">Queued</string>
+    <string name="download_state_running">Downloading</string>
+    <string name="download_state_failed">Failed</string>
+    <string name="download_retry">Try again</string>
+    <string name="download_pause">Stop</string>
+    <string name="download_delete">Delete from device</string>
+    <string name="download_delete_series">Delete the whole series</string>
+    <string name="settings_downloads">Downloads</string>
+    <string name="settings_downloads_wifi">Wi-Fi only</string>
+    <string name="settings_downloads_wifi_hint">Downloads wait for Wi-Fi instead of spending mobile data.</string>
+    <string name="settings_downloads_watched">Delete once watched</string>
+    <string name="settings_downloads_watched_hint">When you finish a film or an episode, the file removes itself.</string>
+    <string name="settings_downloads_limit">Room for downloads</string>
+    <string name="settings_downloads_limit_hint">Once the downloads add up to this, no more are taken.</string>
+    <string name="settings_downloads_no_limit">No limit</string>
+    <string name="settings_downloads_gb">%1$d GB</string>
 </resources>

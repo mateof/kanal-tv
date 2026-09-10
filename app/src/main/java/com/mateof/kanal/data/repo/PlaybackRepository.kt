@@ -4,6 +4,8 @@ import com.mateof.kanal.data.db.ChannelEntity
 import com.mateof.kanal.data.db.EpgEntity
 import com.mateof.kanal.data.db.EpisodeEntity
 import com.mateof.kanal.data.db.MovieEntity
+import com.mateof.kanal.data.download.DownloadLibrary
+import com.mateof.kanal.data.download.DownloadRepository
 import com.mateof.kanal.data.model.ContentKind
 import com.mateof.kanal.data.model.HistoryItem
 import com.mateof.kanal.data.model.Source
@@ -57,7 +59,9 @@ private const val LEGACY_CANDIDATE = "legacy"
 
 @Singleton
 class PlaybackRepository @Inject constructor(
-    private val prefs: AppPreferences
+    private val prefs: AppPreferences,
+    private val library: DownloadLibrary,
+    private val downloads: DownloadRepository
 ) {
     suspend fun forChannel(source: Source, channel: ChannelEntity): Playable {
         val settings = prefs.settings.first()
@@ -133,11 +137,28 @@ class PlaybackRepository @Inject constructor(
             ?.key
     }
 
+    /**
+     * The provider's own address for a film, with no regard for whether it is
+     * already on the device. The downloader needs exactly this: asking for the
+     * playable url would hand it back the copy it is about to write.
+     */
+    fun remoteMovieUrl(source: Source, movie: MovieEntity): String = when (source.type) {
+        SourceType.M3U -> movie.url
+        SourceType.XTREAM -> XtreamUrls.movie(source, movie.streamId, movie.containerExtension)
+    }
+
+    fun remoteEpisodeUrl(source: Source, episode: EpisodeEntity): String = when (source.type) {
+        SourceType.M3U -> episode.url
+        SourceType.XTREAM -> XtreamUrls.episode(source, episode.episodeId, episode.containerExtension)
+    }
+
     suspend fun forMovie(source: Source, movie: MovieEntity): Playable {
-        val url = when (source.type) {
-            SourceType.M3U -> movie.url
-            SourceType.XTREAM -> XtreamUrls.movie(source, movie.streamId, movie.containerExtension)
-        }
+        val remote = remoteMovieUrl(source, movie)
+        // A downloaded copy wins, with the provider kept as the fallback the
+        // player already knows how to try: a file the user deleted from their
+        // Downloads behind our back then costs a stumble, not an error.
+        val local = library.localUri(ContentKind.MOVIE, source.id, movie.streamId)
+        val url = local ?: remote
         return Playable(
             kind = ContentKind.MOVIE,
             sourceId = source.id,
@@ -148,15 +169,15 @@ class PlaybackRepository @Inject constructor(
             url = url,
             userAgent = userAgentFor(source),
             isLive = false,
-            startPositionMs = prefs.resumePositionOf("${ContentKind.MOVIE.name}:${source.id}:${movie.streamId}")
+            startPositionMs = prefs.resumePositionOf("${ContentKind.MOVIE.name}:${source.id}:${movie.streamId}"),
+            fallbackUrls = if (local != null) listOf(remote) else emptyList()
         )
     }
 
     suspend fun forEpisode(source: Source, episode: EpisodeEntity, seriesName: String): Playable {
-        val url = when (source.type) {
-            SourceType.M3U -> episode.url
-            SourceType.XTREAM -> XtreamUrls.episode(source, episode.episodeId, episode.containerExtension)
-        }
+        val remote = remoteEpisodeUrl(source, episode)
+        val local = library.localUri(ContentKind.SERIES, source.id, episode.episodeId)
+        val url = local ?: remote
         return Playable(
             kind = ContentKind.SERIES,
             sourceId = source.id,
@@ -168,7 +189,8 @@ class PlaybackRepository @Inject constructor(
             userAgent = userAgentFor(source),
             isLive = false,
             seriesId = episode.seriesId,
-            startPositionMs = prefs.resumePositionOf("${ContentKind.SERIES.name}:${source.id}:${episode.episodeId}")
+            startPositionMs = prefs.resumePositionOf("${ContentKind.SERIES.name}:${source.id}:${episode.episodeId}"),
+            fallbackUrls = if (local != null) listOf(remote) else emptyList()
         )
     }
 
@@ -212,6 +234,10 @@ class PlaybackRepository @Inject constructor(
                 playedAt = System.currentTimeMillis()
             )
         )
+        // Watched to the end: the setting decides whether the copy goes.
+        if (!playable.isLive && durationMs > 0 && positionMs > durationMs * 0.95) {
+            downloads.onWatched(playable.kind, playable.sourceId, playable.itemId)
+        }
     }
 
     private suspend fun userAgentFor(source: Source): String =

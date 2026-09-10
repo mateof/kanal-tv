@@ -144,6 +144,14 @@ class SettingsViewModel @Inject constructor(
     fun setAutoSyncHours(value: Int) = viewModelScope.launch { prefs.setAutoSyncHours(value.coerceIn(0, 168)) }
     fun setStillWatching(value: Boolean) = viewModelScope.launch { prefs.setStillWatching(value) }
 
+    fun setDownloadWifiOnly(value: Boolean) =
+        viewModelScope.launch { prefs.setDownloadWifiOnly(value) }
+
+    fun setDownloadDeleteWatched(value: Boolean) =
+        viewModelScope.launch { prefs.setDownloadDeleteWatched(value) }
+
+    fun setDownloadLimitGb(value: Int) = viewModelScope.launch { prefs.setDownloadLimitGb(value) }
+
     fun setSleepMinutes(value: Int) = viewModelScope.launch {
         prefs.setSleepTimerMinutes(value.coerceIn(SleepTimer.MIN_MINUTES, SleepTimer.MAX_MINUTES))
     }

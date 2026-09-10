@@ -443,4 +443,38 @@
     <string name="reminder_add">Avisarme</string>
     <string name="reminder_added">Avisarase</string>
     <string name="reminder_remove">Non avisar</string>
+
+    <!-- Descargas -->
+    <string name="nav_downloads">Descargas</string>
+    <string name="downloads_title">Descargas</string>
+    <string name="downloads_waiting_wifi">Agardando pola Wi-Fi</string>
+    <string name="downloads_empty_title">Aínda non hai nada descargado</string>
+    <string name="downloads_empty_body">Nas fichas de películas e series atoparás o botón de descargar. O ficheiro gárdase en Descargas/Kanal.</string>
+    <string name="downloads_in_progress">En marcha</string>
+    <string name="downloads_ready">No dispositivo</string>
+    <string name="downloads_used">%1$s ocupados</string>
+    <string name="download_action">Descargar</string>
+    <string name="download_action_season">Descargar a tempada</string>
+    <string name="download_downloaded">Descargada</string>
+    <string name="download_queued">Engadida ás descargas</string>
+    <string name="download_already">Xa a tes</string>
+    <string name="download_no_room">Non hai sitio abondo no dispositivo.</string>
+    <string name="download_over_limit">Acadaches o límite de %1$d GB que fixaches para as descargas.</string>
+    <string name="download_season_queued">Engadíronse %1$d episodios</string>
+    <string name="download_state_queued">Na cola</string>
+    <string name="download_state_running">Descargando</string>
+    <string name="download_state_failed">Fallou</string>
+    <string name="download_retry">Reintentar</string>
+    <string name="download_pause">Deter</string>
+    <string name="download_delete">Borrar do dispositivo</string>
+    <string name="download_delete_series">Borrar toda a serie</string>
+    <string name="settings_downloads">Descargas</string>
+    <string name="settings_downloads_wifi">Só pola Wi-Fi</string>
+    <string name="settings_downloads_wifi_hint">As descargas agardan a que haxa Wi-Fi en vez de gastar datos.</string>
+    <string name="settings_downloads_watched">Borrar ao rematar de ver</string>
+    <string name="settings_downloads_watched_hint">Cando remates unha película ou un episodio, o ficheiro bórrase só.</string>
+    <string name="settings_downloads_limit">Espazo para descargas</string>
+    <string name="settings_downloads_limit_hint">Cando o conxunto de descargas chegue aquí, non se engaden máis.</string>
+    <string name="settings_downloads_no_limit">Sen límite</string>
+    <string name="settings_downloads_gb">%1$d GB</string>
 </resources>

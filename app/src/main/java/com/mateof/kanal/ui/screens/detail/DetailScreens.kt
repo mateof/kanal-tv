@@ -14,6 +14,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
@@ -25,8 +26,11 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Star
 import androidx.compose.material.icons.outlined.Movie
 import androidx.compose.material.icons.outlined.Cast
+import androidx.compose.material.icons.outlined.CheckCircle
+import androidx.compose.material.icons.outlined.Download
 import androidx.compose.material.icons.outlined.PlayArrow
 import androidx.compose.material.icons.outlined.Tv
+import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -55,6 +59,8 @@ import com.mateof.kanal.ui.components.ArtworkImage
 import com.mateof.kanal.ui.components.ButtonTone
 import com.mateof.kanal.ui.components.ErrorState
 import com.mateof.kanal.ui.components.FocusableSurface
+import com.mateof.kanal.data.download.DownloadItem
+import com.mateof.kanal.data.download.DownloadState
 import com.mateof.kanal.ui.components.KanalButton
 import com.mateof.kanal.ui.components.KanalChip
 import com.mateof.kanal.ui.components.LoadingState
@@ -69,6 +75,8 @@ fun MovieDetailScreen(
 ) {
     val vm: MovieDetailViewModel = hiltViewModel()
     val castVm: CastViewModel = hiltViewModel()
+    val download by vm.download.collectAsStateWithLifecycle()
+    val message by vm.message.collectAsStateWithLifecycle()
     val castState by castVm.state.collectAsStateWithLifecycle()
     val state by vm.state.collectAsStateWithLifecycle()
     val compact = isCompact
@@ -160,8 +168,24 @@ fun MovieDetailScreen(
                         isFavorite = state.isFavorite,
                         onToggleFavorite = vm::toggleFavorite,
                         onBack = onBack,
-                        onCast = { castVm.open(CastTarget.Movie(movie.streamId), movie.name) }
+                        onCast = { castVm.open(CastTarget.Movie(movie.streamId), movie.name) },
+                        downloadLabel = downloadLabel(download),
+                        onDownload = {
+                            if (download?.state == DownloadState.FAILED) {
+                                vm.retryDownload()
+                            } else if (download?.isDone != true) {
+                                vm.download()
+                            }
+                        }
                     )
+                    message?.let {
+                        Spacer(Modifier.height(10.dp))
+                        Text(
+                            it.resolve(),
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = KanalColors.Accent
+                        )
+                    }
                 }
             }
 
@@ -240,6 +264,8 @@ fun SeriesDetailScreen(
 ) {
     val vm: SeriesDetailViewModel = hiltViewModel()
     val castVm: CastViewModel = hiltViewModel()
+    val episodeDownloads by vm.downloadsByEpisode.collectAsStateWithLifecycle()
+    val message by vm.message.collectAsStateWithLifecycle()
     val castState by castVm.state.collectAsStateWithLifecycle()
     val state by vm.state.collectAsStateWithLifecycle()
     val compact = isCompact
@@ -297,8 +323,18 @@ fun SeriesDetailScreen(
                             onPlay = {},
                             isFavorite = state.isFavorite,
                             onToggleFavorite = vm::toggleFavorite,
-                            onBack = onBack
+                            onBack = onBack,
+                            downloadLabel = stringResource(R.string.download_action_season),
+                            onDownload = vm::downloadSeason
                         )
+                        message?.let {
+                            Spacer(Modifier.height(10.dp))
+                            Text(
+                                it.resolve(),
+                                style = MaterialTheme.typography.bodyMedium,
+                                color = KanalColors.Accent
+                            )
+                        }
                     }
                     if (state.seasons.size > 1) {
                         item {
@@ -326,6 +362,8 @@ fun SeriesDetailScreen(
                         EpisodeRow(
                             episode,
                             compact = true,
+                            download = episodeDownloads[episode.episodeId],
+                            onDownload = { vm.downloadEpisode(episode.episodeId) },
                             onLongClick = {
                                 castVm.open(CastTarget.Episode(episode.episodeId), episode.title)
                             }
@@ -351,6 +389,13 @@ fun SeriesDetailScreen(
                         ArtworkImage(series.cover, series.name, Icons.Outlined.Tv)
                     }
                     Spacer(Modifier.height(18.dp))
+                    KanalButton(
+                        text = stringResource(R.string.download_action_season),
+                        onClick = vm::downloadSeason,
+                        icon = Icons.Outlined.Download,
+                        modifier = Modifier.fillMaxWidth()
+                    )
+                    Spacer(Modifier.height(10.dp))
                     KanalButton(
                         text = if (state.isFavorite) stringResource(R.string.detail_in_favorites) else stringResource(R.string.detail_add_favorite),
                         onClick = vm::toggleFavorite,
@@ -402,6 +447,8 @@ fun SeriesDetailScreen(
                                 EpisodeRow(
                                     episode,
                                     compact = false,
+                                    download = episodeDownloads[episode.episodeId],
+                                    onDownload = { vm.downloadEpisode(episode.episodeId) },
                                     onLongClick = {
                                         castVm.open(CastTarget.Episode(episode.episodeId), episode.title)
                                     }
@@ -462,6 +509,18 @@ private fun SeriesHeading(name: String, meta: String, plot: String, compact: Boo
 }
 
 /** Upright the buttons stack full width; on a TV they sit in a row. */
+/** What the download button says, given what the copy is doing. */
+@Composable
+private fun downloadLabel(item: DownloadItem?): String = when (item?.state) {
+    null -> stringResource(R.string.download_action)
+    DownloadState.QUEUED -> stringResource(R.string.download_state_queued)
+    DownloadState.WAITING -> stringResource(R.string.downloads_waiting_wifi)
+    DownloadState.RUNNING ->
+        "${stringResource(R.string.download_state_running)} ${(item.progress * 100).toInt()}%"
+    DownloadState.DONE -> stringResource(R.string.download_downloaded)
+    DownloadState.FAILED -> stringResource(R.string.download_retry)
+}
+
 @Composable
 private fun DetailActions(
     compact: Boolean,
@@ -471,7 +530,10 @@ private fun DetailActions(
     onToggleFavorite: () -> Unit,
     onBack: () -> Unit,
     /** Sending straight from here never opens a connection on this device. */
-    onCast: (() -> Unit)? = null
+    onCast: (() -> Unit)? = null,
+    /** Null hides the button: a live channel has nothing to keep. */
+    downloadLabel: String? = null,
+    onDownload: (() -> Unit)? = null
 ) {
     val favoriteLabel = if (isFavorite) stringResource(R.string.detail_in_favorites) else stringResource(R.string.detail_add_favorite)
     if (compact) {
@@ -490,6 +552,14 @@ private fun DetailActions(
                     text = stringResource(R.string.cast_send),
                     onClick = it,
                     icon = Icons.Outlined.Cast,
+                    modifier = Modifier.fillMaxWidth()
+                )
+            }
+            if (downloadLabel != null && onDownload != null) {
+                KanalButton(
+                    text = downloadLabel,
+                    onClick = onDownload,
+                    icon = Icons.Outlined.Download,
                     modifier = Modifier.fillMaxWidth()
                 )
             }
@@ -514,6 +584,9 @@ private fun DetailActions(
             onCast?.let {
                 KanalButton(text = stringResource(R.string.cast_send), onClick = it, icon = Icons.Outlined.Cast)
             }
+            if (downloadLabel != null && onDownload != null) {
+                KanalButton(text = downloadLabel, onClick = onDownload, icon = Icons.Outlined.Download)
+            }
             KanalButton(text = favoriteLabel, onClick = onToggleFavorite, icon = Icons.Filled.Star)
             KanalButton(text = stringResource(R.string.common_back), onClick = onBack)
         }
@@ -524,6 +597,8 @@ private fun DetailActions(
 private fun EpisodeRow(
     episode: EpisodeEntity,
     compact: Boolean,
+    download: DownloadItem? = null,
+    onDownload: (() -> Unit)? = null,
     onLongClick: (() -> Unit)? = null,
     onClick: () -> Unit
 ) {
@@ -578,6 +653,49 @@ private fun EpisodeRow(
                     )
                 }
             }
+            if (onDownload != null) {
+                Spacer(Modifier.width(10.dp))
+                // Its own target rather than a menu: one press per episode is
+                // the whole point, and with the remote it is simply the next
+                // thing to the right of the row.
+                EpisodeDownloadMark(download, onDownload)
+            }
+        }
+    }
+}
+
+@Composable
+private fun EpisodeDownloadMark(item: DownloadItem?, onDownload: () -> Unit) {
+    when (item?.state) {
+        DownloadState.DONE -> Icon(
+            Icons.Outlined.CheckCircle,
+            contentDescription = stringResource(R.string.download_downloaded),
+            tint = KanalColors.Accent,
+            modifier = Modifier.size(20.dp)
+        )
+
+        DownloadState.RUNNING, DownloadState.QUEUED, DownloadState.WAITING -> Text(
+            text = if (item.state == DownloadState.RUNNING) {
+                "${(item.progress * 100).toInt()}%"
+            } else {
+                stringResource(R.string.download_state_queued)
+            },
+            style = MaterialTheme.typography.labelSmall,
+            color = KanalColors.OnSurfaceMuted
+        )
+
+        else -> FocusableSurface(
+            onClick = onDownload,
+            shape = RoundedCornerShape(10.dp),
+            color = Color.Transparent,
+            focusedColor = KanalColors.SurfaceVariant
+        ) {
+            Icon(
+                Icons.Outlined.Download,
+                contentDescription = stringResource(R.string.download_action),
+                tint = if (item?.state == DownloadState.FAILED) KanalColors.Error else KanalColors.OnSurfaceMuted,
+                modifier = Modifier.padding(8.dp).size(20.dp)
+            )
         }
     }
 }

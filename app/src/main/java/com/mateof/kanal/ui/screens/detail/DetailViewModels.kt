@@ -9,6 +9,10 @@ import com.mateof.kanal.core.double
 import com.mateof.kanal.core.firstStr
 import com.mateof.kanal.core.int
 import com.mateof.kanal.core.log.FileLogger
+import com.mateof.kanal.data.download.DownloadItem
+import com.mateof.kanal.data.download.DownloadRepository
+import com.mateof.kanal.data.download.EnqueueResult
+import com.mateof.kanal.data.download.downloadId
 import com.mateof.kanal.data.db.EpisodeEntity
 import com.mateof.kanal.data.db.MovieEntity
 import com.mateof.kanal.data.db.SeriesEntity
@@ -23,7 +27,11 @@ import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.SharingStarted
+import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import javax.inject.Inject
 
@@ -48,6 +56,7 @@ class MovieDetailViewModel @Inject constructor(
     private val prefs: AppPreferences,
     private val content: ContentRepository,
     private val xtream: XtreamClient,
+    private val downloads: DownloadRepository,
     private val logger: FileLogger
 ) : ViewModel() {
 
@@ -99,6 +108,43 @@ class MovieDetailViewModel @Inject constructor(
         }
     }
 
+    /**
+     * What this film's copy is doing, if there is one.
+     *
+     * Combined with the state rather than reading it inside the map: the film
+     * is loaded a moment after the screen opens, and a map over the downloads
+     * alone would have answered "no copy" before it arrived and never looked
+     * again.
+     */
+    val download: StateFlow<DownloadItem?> = combine(_state, downloads.downloads) { state, all ->
+        val id = state.movie?.streamId ?: return@combine null
+        all.firstOrNull { it.itemId == id }
+    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), null)
+
+    private val _message = MutableStateFlow<UiText?>(null)
+    val message: StateFlow<UiText?> = _message.asStateFlow()
+
+    fun download() {
+        val movie = _state.value.movie ?: return
+        viewModelScope.launch {
+            val source = prefs.activeSource.first() ?: return@launch
+            _message.value = when (val result = downloads.enqueueMovie(source, movie)) {
+                EnqueueResult.Queued -> UiText(R.string.download_queued)
+                EnqueueResult.AlreadyThere -> UiText(R.string.download_already)
+                is EnqueueResult.NoRoom -> UiText(R.string.download_no_room)
+                is EnqueueResult.OverLimit -> UiText(R.string.download_over_limit, result.limitGb)
+            }
+        }
+    }
+
+    fun retryDownload() {
+        val movie = _state.value.movie ?: return
+        viewModelScope.launch {
+            val source = prefs.activeSource.first() ?: return@launch
+            downloads.retry(downloadId(ContentKind.MOVIE, source.id, movie.streamId))
+        }
+    }
+
     fun toggleFavorite() {
         val movie = _state.value.movie ?: return
         viewModelScope.launch {
@@ -124,11 +170,49 @@ data class SeriesDetailState(
 class SeriesDetailViewModel @Inject constructor(
     private val prefs: AppPreferences,
     private val content: ContentRepository,
-    private val sync: SyncRepository
+    private val sync: SyncRepository,
+    private val downloads: DownloadRepository
 ) : ViewModel() {
 
     private val _state = MutableStateFlow(SeriesDetailState())
     val state: StateFlow<SeriesDetailState> = _state.asStateFlow()
+
+    /** Every episode's copy, by episode id, so each row can show its own state. */
+    val downloadsByEpisode: StateFlow<Map<String, DownloadItem>> = downloads.downloads
+        .map { all -> all.associateBy { it.itemId } }
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyMap())
+
+    private val _message = MutableStateFlow<UiText?>(null)
+    val message: StateFlow<UiText?> = _message.asStateFlow()
+
+    fun downloadEpisode(episodeId: String) {
+        val episode = _state.value.episodes.firstOrNull { it.episodeId == episodeId } ?: return
+        val name = _state.value.series?.name.orEmpty()
+        viewModelScope.launch {
+            val source = prefs.activeSource.first() ?: return@launch
+            _message.value = when (val result = downloads.enqueueEpisode(source, episode, name)) {
+                EnqueueResult.Queued -> UiText(R.string.download_queued)
+                EnqueueResult.AlreadyThere -> UiText(R.string.download_already)
+                is EnqueueResult.NoRoom -> UiText(R.string.download_no_room)
+                is EnqueueResult.OverLimit -> UiText(R.string.download_over_limit, result.limitGb)
+            }
+        }
+    }
+
+    /** The season on screen, skipping whatever is already downloaded. */
+    fun downloadSeason() {
+        val episodes = _state.value.episodes.ifEmpty { return }
+        val name = _state.value.series?.name.orEmpty()
+        viewModelScope.launch {
+            val source = prefs.activeSource.first() ?: return@launch
+            val queued = downloads.enqueueAll(source, episodes, name)
+            _message.value = if (queued > 0) {
+                UiText(R.string.download_season_queued, queued)
+            } else {
+                UiText(R.string.download_already)
+            }
+        }
+    }
 
     private var loadedId = ""
 
