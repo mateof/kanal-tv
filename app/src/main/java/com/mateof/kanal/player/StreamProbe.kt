@@ -15,6 +15,9 @@ private const val PROBE_BYTES = 2048L
 /** Transport stream packets all begin with this, every 188 bytes. */
 private const val TS_SYNC = 0x47.toByte()
 
+/** Enough of the server's message to be useful, short enough to fit on screen. */
+private const val MESSAGE_CHARS = 160
+
 /**
  * Asks a stream that would not play what it actually sent.
  *
@@ -100,14 +103,42 @@ class StreamProbe @Inject constructor(
 
     /** The line the user sees under the error, when there is something to say. */
     private fun verdict(code: Int, type: String, body: ByteArray): String? = when {
-        code !in 200..299 -> "El servidor respondió $code."
+        code !in 200..299 -> spoken(body)
+            ?.let { "El servidor respondió $code: $it" }
+            ?: "El servidor respondió $code."
+
         body.isEmpty() -> "El servidor aceptó la conexión pero no envió nada."
         body[0] == '<'.code.toByte() || body[0] == '{'.code.toByte() ->
-            "El servidor devolvió un mensaje de texto en lugar de vídeo."
+            spoken(body) ?: "El servidor devolvió un mensaje de texto en lugar de vídeo."
 
         looksLikeTs(body) -> null
-        type.startsWith("text/") -> "El servidor devolvió texto en lugar de vídeo."
+        type.startsWith("text/") ->
+            spoken(body) ?: "El servidor devolvió texto en lugar de vídeo."
+
         else -> null
+    }
+
+    /**
+     * The server's own words, when it bothered to write any.
+     *
+     * Worth far more than the code on its own: a panel that cannot reach the
+     * provider says so in plain text, and repeating that is the difference
+     * between "no se pudo reproducir" and knowing who to ask. Passed through
+     * [redactUrl] because those messages quote the upstream address —
+     * credentials and all — and this line ends up in the exportable log.
+     */
+    private fun spoken(body: ByteArray): String? {
+        if (body.isEmpty()) return null
+        val text = body.toString(Charsets.UTF_8)
+            .filter { it.code >= 32 || it == ' ' }
+            .replace(Regex("<[^>]*>"), " ")
+            .replace(Regex("\\s+"), " ")
+            .trim()
+        if (text.length < 8) return null
+        // Anything that is mostly unprintable is a container, not a sentence.
+        val printable = text.count { it.isLetterOrDigit() || it.isWhitespace() || it in ".,:;/_-()" }
+        if (printable < text.length * 0.85) return null
+        return redactUrl(text).take(MESSAGE_CHARS)
     }
 
     /** First bytes as hex, with the printable ones alongside. */

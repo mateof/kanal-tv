@@ -147,7 +147,7 @@
     <string name="error_not_found">Content not found.</string>
     <string name="error_no_connection">Could not reach the server.</string>
     <string name="error_gone">The stream no longer exists on the server.</string>
-    <string name="error_rejected">The server refused the stream. Too many open connections?</string>
+    <string name="error_rejected">The server refused the stream.</string>
     <string name="error_decode">This device cannot decode this stream.</string>
     <string name="error_container">The server sends no video in any recognisable format. Usually a dead channel or the connection limit being reached.</string>
     <string name="error_generic">Could not play it (%s).</string>

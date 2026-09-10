@@ -226,6 +226,9 @@ class PlayerViewModel @Inject constructor(
     private var keepChannelOnExit = false
     private var resilient = false
 
+    /** Whether this item ever put a frame on screen; see [isRecoverable]. */
+    private var everPlayed = false
+
     init {
         // Followed rather than read once: changing them in the settings while a
         // film is paused behind should land without reopening anything.
@@ -306,6 +309,7 @@ class PlayerViewModel @Inject constructor(
         keepChannelOnExit = settings.keepLastChannel
         reconnectJob?.cancel()
         reconnects = 0
+        everPlayed = false
         signature = buildSignature(settings, playable.userAgent)
         val previousKey = streamKey
         streamKey = playable.url
@@ -517,6 +521,7 @@ class PlayerViewModel @Inject constructor(
         // The new channel is on screen, so the picture is worth keeping again if
         // the connection stumbles later.
         override fun onRenderedFirstFrame() {
+            everPlayed = true
             if (_state.value.switching) _state.value = _state.value.copy(switching = false)
             // A picture is the only proof that this url was the right one, so
             // the note is taken here and not when playback merely started.
@@ -559,31 +564,44 @@ class PlayerViewModel @Inject constructor(
      * could read. A timeout or a refused connection already says what happened.
      */
     private fun examineFailure(error: PlaybackException) {
-        if (!isContainerProblem(error)) return
+        if (!worthExamining(error)) return
         val url = candidates.getOrNull(candidateIndex) ?: return
         val userAgent = _state.value.playable?.userAgent ?: return
         viewModelScope.launch {
-            // The account first: when the panel says every connection is taken,
-            // that is the answer, and no amount of looking at the stream will
-            // say so. It is also the one the user can do something about.
-            val current = source
-            if (current != null) {
-                val account = accounts.refresh(current)
-                if (account?.full == true) {
-                    _state.value = _state.value.copy(errorAccount = account)
-                    return@launch
-                }
-            }
+            // The stream first. A panel that cannot reach the provider answers
+            // with a sentence saying so, and repeating it beats any guess made
+            // from the account's counters — which is exactly the guess that was
+            // being made: a burst of failed attempts fills the connection count
+            // for a moment, and the screen blamed a full account for a file the
+            // server never had.
             val detail = probe.describe(url, userAgent)
             if (detail != null) _state.value = _state.value.copy(errorDetail = detail)
+
+            val current = source ?: return@launch
+            val account = accounts.refresh(current)
+            // Kept for the case it was written for: nothing else to say, and
+            // the panel really is out of connections.
+            if (detail == null && account?.full == true) {
+                _state.value = _state.value.copy(errorAccount = account)
+            }
         }
     }
 
-    private fun isContainerProblem(error: PlaybackException): Boolean = when (error.errorCode) {
+    /**
+     * Whether asking the url what it served is likely to add anything.
+     *
+     * A container nothing could read, and now a bad status too: the message the
+     * user was shown for one of those said "too many open connections?" for any
+     * refusal at all, which sent more than one afternoon looking at the wrong
+     * thing. A panel that cannot fetch from its provider answers with a
+     * sentence explaining exactly that, and it is worth going to get it.
+     */
+    private fun worthExamining(error: PlaybackException): Boolean = when (error.errorCode) {
         PlaybackException.ERROR_CODE_PARSING_CONTAINER_UNSUPPORTED,
         PlaybackException.ERROR_CODE_PARSING_CONTAINER_MALFORMED,
         PlaybackException.ERROR_CODE_PARSING_MANIFEST_UNSUPPORTED,
-        PlaybackException.ERROR_CODE_PARSING_MANIFEST_MALFORMED -> true
+        PlaybackException.ERROR_CODE_PARSING_MANIFEST_MALFORMED,
+        PlaybackException.ERROR_CODE_IO_BAD_HTTP_STATUS -> true
 
         else -> false
     }
@@ -668,9 +686,16 @@ class PlayerViewModel @Inject constructor(
      * better, and ExoPlayer already skips what it cannot decode.
      */
     private fun isRecoverable(error: PlaybackException): Boolean = when (error.errorCode) {
+        // A refusal that arrives before a single frame is not a stumble: the
+        // answer will be the same however many times it is asked, and each
+        // attempt opens another session on the server — which is what made a
+        // file the panel could not fetch look like an account out of
+        // connections. Once something has played, the same code means the
+        // stream dropped, and retrying is right.
+        PlaybackException.ERROR_CODE_IO_BAD_HTTP_STATUS -> everPlayed
+
         PlaybackException.ERROR_CODE_IO_NETWORK_CONNECTION_FAILED,
         PlaybackException.ERROR_CODE_IO_NETWORK_CONNECTION_TIMEOUT,
-        PlaybackException.ERROR_CODE_IO_BAD_HTTP_STATUS,
         PlaybackException.ERROR_CODE_IO_UNSPECIFIED,
         PlaybackException.ERROR_CODE_TIMEOUT -> true
 

@@ -154,7 +154,7 @@
     <string name="error_not_found">Non se atopou o contido.</string>
     <string name="error_no_connection">Non se puido conectar co servidor.</string>
     <string name="error_gone">A emisión xa non existe no servidor.</string>
-    <string name="error_rejected">O servidor rexeitou a emisión. Demasiadas conexións abertas?</string>
+    <string name="error_rejected">O servidor rexeitou a emisión.</string>
     <string name="error_decode">O aparato non pode decodificar esta emisión.</string>
     <string name="error_container">O servidor non envía vídeo en ningún formato recoñecible. Adoita ser unha canle caída ou o límite de conexións acadado.</string>
     <string name="error_generic">Non se puido reproducir (%s).</string>

@@ -37,9 +37,16 @@ falla, las causas habituales son:
 | Síntoma | Causa probable |
 | --- | --- |
 | «El servidor no envía vídeo en ningún formato reconocible» | Canal caído, o límite de conexiones del proveedor alcanzado |
-| «El servidor rechazó la emisión» | Demasiadas conexiones simultáneas abiertas |
+| «El servidor rechazó la emisión» | El servidor contestó con un error; **la segunda línea dice cuál** |
 | «La emisión ya no existe en el servidor» | El canal ha desaparecido del panel; conviene sincronizar |
 | «El dispositivo no puede decodificar esta emisión» | Códec no soportado por el aparato |
+
+Bajo el mensaje aparece, cuando la hay, **la respuesta literal del servidor**: el código y lo
+que escribiera. Esa línea es la que más dice. Un panel que no consigue el fichero de su
+proveedor lo cuenta ahí con todas las letras —«Streaming error: 401 …»—, y entonces no hay
+nada que arreglar en la aplicación ni en la cuenta: el problema está entre el panel y el
+proveedor. Las credenciales que aparezcan en esa respuesta se ocultan antes de mostrarla y
+antes de guardarla en el registro.
 
 Probar otro canal permite distinguir entre un problema del canal y uno de la cuenta.
 
