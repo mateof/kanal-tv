@@ -18,6 +18,24 @@ private const val TS_SYNC = 0x47.toByte()
 /** Enough of the server's message to be useful, short enough to fit on screen. */
 private const val MESSAGE_CHARS = 160
 
+/** Above this a short note becomes a plausible stream and is left alone. */
+private const val NOT_READY_MAX_BYTES = 1024
+
+/**
+ * What came back when a stream that would not play was asked again.
+ *
+ * [notReady] is the one worth acting on: a panel that is still tearing the
+ * previous viewer's channel down answers 200, calls it video, and sends a
+ * sentence of JSON instead. Asking again a few seconds later works; asking
+ * again straight away gets the same note and keeps the channel from ever
+ * settling.
+ */
+data class ProbeReport(
+    val code: Int,
+    val message: String?,
+    val notReady: Boolean
+)
+
 /**
  * Asks a stream that would not play what it actually sent.
  *
@@ -39,7 +57,9 @@ class StreamProbe @Inject constructor(
      * @return a short phrase for the screen, or null when nothing useful came
      *   of it. The detail always goes to the log either way.
      */
-    suspend fun describe(url: String, userAgent: String): String? = withContext(Dispatchers.IO) {
+    suspend fun describe(url: String, userAgent: String): String? = inspect(url, userAgent)?.message
+
+    suspend fun inspect(url: String, userAgent: String): ProbeReport? = withContext(Dispatchers.IO) {
         val safeUrl = redactUrl(url)
         try {
             val request = Request.Builder()
@@ -64,12 +84,30 @@ class StreamProbe @Inject constructor(
                 if (body.isNotEmpty()) {
                     logger.d("Probe", "Primeros bytes: ${preview(body)}")
                 }
-                verdict(response.code, type, body)
+                ProbeReport(
+                    code = response.code,
+                    message = verdict(response.code, type, body),
+                    notReady = notReady(response.code, body)
+                )
             }
         } catch (e: Exception) {
             logger.w("Probe", "No se pudo examinar $safeUrl", e)
             null
         }
+    }
+
+    /**
+     * A short note where a stream should be. Small on purpose: a real stream
+     * fills the two kilobytes asked for, so anything that fits in a sentence is
+     * the server talking rather than sending.
+     */
+    private fun notReady(code: Int, body: ByteArray): Boolean {
+        if (code !in 200..299) return false
+        if (body.isEmpty() || body.size >= NOT_READY_MAX_BYTES) return false
+        if (looksLikeTs(body)) return false
+        val first = body[0]
+        return first == '{'.code.toByte() || first == '['.code.toByte() ||
+            first == '<'.code.toByte() || first in 0x20..0x7E
     }
 
     private fun summarise(body: ByteArray): String = when {

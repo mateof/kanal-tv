@@ -48,6 +48,16 @@ nada que arreglar en la aplicación ni en la cuenta: el problema está entre el 
 proveedor. Las credenciales que aparezcan en esa respuesta se ocultan antes de mostrarla y
 antes de guardarla en el registro.
 
+Si el canal se queda **cargando y reintentando** sin llegar a error, suele ser otra cosa: el
+panel aún está cerrando ese canal para el visor anterior. Dispatcharr contesta a quien llega
+demasiado pronto con un aviso —HTTP 200, etiquetado como vídeo, un renglón de JSON dentro— y
+volver a pedirlo de inmediato sólo reinicia esa cuenta atrás. Kanal lo reconoce, **espera seis
+segundos y lo vuelve a pedir**, hasta dos veces, antes de dar nada por fallado.
+
+En el panel eso se evita subiendo `channel_shutdown_delay` por encima de 0 (Ajustes → Proxy):
+con 0, el canal se desmonta en el instante en que se va el último que lo veía, y cualquier
+cambio de canal cae justo en esa ventana.
+
 Probar otro canal permite distinguir entre un problema del canal y uno de la cuenta.
 
 ### La imagen se corta

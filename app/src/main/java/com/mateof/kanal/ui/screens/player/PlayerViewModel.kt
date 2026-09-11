@@ -48,6 +48,13 @@ import javax.inject.Inject
 /** How many silent reconnections before the user is told something is wrong. */
 private const val MAX_RECONNECTS = 6
 
+/**
+ * How long to leave a panel alone when it says the channel is still stopping.
+ * Dispatcharr's own wait before it will hand one over again is five seconds.
+ */
+private const val NOT_READY_DELAY_MS = 6_000L
+private const val MAX_NOT_READY_WAITS = 2
+
 /** Ticks of half a second between progress writes. */
 private const val SAVE_EVERY_TICKS = 30
 
@@ -229,6 +236,9 @@ class PlayerViewModel @Inject constructor(
     /** Whether this item ever put a frame on screen; see [isRecoverable]. */
     private var everPlayed = false
 
+    /** How many times the panel has been given a moment to get ready. */
+    private var notReadyWaits = 0
+
     init {
         // Followed rather than read once: changing them in the settings while a
         // film is paused behind should land without reopening anything.
@@ -310,6 +320,7 @@ class PlayerViewModel @Inject constructor(
         reconnectJob?.cancel()
         reconnects = 0
         everPlayed = false
+        notReadyWaits = 0
         signature = buildSignature(settings, playable.userAgent)
         val previousKey = streamKey
         streamKey = playable.url
@@ -503,15 +514,16 @@ class PlayerViewModel @Inject constructor(
     private val listener = object : Player.Listener {
         override fun onPlayerError(error: PlaybackException) {
             logger.w("Player", "Error de reproducción: ${error.errorCodeName}")
-            if (tryNextCandidate(error)) return
-            if (scheduleReconnect(error)) return
-            logger.e("Player", "Sin más formatos que probar", error)
-            _state.value = _state.value.copy(
-                error = friendlyError(error),
-                buffering = false,
-                playing = false
-            )
-            examineFailure(error)
+            // A stream that would not parse gets asked what it sent before
+            // anything else is decided: the answer is often "the channel is
+            // still shutting down, try again shortly", and walking through the
+            // other formats only makes that worse.
+            if (worthAskingTheServer(error) && notReadyWaits < MAX_NOT_READY_WAITS) {
+                _state.value = _state.value.copy(error = null, buffering = true)
+                viewModelScope.launch { resolveParsingFailure(error) }
+                return
+            }
+            giveUpOrRetry(error, null)
         }
 
         override fun onPlaybackStateChanged(playbackState: Int) {
@@ -555,6 +567,75 @@ class PlayerViewModel @Inject constructor(
             _state.value = _state.value.copy(playing = isPlaying)
             if (!isPlaying) recordProgress()
         }
+    }
+
+    /**
+     * Whether to go and ask the url what it is sending before deciding anything.
+     *
+     * Only before a first frame: until then every failure is "this never
+     * started", and the panel's own answer settles it in one request. A channel
+     * caught mid-teardown shows up in several disguises — a container that will
+     * not parse, and, once the loader has spent its retries on the same note, a
+     * plain timeout — so the disguise is not what is checked.
+     */
+    private fun worthAskingTheServer(error: PlaybackException): Boolean {
+        if (everPlayed) return false
+        return when (error.errorCode) {
+            PlaybackException.ERROR_CODE_PARSING_CONTAINER_UNSUPPORTED,
+            PlaybackException.ERROR_CODE_PARSING_CONTAINER_MALFORMED,
+            PlaybackException.ERROR_CODE_PARSING_MANIFEST_UNSUPPORTED,
+            PlaybackException.ERROR_CODE_PARSING_MANIFEST_MALFORMED,
+            PlaybackException.ERROR_CODE_IO_BAD_HTTP_STATUS,
+            PlaybackException.ERROR_CODE_IO_UNSPECIFIED,
+            PlaybackException.ERROR_CODE_TIMEOUT -> true
+
+            else -> false
+        }
+    }
+
+    /**
+     * Waits out a channel that is not ready yet, or lets the usual path run.
+     *
+     * The panel answers a request that arrives too soon with a note — HTTP 200,
+     * labelled as video, a sentence of JSON inside. Nothing is wrong with the
+     * channel: it needs a few seconds to finish letting go of the last viewer,
+     * and asking again immediately only restarts that clock.
+     */
+    private suspend fun resolveParsingFailure(error: PlaybackException) {
+        val url = candidates.getOrNull(candidateIndex)
+        val userAgent = _state.value.playable?.userAgent
+        val report = if (url != null && userAgent != null) probe.inspect(url, userAgent) else null
+
+        if (report?.notReady == true && url != null) {
+            notReadyWaits++
+            logger.i(
+                "Player",
+                "El servidor aún no tiene el canal listo; se reintenta en ${NOT_READY_DELAY_MS}ms " +
+                    "(espera $notReadyWaits/$MAX_NOT_READY_WAITS)"
+            )
+            delay(NOT_READY_DELAY_MS)
+            val exo = player ?: return
+            exo.setMediaItem(playerFactory.mediaItem(url, _state.value.playable?.title.orEmpty()))
+            exo.prepare()
+            exo.playWhenReady = true
+            return
+        }
+        giveUpOrRetry(error, report?.message)
+    }
+
+    /** The old path: another format, a reconnection, or an error on screen. */
+    private fun giveUpOrRetry(error: PlaybackException, detail: String?) {
+        if (tryNextCandidate(error)) return
+        if (scheduleReconnect(error)) return
+        logger.e("Player", "Sin más formatos que probar", error)
+        _state.value = _state.value.copy(
+            error = friendlyError(error),
+            errorDetail = detail,
+            buffering = false,
+            playing = false
+        )
+        // Already asked when the failure was a parsing one.
+        if (detail == null) examineFailure(error)
     }
 
     /**
@@ -623,6 +704,14 @@ class PlayerViewModel @Inject constructor(
         val url = candidates[candidateIndex]
         val title = _state.value.playable?.title.orEmpty()
         logger.i("Player", "Reintentando '$title' con ${redactUrl(url)}")
+        // Written down now and not only on success: otherwise a panel that
+        // never answers the preferred format is met with the same wasted
+        // attempt on every channel, for ever — and against a server that drops
+        // a channel as soon as its last viewer leaves, that wasted attempt is
+        // what keeps the good one from working.
+        _state.value.playable?.let { playable ->
+            viewModelScope.launch { playback.rememberCandidateToTry(playable, candidateIndex) }
+        }
 
         _state.value = _state.value.copy(error = null, buffering = true)
         exo.setMediaItem(playerFactory.mediaItem(url, title))

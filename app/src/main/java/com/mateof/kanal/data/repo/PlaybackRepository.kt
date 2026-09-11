@@ -118,7 +118,22 @@ class PlaybackRepository @Inject constructor(
     }
 
     /** Notes that [index] of the candidates is the one that produced a picture. */
-    suspend fun rememberWorkingCandidate(playable: Playable, index: Int) {
+    suspend fun rememberWorkingCandidate(playable: Playable, index: Int) =
+        rememberCandidate(playable, index)
+
+    /**
+     * Notes the one about to be tried after another was refused.
+     *
+     * Learning only from success is not enough: a panel that never answers the
+     * preferred format leaves nothing remembered, so every channel opens by
+     * failing the same way first — and against a server that tears a channel
+     * down the moment its last viewer leaves, that wasted attempt is what stops
+     * the good one from working.
+     */
+    suspend fun rememberCandidateToTry(playable: Playable, index: Int) =
+        rememberCandidate(playable, index)
+
+    private suspend fun rememberCandidate(playable: Playable, index: Int) {
         if (!playable.isLive) return
         val id = playable.candidateIds.getOrNull(index) ?: return
         prefs.rememberStreamChoice(choiceKey(playable.sourceId, playable.itemId), id)
