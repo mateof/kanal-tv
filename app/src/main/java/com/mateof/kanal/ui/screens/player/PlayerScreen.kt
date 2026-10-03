@@ -41,6 +41,12 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.displayCutout
+import androidx.compose.foundation.layout.windowInsetsPadding
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.material.icons.outlined.ArrowBack
+import androidx.compose.material3.Icon
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
@@ -691,7 +697,45 @@ fun PlayerScreen(
         }
 
         state.stats?.takeIf { !inPip }?.let { stats ->
-            StatsOverlay(stats, Modifier.align(Alignment.TopStart))
+            // Below the way out on a phone, which owns that corner.
+            StatsOverlay(
+                stats,
+                Modifier
+                    .align(Alignment.TopStart)
+                    .padding(top = if (onTelevision) 0.dp else 56.dp)
+            )
+        }
+
+        // With the system bars hidden a phone has no back key in sight, and
+        // the swipe that also leaves is not something anyone guesses. It comes
+        // and goes with the title band. Not on a television: the remote has
+        // BACK, and a focusable button there would only be one more stop for
+        // the arrows.
+        if (!onTelevision) {
+            AnimatedVisibility(
+                visible = osdVisible && mode == Mode.Watching && state.error == null && !inPip,
+                enter = fadeIn(),
+                exit = fadeOut(),
+                modifier = Modifier
+                    .align(Alignment.TopStart)
+                    .windowInsetsPadding(WindowInsets.displayCutout)
+                    .padding(16.dp)
+            ) {
+                FocusableSurface(
+                    onClick = { onBack(liveChannelId()) },
+                    modifier = Modifier.size(48.dp),
+                    shape = CircleShape,
+                    color = Color(0x9905070C),
+                    focusedScale = 1f
+                ) {
+                    Icon(
+                        Icons.Outlined.ArrowBack,
+                        contentDescription = stringResource(R.string.common_back),
+                        tint = Color.White,
+                        modifier = Modifier.align(Alignment.Center)
+                    )
+                }
+            }
         }
 
         // Band and strip stack at the foot of the picture: the band says what
