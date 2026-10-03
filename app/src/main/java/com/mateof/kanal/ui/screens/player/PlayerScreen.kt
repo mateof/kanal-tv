@@ -53,6 +53,7 @@ import androidx.compose.material.icons.outlined.StarOutline
 import androidx.compose.material.icons.outlined.Analytics
 import androidx.compose.material.icons.outlined.AspectRatio
 import androidx.compose.material.icons.outlined.Bedtime
+import androidx.compose.material.icons.outlined.Refresh
 import androidx.compose.material.icons.outlined.Fullscreen
 import androidx.compose.material.icons.outlined.FullscreenExit
 import androidx.compose.material.icons.outlined.Timer
@@ -732,6 +733,15 @@ fun PlayerScreen(
                 subtitle = state.now?.title,
                 onDismiss = { mode = Mode.Watching },
                 actions = buildList {
+                    // First on purpose: it is what gets reached for when the
+                    // picture has frozen, and that should be one press away.
+                    if (playable != null) {
+                        add(
+                            MenuAction(stringResource(R.string.player_reload), Icons.Outlined.Refresh) {
+                                vm.reload(); mode = Mode.Watching
+                            }
+                        )
+                    }
                     if (playable != null && !playable.isLive) {
                         add(
                             MenuAction(

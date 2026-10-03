@@ -55,6 +55,16 @@ private const val MAX_RECONNECTS = 6
 private const val NOT_READY_DELAY_MS = 6_000L
 private const val MAX_NOT_READY_WAITS = 2
 
+/**
+ * How long the clock may run with no new frame on screen before the picture is
+ * taken for frozen. Long enough that a channel at a handful of frames a second
+ * never trips it.
+ */
+private const val FROZEN_PICTURE_MS = 5_000L
+
+/** Reloads the watchdog may do on its own for one item before leaving it be. */
+private const val MAX_FROZEN_RELOADS = 3
+
 /** Ticks of half a second between progress writes. */
 private const val SAVE_EVERY_TICKS = 30
 
@@ -239,6 +249,12 @@ class PlayerViewModel @Inject constructor(
     /** How many times the panel has been given a moment to get ready. */
     private var notReadyWaits = 0
 
+    /** Last decoder output seen by [watchForFrozenPicture], and when it moved. */
+    private var lastRenderedFrames = -1
+    private var lastDroppedFrames = 0
+    private var lastFrameAt = 0L
+    private var frozenReloads = 0
+
     init {
         // Followed rather than read once: changing them in the settings while a
         // film is paused behind should land without reopening anything.
@@ -321,6 +337,8 @@ class PlayerViewModel @Inject constructor(
         reconnects = 0
         everPlayed = false
         notReadyWaits = 0
+        frozenReloads = 0
+        lastRenderedFrames = -1
         signature = buildSignature(settings, playable.userAgent)
         val previousKey = streamKey
         streamKey = playable.url
@@ -498,6 +516,7 @@ class PlayerViewModel @Inject constructor(
                         sinceSave = 0
                         recordProgress()
                     }
+                    watchForFrozenPicture(exo)
                     _state.value = _state.value.copy(
                         positionMs = exo.currentPosition.coerceAtLeast(0),
                         durationMs = exo.duration.takeIf { it > 0 } ?: 0L,
@@ -1228,6 +1247,104 @@ class PlayerViewModel @Inject constructor(
         }
         exo.prepare()
         exo.playWhenReady = true
+    }
+
+    /**
+     * Asks for what is playing again from scratch, on the url that was working.
+     *
+     * The stop is the point, not a formality: it resets the renderers, which
+     * releases the video decoder. A frozen picture over running audio is very
+     * often the decoder having wedged, and only a new one gets it moving — a
+     * new connection feeding the same decoder would freeze the same way.
+     */
+    fun reload() {
+        val exo = player ?: return
+        val playable = _state.value.playable ?: return
+        if (standing) return
+        val url = candidates.getOrNull(candidateIndex) ?: playable.url
+        val positionMs = if (playable.isLive) 0L else exo.currentPosition.coerceAtLeast(0)
+        logger.i("Player", "Recargando '${playable.title}'")
+
+        reconnectJob?.cancel()
+        reconnects = 0
+        // A fresh request, so it is judged like one: a refusal now is not a
+        // dropout, and a panel still tearing the channel down gets its wait.
+        everPlayed = false
+        notReadyWaits = 0
+        lastRenderedFrames = -1
+        _state.value = _state.value.copy(
+            error = null,
+            errorDetail = null,
+            errorAccount = null,
+            buffering = true,
+            switching = true,
+            reconnectAttempt = 0
+        )
+        startedAt = System.currentTimeMillis()
+        exo.stop()
+        exo.clearMediaItems()
+        exo.setMediaItem(playerFactory.mediaItem(url, playable.title))
+        exo.prepare()
+        if (positionMs > 0) exo.seekTo(positionMs)
+        exo.playWhenReady = true
+    }
+
+    /**
+     * Notices the picture stopping while the sound carries on, and reloads.
+     *
+     * ExoPlayer raises no error for it: audio drives the clock, so playback is
+     * "fine" as far as it can tell. What gives it away is the video decoder's
+     * output counter standing still while the clock runs. The log line keeps
+     * the counters, because they are what tells the possible causes apart:
+     * frames still arriving but all dropped means they are late (a decoder too
+     * slow for the stream, or timestamps that jumped backwards); nothing at all
+     * means the decoder wedged, the video stopped coming, or its timestamps
+     * jumped ahead of the sound.
+     */
+    private fun watchForFrozenPicture(exo: ExoPlayer) {
+        val counters = exo.videoDecoderCounters
+        val now = android.os.SystemClock.elapsedRealtime()
+        // Only once a frame has been seen: before that a slow start is not a
+        // freeze, and an audio-only channel has no decoder to watch.
+        if (counters == null || exo.videoFormat == null || !everPlayed || standing ||
+            !exo.isPlaying || _state.value.switching
+        ) {
+            lastFrameAt = now
+            return
+        }
+        counters.ensureUpdated()
+        val rendered = counters.renderedOutputBufferCount
+        if (rendered != lastRenderedFrames) {
+            lastRenderedFrames = rendered
+            lastDroppedFrames = counters.droppedBufferCount
+            lastFrameAt = now
+            return
+        }
+        val frozenMs = now - lastFrameAt
+        if (frozenMs < FROZEN_PICTURE_MS) return
+
+        val video = exo.videoFormat
+        val dropped = counters.droppedBufferCount - lastDroppedFrames
+        val detail = "${video?.width}×${video?.height} ${video?.sampleMimeType}, " +
+            "perdidos +$dropped, saltados ${counters.skippedOutputBufferCount}, " +
+            "búfer ${exo.totalBufferedDuration} ms"
+        if (frozenReloads >= MAX_FROZEN_RELOADS) {
+            // Logged once and then left alone: a channel that keeps doing it
+            // would otherwise reconnect forever, and the user can still reload.
+            if (frozenReloads == MAX_FROZEN_RELOADS) {
+                frozenReloads++
+                logger.w("Player", "Imagen congelada otra vez ($detail); no se recarga más sola")
+            }
+            lastFrameAt = now
+            return
+        }
+        frozenReloads++
+        logger.w(
+            "Player",
+            "Imagen congelada ${frozenMs / 1000} s con el audio en marcha ($detail); " +
+                "recargando ($frozenReloads/$MAX_FROZEN_RELOADS)"
+        )
+        reload()
     }
 
     private fun recordProgress() {

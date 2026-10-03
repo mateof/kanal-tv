@@ -9,7 +9,10 @@ import androidx.media3.datasource.DefaultDataSource
 import androidx.media3.datasource.okhttp.OkHttpDataSource
 import androidx.media3.exoplayer.DefaultLoadControl
 import androidx.media3.exoplayer.DefaultRenderersFactory
+import androidx.media3.exoplayer.DecoderReuseEvaluation
 import androidx.media3.exoplayer.ExoPlayer
+import androidx.media3.exoplayer.analytics.AnalyticsListener
+import androidx.media3.common.Format
 import androidx.media3.exoplayer.source.DefaultMediaSourceFactory
 import androidx.media3.exoplayer.trackselection.DefaultTrackSelector
 import android.net.Uri
@@ -113,6 +116,7 @@ class PlayerFactory @Inject constructor(
             .setWakeMode(C.WAKE_MODE_NETWORK)
             .build()
             .also {
+                it.addAnalyticsListener(DecoderLog(logger))
                 logger.d(
                     "Player",
                     "Reproductor creado (buffer ${profile.name}: arranque ${profile.startMs} ms, " +
@@ -199,5 +203,47 @@ private class StubbornLoadErrorPolicy : DefaultLoadErrorHandlingPolicy() {
         val previous = super.getRetryDelayMsFor(info)
         if (previous == C.TIME_UNSET) return C.TIME_UNSET
         return previous.coerceAtMost(2_000L)
+    }
+}
+
+/**
+ * Puts the video decoder's story in the log: which one was picked, and every
+ * change of format it was asked to take mid-stream.
+ *
+ * That is the evidence a frozen picture needs. A software decoder (FFmpeg)
+ * taking a 1080p HEVC channel on a stick explains frames arriving too late to
+ * show; a resolution change the hardware decoder was told to absorb without
+ * being rebuilt, just before the freeze, points at the decoder itself.
+ */
+@UnstableApi
+private class DecoderLog(private val logger: FileLogger) : AnalyticsListener {
+    override fun onVideoDecoderInitialized(
+        eventTime: AnalyticsListener.EventTime,
+        decoderName: String,
+        initializedTimestampMs: Long,
+        initializationDurationMs: Long
+    ) {
+        logger.d("Player", "Decodificador de vídeo: $decoderName")
+    }
+
+    override fun onVideoInputFormatChanged(
+        eventTime: AnalyticsListener.EventTime,
+        format: Format,
+        decoderReuseEvaluation: DecoderReuseEvaluation?
+    ) {
+        val reuse = when (decoderReuseEvaluation?.result) {
+            null -> "decodificador nuevo"
+            DecoderReuseEvaluation.REUSE_RESULT_NO -> "se rehace el decodificador"
+            else -> "se reutiliza el decodificador"
+        }
+        logger.d(
+            "Player",
+            "Vídeo ${format.width}×${format.height} ${format.sampleMimeType} " +
+                "${format.frameRate} fps ($reuse)"
+        )
+    }
+
+    override fun onVideoCodecError(eventTime: AnalyticsListener.EventTime, videoCodecError: Exception) {
+        logger.w("Player", "Error del decodificador de vídeo: ${videoCodecError.message}")
     }
 }
