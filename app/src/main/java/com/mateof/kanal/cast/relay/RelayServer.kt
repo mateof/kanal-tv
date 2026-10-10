@@ -70,6 +70,10 @@ class RelayServer(
     private var server: ServerSocket? = null
     private val active = AtomicInteger(0)
     private val lastActivity = AtomicLong(System.currentTimeMillis())
+    private val served = AtomicLong(0)
+
+    @Volatile
+    private var stopped = false
     private val sockets: MutableSet<Socket> = Collections.synchronizedSet(mutableSetOf())
 
     /** The GET currently being served; a new one from the television replaces it. */
@@ -91,11 +95,18 @@ class RelayServer(
         return "http://$host:$port" + RelayTokens.path(session.token, Dlna.extensionOf(session.mime))
     }
 
+    /** Bytes of the stream the television has been given, across all its requests. */
+    fun servedBytes(): Long = served.get()
+
+    /** Whether the television has a connection open right now. */
+    fun connected(): Boolean = active.get() > 0
+
     /** How long nothing has been connected; zero while the television is reading. */
     fun idleMs(now: Long = System.currentTimeMillis()): Long =
         if (active.get() > 0) 0 else now - lastActivity.get()
 
     fun stop() {
+        stopped = true
         session = null
         runCatching { server?.close() }
         streaming?.second?.cancel()
@@ -122,6 +133,7 @@ class RelayServer(
         var range: String? = null,
         var code: Int = 0,
         var bytes: Long = 0,
+        var agent: String? = null,
         var ending: String = ""
     )
 
@@ -148,6 +160,7 @@ class RelayServer(
             }
             exchange.method = request.method
             exchange.range = request.headers["range"]
+            exchange.agent = request.headers["user-agent"]
             handle(client, request, exchange)
         } catch (e: IOException) {
             if (exchange.ending.isEmpty()) exchange.ending = e.message ?: e.javaClass.simpleName
@@ -161,6 +174,7 @@ class RelayServer(
                 events.info(
                     "TV ${exchange.method}" +
                         (exchange.range?.let { " Range=$it" } ?: "") +
+                        (exchange.agent?.let { " UA='$it'" } ?: "") +
                         " → ${exchange.code} · ${formatBytes(exchange.bytes)} · $ms ms" +
                         (if (exchange.ending.isNotEmpty()) " · ${exchange.ending}" else "")
                 )
@@ -298,7 +312,11 @@ class RelayServer(
             val read = try {
                 input.read(buffer)
             } catch (e: IOException) {
-                exchange.ending = if (call.isCanceled()) "sustituida por otra petición" else "el servidor cortó: ${e.message}"
+                exchange.ending = when {
+                    stopped -> "relay cerrado"
+                    call.isCanceled() -> "sustituida por otra petición"
+                    else -> "el servidor cortó: ${e.message}"
+                }
                 if (!call.isCanceled()) events.warn("El servidor cortó la emisión a mitad: ${e.message}")
                 return
             }
@@ -311,11 +329,12 @@ class RelayServer(
                 // Live video: whatever arrived goes out now, not when a buffer fills.
                 out.flush()
             } catch (_: IOException) {
-                exchange.ending = "la tele cerró la conexión"
+                exchange.ending = if (stopped) "relay cerrado" else "la tele cerró la conexión"
                 call.cancel()
                 return
             }
             exchange.bytes += read
+            served.addAndGet(read.toLong())
             lastActivity.set(System.currentTimeMillis())
         }
     }

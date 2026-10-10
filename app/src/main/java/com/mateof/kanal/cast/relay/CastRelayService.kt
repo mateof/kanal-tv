@@ -122,6 +122,7 @@ class CastRelayService : Service() {
     private suspend fun watch() {
         var lastPoll = System.currentTimeMillis()
         var misses = 0
+        var lastState: String? = null
         while (scope.isActive) {
             delay(TICK_MS)
             val running = relay.status.value as? RelayStatus.Running ?: return
@@ -139,7 +140,10 @@ class CastRelayService : Service() {
             upnp.transportState(running.device)
                 .onSuccess { state ->
                     misses = 0
-                    logger.d("Cast", "${running.device.name}: $state")
+                    // Only changes: an evening of PLAYING every fifteen seconds
+                    // would bury everything else in the log.
+                    if (state != lastState) logger.d("Cast", "${running.device.name}: $state")
+                    lastState = state
                 }
                 .onFailure { error ->
                     misses++

@@ -166,6 +166,14 @@ class CastRelay @Inject constructor(
     /** Milliseconds since the television last had a connection open, or null when not running. */
     fun idleMs(): Long? = server?.idleMs()
 
+    /**
+     * Whether the television is pulling the stream right now, with at least
+     * [minBytes] already through: the only proof of playback that does not
+     * depend on how the renderer words its answers.
+     */
+    fun tvReading(minBytes: Long = 1): Boolean =
+        server?.let { it.connected() && it.servedBytes() >= minBytes } ?: false
+
     /** Closes session [generation] only if no newer one has replaced it. */
     @Synchronized
     fun closeIfStill(generation: Int, reason: String) {
@@ -190,6 +198,12 @@ class CastRelay @Inject constructor(
         lastEnded = ended
         shutdown()
         _ended.tryEmit(ended)
+    }
+
+    /** Ends session [generation] on its own only if no newer one has replaced it. */
+    @Synchronized
+    fun endIfStill(generation: Int, problem: String?, hint: UiText? = null) {
+        if (generation == this.generation) end(problem, hint)
     }
 
     private fun shutdown() {

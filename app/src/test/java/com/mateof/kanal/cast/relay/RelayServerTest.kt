@@ -305,6 +305,20 @@ class RelayServerTest {
         assertTrue(relay.idleMs(now) in 0..5_000)
         assertTrue(relay.idleMs(now + 60_000) >= 60_000)
     }
+
+    @Test
+    fun countsWhatTheTelevisionWasGivenAcrossRequests() {
+        val session = open("/live/u/p/1.ts")
+        assertEquals(0L, relay.servedBytes())
+        ask("HEAD", pathOf(session))
+        assertEquals(0L, relay.servedBytes())
+        ask("GET", pathOf(session))
+        ask("GET", pathOf(session))
+        assertEquals(2L * payload.size, relay.servedBytes())
+        val deadline = System.currentTimeMillis() + 2_000
+        while (relay.connected() && System.currentTimeMillis() < deadline) Thread.sleep(10)
+        assertFalse(relay.connected())
+    }
 }
 
 /**

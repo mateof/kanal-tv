@@ -11,9 +11,15 @@ import com.mateof.kanal.data.prefs.AppPreferences
 import com.mateof.kanal.data.prefs.CastRouteMode
 import com.mateof.kanal.data.prefs.StreamFormat
 import com.mateof.kanal.data.repo.Playable
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Deferred
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.async
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.SharedFlow
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import java.net.InetAddress
 import java.net.URI
@@ -70,6 +76,9 @@ class CastController @Inject constructor(
     private val logger: FileLogger
 ) {
     private val memory = RouteMemory()
+
+    /** Outlives a send: a television may answer Play long after it started playing. */
+    private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
 
     /** Relays that ended on their own; the screens clear their "playing on". */
     val ended: SharedFlow<RelayEnded> = relay.ended
@@ -176,11 +185,56 @@ class CastController @Inject constructor(
             title = request.title,
             port = port
         )
-        upnp.play(device, CastSource(url, mime, features, route), request.title)
-            .onFailure { relay.close("${device.name} rechazó la dirección del relay") }
-            .getOrThrow()
+        val generation = relay.generation
+        val source = CastSource(url, mime, features, route)
+        val play = scope.async { upnp.play(device, source, request.title) }
+        // webOS holds Play open until its player settles, and on a live stream
+        // answers 501 after thirty seconds while it is already showing it. What
+        // the television does with the relay says more than what it answers.
+        while (!play.isCompleted && !relay.tvReading(PLAYBACK_EVIDENCE_BYTES)) delay(EVIDENCE_POLL_MS)
+        if (play.isCompleted) {
+            play.await().onFailure { error ->
+                if (!keepsReading()) {
+                    relay.close("${device.name} rechazó la dirección del relay")
+                    throw error
+                }
+                logger.w("Cast", "${device.name} contestó a Play con un error (${error.message}), pero está recibiendo la emisión; se sigue")
+            }
+        } else {
+            logger.i("Cast", "${device.name} ya está recibiendo la emisión; no se espera a que conteste a Play")
+            scope.launch { lateAnswer(device, play, generation) }
+        }
         logger.i("Cast", "'${request.title}' sale de ${redactUrl(request.relayUrl)} a través del móvil")
         return CastOutcome(route)
+    }
+
+    /**
+     * Play answering after the send was already given up as working. A failure
+     * only counts if the television has also stopped reading; otherwise it is
+     * the renderer's wording, and the relay's watchdog has the last word.
+     */
+    private suspend fun lateAnswer(device: CastDevice, play: Deferred<Result<Unit>>, generation: Int) {
+        play.await()
+            .onSuccess { logger.d("Cast", "${device.name} contestó a Play") }
+            .onFailure { error ->
+                if (relay.generation != generation) return
+                if (keepsReading()) {
+                    logger.w("Cast", "${device.name} contestó a Play con un error (${error.message}), pero sigue recibiendo la emisión; se sigue")
+                } else {
+                    relay.endIfStill(generation, "${device.name} no consiguió reproducir: ${error.message}", CastHints.of(error))
+                }
+            }
+    }
+
+    /**
+     * Whether the television goes on reading after an error from Play. Asked
+     * twice, a moment apart: one that gives up sends the error first and hangs
+     * up right after, and the first look would still see it connected.
+     */
+    private suspend fun keepsReading(): Boolean {
+        if (!relay.tvReading()) return false
+        delay(READING_GRACE_MS)
+        return relay.tvReading()
     }
 
     private fun hostOf(url: String): String? = runCatching { URI(url).host }.getOrNull()?.takeIf { it.isNotBlank() }
@@ -189,4 +243,11 @@ class CastController @Inject constructor(
         runCatching { InetAddress.getByName(host) }
             .onFailure { logger.w("Cast", "No se pudo resolver $host: ${it.message}") }
             .getOrNull()
+
+    private companion object {
+        /** A couple of seconds of HD: more than a renderer reads just to sniff the format. */
+        const val PLAYBACK_EVIDENCE_BYTES = 2L * 1024 * 1024
+        const val EVIDENCE_POLL_MS = 250L
+        const val READING_GRACE_MS = 3_000L
+    }
 }
