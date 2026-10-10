@@ -264,10 +264,33 @@ class PlayerViewModel @Inject constructor(
     /** The device the stream was handed to, so a relay that ends can be matched to it. */
     private var castDevice: CastDevice? = null
 
+    /** Kept after it stops, so a resend from the panel can be matched to it. */
+    private var lastCastDevice: CastDevice? = null
+
     init {
         // The relay can end without anyone here asking: the television went
         // away, or the phone lost the network or the server. The picture
         // comes back here, as with "bring it back".
+        // The transmission panel is about to send again what stopped: the
+        // picture this screen took back has to let go of the connection first.
+        viewModelScope.launch {
+            cast.reclaiming.collect { device ->
+                if (castDevice != null || device.controlUrl != lastCastDevice?.controlUrl) return@collect
+                player?.stop()
+            }
+        }
+        viewModelScope.launch {
+            cast.resumed.collect { resumed ->
+                if (resumed.device.controlUrl != lastCastDevice?.controlUrl) return@collect
+                castDevice = resumed.device
+                _state.value = _state.value.copy(
+                    castingTo = resumed.device.name,
+                    castViaPhone = resumed.outcome.viaPhone,
+                    castError = null,
+                    castHint = null
+                )
+            }
+        }
         viewModelScope.launch {
             cast.ended.collect { ended ->
                 if (ended.device.controlUrl != castDevice?.controlUrl) return@collect
@@ -979,6 +1002,7 @@ class PlayerViewModel @Inject constructor(
             cast.send(device, CastRequest.from(playable, url))
                 .onSuccess { outcome ->
                     castDevice = device
+                    lastCastDevice = device
                     _state.value = _state.value.copy(
                         castingTo = device.name,
                         castViaPhone = outcome.viaPhone,

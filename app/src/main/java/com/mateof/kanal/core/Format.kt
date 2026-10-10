@@ -79,6 +79,15 @@ fun formatBytes(bytes: Long): String {
     return String.format(Locale.getDefault(), if (unit == 0) "%.0f %s" else "%.1f %s", value, units[unit])
 }
 
+/** A stream's speed as video people read it: bits, not bytes. "4.2 Mb/s" / "850 kb/s". */
+fun formatBitrate(bytesPerSecond: Long): String {
+    val bits = bytesPerSecond * 8.0
+    return when {
+        bits >= 1_000_000 -> String.format(Locale.getDefault(), "%.1f Mb/s", bits / 1_000_000)
+        else -> String.format(Locale.getDefault(), "%.0f kb/s", bits / 1_000)
+    }
+}
+
 /**
  * Sort key that ignores leading channel numbering ("101. La 1", "|ES| La 1")
  * and accents, so alphabetical order matches what the user sees.

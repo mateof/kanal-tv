@@ -33,6 +33,9 @@ data class CastDevice(
     val host: String get() = runCatching { URI(controlUrl).host }.getOrNull().orEmpty()
 }
 
+/** What a renderer reports about the item it holds; see [UpnpClient.position]. */
+data class CastPosition(val elapsed: String?, val duration: String?)
+
 /**
  * Sends a stream to a DLNA/UPnP renderer on the same network.
  *
@@ -195,6 +198,24 @@ class UpnpClient @Inject constructor(
             tag(soap(device, "GetTransportInfo", "<InstanceID>0</InstanceID>"), "CurrentTransportState")
         }
     }
+
+    /**
+     * Where the renderer says it is, as "H:MM:SS" strings, with nulls for what
+     * it does not know. A live stream usually has no duration, and plenty of
+     * renderers answer NOT_IMPLEMENTED or all zeroes.
+     */
+    suspend fun position(device: CastDevice): Result<CastPosition> = withContext(Dispatchers.IO) {
+        runCatching {
+            val reply = soap(device, "GetPositionInfo", "<InstanceID>0</InstanceID>")
+            CastPosition(
+                elapsed = tag(reply, "RelTime")?.let(::knownTime),
+                duration = tag(reply, "TrackDuration")?.let(::knownTime)
+            )
+        }
+    }
+
+    private fun knownTime(value: String): String? =
+        value.takeIf { it.isNotBlank() && it != "NOT_IMPLEMENTED" && it.any { c -> c in '1'..'9' } }
 
     private fun soap(device: CastDevice, action: String, body: String): String {
         val envelope = """<?xml version="1.0" encoding="utf-8"?>

@@ -23,6 +23,7 @@ object CastHints {
     fun of(error: Throwable): UiText? = when (error) {
         is RelayUnavailable -> error.hint
         is CastFailure -> error.relay.hint
+        is RelayStopped -> error.hint ?: forDetail(error.message.orEmpty())
         else -> forDetail(error.message.orEmpty())
     }
 

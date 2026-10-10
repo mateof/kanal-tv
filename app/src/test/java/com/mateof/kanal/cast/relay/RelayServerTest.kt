@@ -35,15 +35,26 @@ class RelayServerTest {
     private val originRanges = Collections.synchronizedList(mutableListOf<String?>())
     private val unreachable = Collections.synchronizedList(mutableListOf<IOException>())
     private val unsupported = Collections.synchronizedList(mutableListOf<String>())
+    private val comebacks = AtomicInteger()
+    private val refusedFrom = Collections.synchronizedList(mutableListOf<String>())
+    private val refusedCodes = Collections.synchronizedList(mutableListOf<Int>())
 
     private val events = object : RelayServer.Events {
         override fun info(message: String) = Unit
-        override fun warn(message: String) = Unit
         override fun upstreamUnreachable(error: IOException) {
             unreachable += error
         }
         override fun unsupported(contentType: String) {
             unsupported += contentType
+        }
+        override fun tvReconnected() {
+            comebacks.incrementAndGet()
+        }
+        override fun refused(address: String) {
+            refusedFrom += address
+        }
+        override fun upstreamRefused(code: Int) {
+            refusedCodes += code
         }
     }
 
@@ -229,6 +240,7 @@ class RelayServerTest {
         val session = open("/live/u/p/1.ts", client = InetAddress.getByName("192.168.1.137"))
         assertEquals(403, ask("GET", pathOf(session)).status)
         assertEquals(0, originHits.get())
+        assertEquals(listOf("127.0.0.1"), refusedFrom.toList())
     }
 
     @Test
@@ -258,6 +270,8 @@ class RelayServerTest {
         val session = open("/missing")
         assertEquals(404, ask("GET", pathOf(session)).status)
         assertTrue(unreachable.isEmpty())
+        assertEquals(listOf(404), refusedCodes.toList())
+        assertEquals(0, relay.stats().streams)
     }
 
     @Test
@@ -318,6 +332,40 @@ class RelayServerTest {
         val deadline = System.currentTimeMillis() + 2_000
         while (relay.connected() && System.currentTimeMillis() < deadline) Thread.sleep(10)
         assertFalse(relay.connected())
+    }
+
+    @Test
+    fun tellsATelevisionComingBackFromItsFirstRequest() {
+        val session = open("/live/u/p/1.ts")
+        ask("HEAD", pathOf(session), "User-Agent" to "LG Player/1.0")
+        ask("GET", pathOf(session), "User-Agent" to "LG Player/1.0")
+        assertEquals(0, comebacks.get())
+        ask("GET", pathOf(session))
+
+        val stats = relay.stats()
+        assertEquals(2, stats.streams)
+        assertEquals(1, comebacks.get())
+        assertEquals("LG Player/1.0", stats.agent)
+        assertEquals(2L * payload.size, stats.servedBytes)
+        assertTrue((stats.upstreamMs ?: -1) >= 0)
+    }
+
+    @Test
+    fun aLiveStreamThatEndsWasCutButAFilmThatEndsWasNot() {
+        val live = open("/live/u/p/1.ts")
+        ask("GET", pathOf(live))
+        waitUntilIdle()
+        assertTrue(relay.cutAndAbandoned())
+
+        val film = open("/movie/u/p/2.mp4", live = false, mime = "video/mp4")
+        ask("GET", RelayTokens.path(film.token, ".mp4"))
+        waitUntilIdle()
+        assertFalse(relay.cutAndAbandoned())
+    }
+
+    private fun waitUntilIdle() {
+        val deadline = System.currentTimeMillis() + 2_000
+        while (relay.connected() && System.currentTimeMillis() < deadline) Thread.sleep(10)
     }
 }
 

@@ -32,6 +32,20 @@ data class RelaySession(
     val client: InetAddress
 )
 
+/** What the relay has seen so far, for the transmission panel. */
+data class RelayStats(
+    /** Bytes the television has been given, across all its requests. */
+    val servedBytes: Long,
+    /** Whether the television has a connection open right now. */
+    val connected: Boolean,
+    /** GETs that got as far as the stream; anything past the first is the television coming back. */
+    val streams: Int,
+    /** How the television's player introduces itself. */
+    val agent: String?,
+    /** How long the provider took to answer the last GET. */
+    val upstreamMs: Long?
+)
+
 /**
  * A minimal HTTP server that hands a television the stream the phone can reach
  * and the television cannot — a panel behind a VPN, typically.
@@ -55,13 +69,24 @@ class RelayServer(
 ) {
     interface Events {
         fun info(message: String)
-        fun warn(message: String)
 
         /** The provider could not be reached at all: not a television hanging up. */
         fun upstreamUnreachable(error: IOException)
 
         /** The provider answered with something a single url cannot carry. */
         fun unsupported(contentType: String)
+
+        /** The provider stopped sending halfway through a stream. */
+        fun upstreamCut(detail: String?) = Unit
+
+        /** The provider answered the television's request with an error status. */
+        fun upstreamRefused(code: Int) = Unit
+
+        /** The television asked for the stream again after it had already been served. */
+        fun tvReconnected() = Unit
+
+        /** A request from an address that is not the television's. */
+        fun refused(address: String) = Unit
     }
 
     @Volatile
@@ -71,6 +96,17 @@ class RelayServer(
     private val active = AtomicInteger(0)
     private val lastActivity = AtomicLong(System.currentTimeMillis())
     private val served = AtomicLong(0)
+    private val streams = AtomicInteger(0)
+
+    @Volatile
+    private var agent: String? = null
+
+    @Volatile
+    private var upstreamMs: Long? = null
+
+    /** Whether the last stream ended because the provider stopped sending. */
+    @Volatile
+    private var lastStreamCut = false
 
     @Volatile
     private var stopped = false
@@ -100,6 +136,15 @@ class RelayServer(
 
     /** Whether the television has a connection open right now. */
     fun connected(): Boolean = active.get() > 0
+
+    fun stats(): RelayStats = RelayStats(served.get(), connected(), streams.get(), agent, upstreamMs)
+
+    /**
+     * True when the provider cut the last stream and the television has not
+     * asked again since: a renderer that gives up on a dropped live stream
+     * stays quiet rather than reconnecting.
+     */
+    fun cutAndAbandoned(): Boolean = lastStreamCut && !connected()
 
     /** How long nothing has been connected; zero while the television is reading. */
     fun idleMs(now: Long = System.currentTimeMillis()): Long =
@@ -161,6 +206,7 @@ class RelayServer(
             exchange.method = request.method
             exchange.range = request.headers["range"]
             exchange.agent = request.headers["user-agent"]
+            exchange.agent?.let { agent = it }
             handle(client, request, exchange)
         } catch (e: IOException) {
             if (exchange.ending.isEmpty()) exchange.ending = e.message ?: e.javaClass.simpleName
@@ -191,6 +237,7 @@ class RelayServer(
             exchange.code = 403
             exchange.ending = "petición de ${client.inetAddress.hostAddress}, no de la tele"
             respondEmpty(out, 403)
+            if (current != null) events.refused(client.inetAddress.hostAddress.orEmpty())
             return
         }
         if (request.method != "GET" && request.method != "HEAD") {
@@ -245,6 +292,7 @@ class RelayServer(
             }
         }
 
+        val asked = System.nanoTime()
         val response = try {
             call.execute()
         } catch (e: IOException) {
@@ -270,6 +318,7 @@ class RelayServer(
                 exchange.code = if (reply.code in 400..499) reply.code else 502
                 exchange.ending = "el servidor respondió ${reply.code}"
                 respondEmpty(out, exchange.code)
+                if (!head) events.upstreamRefused(reply.code)
                 return
             }
             val type = reply.header("Content-Type").orEmpty()
@@ -297,16 +346,22 @@ class RelayServer(
 
             val body = reply.body ?: return
             client.soTimeout = 0
-            copy(body.byteStream(), out, exchange, call)
+            upstreamMs = (System.nanoTime() - asked) / 1_000_000
+            lastStreamCut = false
+            // Counted before the bytes, so a television that comes back is
+            // known as soon as it asks, not when its stream ends.
+            if (streams.incrementAndGet() > 1 && served.get() > 0) events.tvReconnected()
+            copy(body.byteStream(), out, exchange, call, current.live)
         }
     }
 
     /**
      * Reads and writes are told apart because they mean different things: a
      * write failing is the television hanging up, which is routine; a read
-     * failing is the provider cutting the stream.
+     * failing is the provider cutting the stream. So is a live stream that
+     * simply ends: a channel has no last byte.
      */
-    private fun copy(input: InputStream, out: OutputStream, exchange: Exchange, call: Call) {
+    private fun copy(input: InputStream, out: OutputStream, exchange: Exchange, call: Call, live: Boolean) {
         val buffer = ByteArray(BUFFER_BYTES)
         while (true) {
             val read = try {
@@ -317,11 +372,20 @@ class RelayServer(
                     call.isCanceled() -> "sustituida por otra petición"
                     else -> "el servidor cortó: ${e.message}"
                 }
-                if (!call.isCanceled()) events.warn("El servidor cortó la emisión a mitad: ${e.message}")
+                if (!stopped && !call.isCanceled()) {
+                    lastStreamCut = true
+                    events.upstreamCut(e.message)
+                }
                 return
             }
             if (read < 0) {
-                exchange.ending = "fin de la emisión"
+                if (live && !stopped) {
+                    exchange.ending = "el servidor cerró la emisión"
+                    lastStreamCut = true
+                    events.upstreamCut("el servidor cerró la conexión")
+                } else {
+                    exchange.ending = "fin de la emisión"
+                }
                 return
             }
             try {

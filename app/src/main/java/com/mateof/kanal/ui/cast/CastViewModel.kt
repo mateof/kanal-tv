@@ -37,7 +37,9 @@ data class CastUiState(
     /** Whether the stream goes through this phone rather than straight from the server. */
     val viaPhone: Boolean = false,
     val error: String? = null,
-    val hint: UiText? = null
+    val hint: UiText? = null,
+    /** Something is (or was, until it stopped by itself) on another device: the panel has it. */
+    val transmission: Boolean = false
 ) {
     val open: Boolean get() = target != null
 }
@@ -70,7 +72,28 @@ class CastViewModel @Inject constructor(
     /** The device last sent to, so a relay that ends can be matched to it. */
     private var sentDevice: CastDevice? = null
 
+    /** Kept after it stops, so a resend from the panel can be matched to it. */
+    private var lastDevice: CastDevice? = null
+
     init {
+        viewModelScope.launch {
+            cast.session.collect { session ->
+                _state.value = _state.value.copy(transmission = session != null)
+            }
+        }
+        // Sent again from the transmission panel after it had stopped.
+        viewModelScope.launch {
+            cast.resumed.collect { resumed ->
+                if (resumed.device.controlUrl != lastDevice?.controlUrl) return@collect
+                sentDevice = resumed.device
+                _state.value = _state.value.copy(
+                    sentTo = resumed.device.name,
+                    viaPhone = resumed.outcome.viaPhone,
+                    error = null,
+                    hint = null
+                )
+            }
+        }
         viewModelScope.launch {
             cast.ended.collect { ended ->
                 if (ended.device.controlUrl != sentDevice?.controlUrl) return@collect
@@ -151,6 +174,7 @@ class CastViewModel @Inject constructor(
             cast.send(device, CastRequest.from(playable))
                 .onSuccess { outcome ->
                     sentDevice = device
+                    lastDevice = device
                     _state.value = _state.value.copy(
                         searching = false,
                         sentTo = device.name,

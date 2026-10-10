@@ -1,6 +1,7 @@
 package com.mateof.kanal
 
 import android.app.PictureInPictureParams
+import android.content.Intent
 import android.content.res.Configuration
 import android.os.Build
 import android.os.Bundle
@@ -18,6 +19,7 @@ import com.mateof.kanal.player.PipController
 import com.mateof.kanal.player.PlayerHandover
 import com.mateof.kanal.ui.AppShell
 import com.mateof.kanal.ui.KanalNavHost
+import com.mateof.kanal.ui.cast.CastPanelRequests
 import com.mateof.kanal.ui.theme.KanalTheme
 import dagger.hilt.android.AndroidEntryPoint
 import kotlinx.coroutines.flow.distinctUntilChanged
@@ -80,6 +82,9 @@ class MainActivity : ComponentActivity() {
             }
         }
 
+        // Not after a rotation: the activity is recreated with the same intent.
+        if (savedInstanceState == null) takePanelRequest(intent)
+
         setContent {
             KanalTheme {
                 AppShell {
@@ -87,6 +92,18 @@ class MainActivity : ComponentActivity() {
                 }
             }
         }
+    }
+
+    override fun onNewIntent(intent: Intent) {
+        super.onNewIntent(intent)
+        takePanelRequest(intent)
+    }
+
+    /** The transmission notification opens the app on its panel. */
+    private fun takePanelRequest(intent: Intent?) {
+        if (intent?.getBooleanExtra(EXTRA_OPEN_CAST, false) != true) return
+        intent.removeExtra(EXTRA_OPEN_CAST)
+        CastPanelRequests.request()
     }
 
     /** @return false when there is nothing playing worth shrinking. */
@@ -153,5 +170,9 @@ class MainActivity : ComponentActivity() {
     override fun onUserInteraction() {
         super.onUserInteraction()
         inactivity.onInteraction()
+    }
+
+    companion object {
+        const val EXTRA_OPEN_CAST = "com.mateof.kanal.OPEN_CAST"
     }
 }

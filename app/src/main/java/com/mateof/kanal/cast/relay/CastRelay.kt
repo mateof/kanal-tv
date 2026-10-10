@@ -37,7 +37,26 @@ sealed interface RelayStatus {
  * [problem] is null for an ordinary end — the Stop button, a television that
  * stopped asking — and set when the user should hear why.
  */
-data class RelayEnded(val device: CastDevice, val problem: String?, val hint: UiText?)
+data class RelayEnded(
+    val device: CastDevice,
+    val problem: String?,
+    val hint: UiText?,
+    /** The session it ended; see [CastRelay.generation]. */
+    val generation: Int = 0,
+    /**
+     * Ended by something on the provider's side — the phone lost the server,
+     * or the server cut the stream and the television gave up — that sending
+     * again may well get past.
+     */
+    val recoverable: Boolean = false,
+    /** The user asked for it, from the notification. */
+    val byUser: Boolean = false
+)
+
+/** Something worth telling the user about while a relay runs, without ending it. */
+data class RelayNotice(val generation: Int, val kind: Kind, val detail: String? = null) {
+    enum class Kind { TV_RECONNECTED, UPSTREAM_CUT, UPSTREAM_REFUSED, REFUSED }
+}
 
 /**
  * Owns the relay server and the one session it serves.
@@ -59,6 +78,9 @@ class CastRelay @Inject constructor(
 
     private val _ended = MutableSharedFlow<RelayEnded>(extraBufferCapacity = 4)
     val ended: SharedFlow<RelayEnded> = _ended.asSharedFlow()
+
+    private val _notices = MutableSharedFlow<RelayNotice>(extraBufferCapacity = 16)
+    val notices: SharedFlow<RelayNotice> = _notices.asSharedFlow()
 
     /** The last end, for the service to word its parting notification. */
     @Volatile
@@ -166,6 +188,18 @@ class CastRelay @Inject constructor(
     /** Milliseconds since the television last had a connection open, or null when not running. */
     fun idleMs(): Long? = server?.idleMs()
 
+    /** What the running relay has seen, or null when none runs. */
+    fun stats(): RelayStats? = server?.stats()
+
+    /** The port the running relay listens on. */
+    fun port(): Int? = server?.port?.takeIf { it > 0 }
+
+    /** Whether session [generation] is still the one being served. */
+    fun running(generation: Int): Boolean = server != null && generation == this.generation
+
+    /** See [RelayServer.cutAndAbandoned]. */
+    fun cutAndAbandoned(): Boolean = server?.cutAndAbandoned() ?: false
+
     /**
      * Whether the television is pulling the stream right now, with at least
      * [minBytes] already through: the only proof of playback that does not
@@ -191,10 +225,10 @@ class CastRelay @Inject constructor(
 
     /** Stopped by itself; the screens and the notification are told. */
     @Synchronized
-    fun end(problem: String?, hint: UiText? = null) {
+    fun end(problem: String?, hint: UiText? = null, recoverable: Boolean = false, byUser: Boolean = false) {
         val running = _status.value as? RelayStatus.Running ?: return
         if (problem != null) logger.w("Cast", "Relay detenido: $problem") else logger.i("Cast", "Relay terminado")
-        val ended = RelayEnded(running.device, problem, hint)
+        val ended = RelayEnded(running.device, problem, hint, generation, recoverable, byUser)
         lastEnded = ended
         shutdown()
         _ended.tryEmit(ended)
@@ -215,13 +249,31 @@ class CastRelay @Inject constructor(
     private fun events(device: CastDevice, tunnel: String) = object : RelayServer.Events {
         override fun info(message: String) = logger.i("Cast", message)
 
-        override fun warn(message: String) = logger.w("Cast", message)
-
         override fun upstreamUnreachable(error: IOException) {
             end(
                 "el móvil no llega al servidor (${error.javaClass.simpleName}: ${error.message})",
-                UiText(R.string.cast_hint_no_route, tunnel)
+                UiText(R.string.cast_hint_no_route, tunnel),
+                // A VPN that is reconnecting looks exactly like this.
+                recoverable = true
             )
+        }
+
+        override fun upstreamCut(detail: String?) {
+            logger.w("Cast", "El servidor cortó la emisión a mitad: $detail")
+            notice(RelayNotice.Kind.UPSTREAM_CUT, detail)
+        }
+
+        override fun upstreamRefused(code: Int) = notice(RelayNotice.Kind.UPSTREAM_REFUSED, code.toString())
+
+        override fun tvReconnected() {
+            logger.i("Cast", "${device.name} volvió a pedir la emisión")
+            notice(RelayNotice.Kind.TV_RECONNECTED)
+        }
+
+        override fun refused(address: String) = notice(RelayNotice.Kind.REFUSED, address)
+
+        private fun notice(kind: RelayNotice.Kind, detail: String? = null) {
+            _notices.tryEmit(RelayNotice(generation, kind, detail))
         }
 
         override fun unsupported(contentType: String) {

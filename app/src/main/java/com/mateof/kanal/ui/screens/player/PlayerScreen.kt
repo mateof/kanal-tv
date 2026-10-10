@@ -124,6 +124,7 @@ import com.mateof.kanal.core.formatClock
 import com.mateof.kanal.core.formatDuration
 import com.mateof.kanal.data.prefs.SubtitleLook
 import com.mateof.kanal.data.prefs.SubtitleSize
+import com.mateof.kanal.ui.cast.CastPanelRequests
 import com.mateof.kanal.ui.components.ActionMenu
 import com.mateof.kanal.ui.components.ArtworkImage
 import com.mateof.kanal.ui.components.ChannelGuide
@@ -1614,6 +1615,7 @@ private fun CastSheet(
         ) {
             if (state.castingTo != null) {
                 KanalButton(stringResource(R.string.cast_bring_back), onBringBack)
+                KanalButton(stringResource(R.string.cast_panel_open), { CastPanelRequests.request() })
             }
             // The anchor is a button, never the address field: landing on a
             // text field throws the on-screen keyboard up over the sheet before

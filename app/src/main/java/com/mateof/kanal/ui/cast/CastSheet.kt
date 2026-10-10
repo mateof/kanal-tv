@@ -226,6 +226,15 @@ fun CastSheet(
                 if (state.sentTo != null) {
                     KanalButton(stringResource(R.string.cast_bring_back), onStop)
                 }
+                if (state.transmission) {
+                    KanalButton(
+                        stringResource(R.string.cast_panel_open),
+                        {
+                            onClose()
+                            CastPanelRequests.request()
+                        }
+                    )
+                }
                 KanalButton(
                     stringResource(R.string.cast_search_again),
                     onSearch,

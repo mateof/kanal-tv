@@ -22,8 +22,11 @@ import androidx.core.app.ServiceCompat
 import androidx.core.content.ContextCompat
 import com.mateof.kanal.MainActivity
 import com.mateof.kanal.R
+import com.mateof.kanal.cast.CastMonitor
 import com.mateof.kanal.cast.UpnpClient
 import com.mateof.kanal.core.UiText
+import com.mateof.kanal.core.formatBitrate
+import com.mateof.kanal.core.formatBytes
 import com.mateof.kanal.core.log.FileLogger
 import dagger.hilt.android.AndroidEntryPoint
 import kotlinx.coroutines.CoroutineScope
@@ -52,6 +55,7 @@ class CastRelayService : Service() {
 
     @Inject lateinit var relay: CastRelay
     @Inject lateinit var upnp: UpnpClient
+    @Inject lateinit var monitor: CastMonitor
     @Inject lateinit var logger: FileLogger
 
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
@@ -80,7 +84,7 @@ class CastRelayService : Service() {
         if (intent?.action == ACTION_STOP) {
             scope.launch {
                 running?.let { upnp.stop(it.device) }
-                relay.end(null)
+                relay.end(null, byUser = true)
             }
             return START_NOT_STICKY
         }
@@ -96,7 +100,10 @@ class CastRelayService : Service() {
             follower = scope.launch {
                 relay.status.collect { status ->
                     if (status is RelayStatus.Running) return@collect
-                    relay.lastEnded?.takeIf { it.problem != null }?.let(::postEndNotice)
+                    // Not one about to be sent again by itself: the controller
+                    // posts the notice if that fails too.
+                    relay.lastEnded?.takeIf { it.problem != null && !it.recoverable }
+                        ?.let { postEndNotice(this@CastRelayService, it) }
                     // A new send sets Running *before* starting this service
                     // again, so: read the id, then make sure nothing reopened.
                     // stopSelf(id) is ignored if a newer start has arrived since.
@@ -127,6 +134,17 @@ class CastRelayService : Service() {
             delay(TICK_MS)
             val running = relay.status.value as? RelayStatus.Running ?: return
             val idle = relay.idleMs() ?: return
+            refreshNotification(running)
+            if (idle > CUT_QUIET_MS && relay.cutAndAbandoned()) {
+                // A television whose live stream was cut tends to stop rather
+                // than ask again; waiting the full minute only lengthens the
+                // black screen before sending it again.
+                relay.end(
+                    "el servidor cortó la emisión y la tele no volvió a pedirla",
+                    recoverable = true
+                )
+                return
+            }
             if (idle > IDLE_LIMIT_MS) {
                 // Not a problem to report: usually the television was switched
                 // off or told to play something else.
@@ -144,10 +162,12 @@ class CastRelayService : Service() {
                     // would bury everything else in the log.
                     if (state != lastState) logger.d("Cast", "${running.device.name}: $state")
                     lastState = state
+                    monitor.tvState(state)
                 }
                 .onFailure { error ->
                     misses++
                     logger.w("Cast", "${running.device.name} no contesta ($misses/$MAX_MISSES): ${error.message}")
+                    monitor.tvSilent(misses, MAX_MISSES, error.message)
                     if (misses >= MAX_MISSES) {
                         relay.end("la tele dejó de responder", UiText(R.string.cast_hint_tv_gone))
                         return
@@ -216,58 +236,41 @@ class CastRelayService : Service() {
             .onFailure { logger.w("Cast", "No se pudo poner el relay en primer plano", it) }
     }
 
+    /** Speed and total in the notification, so a glance at the phone says it is working. */
+    private fun refreshNotification(running: RelayStatus.Running) {
+        val manager = getSystemService(NotificationManager::class.java) ?: return
+        runCatching { manager.notify(NOTIFICATION_ID, notification(running)) }
+    }
+
     private fun notification(running: RelayStatus.Running?): Notification {
-        ensureChannel()
+        ensureChannel(this)
         val stop = PendingIntent.getService(
             this,
             1,
             Intent(this, CastRelayService::class.java).setAction(ACTION_STOP),
             PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT
         )
+        val session = monitor.session.value?.takeIf { it.device == running?.device && it.servedBytes > 0 }
+        val text = if (session != null) {
+            getString(
+                R.string.cast_relay_notification_stats,
+                running?.title.orEmpty(),
+                formatBitrate(session.rateBytes),
+                formatBytes(session.servedBytes)
+            )
+        } else {
+            getString(R.string.cast_relay_notification_text, running?.title.orEmpty())
+        }
         return NotificationCompat.Builder(this, CHANNEL_ID)
             .setContentTitle(getString(R.string.cast_relay_notification_title, running?.device?.name.orEmpty()))
-            .setContentText(getString(R.string.cast_relay_notification_text, running?.title.orEmpty()))
+            .setContentText(text)
             .setSmallIcon(R.drawable.ic_kanal_mark)
             .setOngoing(true)
             .setOnlyAlertOnce(true)
-            .setContentIntent(openApp())
+            .setSilent(true)
+            .setContentIntent(openPanel(this))
             .addAction(0, getString(R.string.cast_relay_stop), stop)
             .build()
-    }
-
-    /** Left behind after the service is gone, so a failure is not silent. */
-    private fun postEndNotice(ended: RelayEnded) {
-        val manager = getSystemService(NotificationManager::class.java) ?: return
-        ensureChannel()
-        val notice = NotificationCompat.Builder(this, CHANNEL_ID)
-            .setContentTitle(getString(R.string.cast_relay_stopped, ended.device.name))
-            .setContentText(ended.problem)
-            .setStyle(NotificationCompat.BigTextStyle().bigText(ended.problem))
-            .setSmallIcon(R.drawable.ic_kanal_mark)
-            .setAutoCancel(true)
-            .setContentIntent(openApp())
-            .build()
-        runCatching { manager.notify(NOTICE_ID, notice) }
-    }
-
-    private fun openApp(): PendingIntent = PendingIntent.getActivity(
-        this,
-        0,
-        Intent(this, MainActivity::class.java),
-        PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT
-    )
-
-    private fun ensureChannel() {
-        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.O) return
-        val manager = getSystemService(NotificationManager::class.java) ?: return
-        if (manager.getNotificationChannel(CHANNEL_ID) != null) return
-        manager.createNotificationChannel(
-            NotificationChannel(
-                CHANNEL_ID,
-                getString(R.string.cast_relay_channel),
-                NotificationManager.IMPORTANCE_LOW
-            )
-        )
     }
 
     companion object {
@@ -282,10 +285,56 @@ class CastRelayService : Service() {
         /** Long enough for a television to reconnect after a hiccup or a channel change. */
         private const val IDLE_LIMIT_MS = 60_000L
 
+        /** After the server cut the stream: a television that means to ask again does so at once. */
+        private const val CUT_QUIET_MS = 8_000L
+
         fun start(context: Context) {
             runCatching {
                 ContextCompat.startForegroundService(context, Intent(context, CastRelayService::class.java))
             }
+        }
+
+        /** Left behind after the service is gone, so a failure is not silent. */
+        fun postEndNotice(context: Context, ended: RelayEnded) {
+            val manager = context.getSystemService(NotificationManager::class.java) ?: return
+            ensureChannel(context)
+            val notice = NotificationCompat.Builder(context, CHANNEL_ID)
+                .setContentTitle(context.getString(R.string.cast_relay_stopped, ended.device.name))
+                .setContentText(ended.problem)
+                .setStyle(NotificationCompat.BigTextStyle().bigText(ended.problem))
+                .setSmallIcon(R.drawable.ic_kanal_mark)
+                .setAutoCancel(true)
+                .setContentIntent(openPanel(context))
+                .build()
+            runCatching { manager.notify(NOTICE_ID, notice) }
+        }
+
+        /** A send that went out again makes the notice that it had stopped wrong. */
+        fun clearEndNotice(context: Context) {
+            runCatching { context.getSystemService(NotificationManager::class.java)?.cancel(NOTICE_ID) }
+        }
+
+        /** Opens the app on the transmission panel, where it can be followed and sent again. */
+        private fun openPanel(context: Context): PendingIntent = PendingIntent.getActivity(
+            context,
+            0,
+            Intent(context, MainActivity::class.java)
+                .putExtra(MainActivity.EXTRA_OPEN_CAST, true)
+                .addFlags(Intent.FLAG_ACTIVITY_SINGLE_TOP),
+            PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT
+        )
+
+        private fun ensureChannel(context: Context) {
+            if (Build.VERSION.SDK_INT < Build.VERSION_CODES.O) return
+            val manager = context.getSystemService(NotificationManager::class.java) ?: return
+            if (manager.getNotificationChannel(CHANNEL_ID) != null) return
+            manager.createNotificationChannel(
+                NotificationChannel(
+                    CHANNEL_ID,
+                    context.getString(R.string.cast_relay_channel),
+                    NotificationManager.IMPORTANCE_LOW
+                )
+            )
         }
     }
 }

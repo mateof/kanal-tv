@@ -6,6 +6,7 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.CalendarMonth
+import androidx.compose.material.icons.outlined.CastConnected
 import androidx.compose.material.icons.outlined.Download
 import androidx.compose.material.icons.outlined.Home
 import androidx.compose.material.icons.outlined.LiveTv
@@ -16,6 +17,7 @@ import androidx.compose.material.icons.outlined.Star
 import androidx.compose.material.icons.outlined.Tv
 import androidx.compose.foundation.focusGroup
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -27,9 +29,15 @@ import androidx.navigation.NavHostController
 import androidx.navigation.NavType
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
+import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
 import androidx.navigation.navArgument
+import androidx.hilt.navigation.compose.hiltViewModel
 import com.mateof.kanal.R
+import com.mateof.kanal.ui.cast.CastBar
+import com.mateof.kanal.ui.cast.CastBarViewModel
+import com.mateof.kanal.ui.cast.CastPanelRequests
+import com.mateof.kanal.ui.cast.CastPanelScreen
 import com.mateof.kanal.ui.components.BottomNav
 import com.mateof.kanal.ui.components.NavItem
 import com.mateof.kanal.ui.components.NavRail
@@ -62,6 +70,7 @@ object Routes {
     const val SEARCH = "search"
     const val SETTINGS = "settings"
     const val LOGS = "logs"
+    const val CAST = "cast"
 
     fun setup(sourceId: String = "") = "setup?sourceId=$sourceId"
     fun movieDetail(id: String) = "movie/$id"
@@ -86,9 +95,24 @@ private val RAIL_ITEMS = listOf(
     NavItem(Routes.SETTINGS, R.string.nav_settings, Icons.Outlined.Settings)
 )
 
+/** Only on the rail while something is on another device. */
+private val CAST_ITEM = NavItem(Routes.CAST, R.string.nav_cast, Icons.Outlined.CastConnected)
+
 @Composable
 fun KanalNavHost() {
     val nav = rememberNavController()
+
+    // The notification, or a sheet, asking for the transmission panel. Held
+    // until the gate has let the app in: there is nothing to go back to before.
+    val panelRequested by CastPanelRequests.pending.collectAsStateWithLifecycle()
+    val current by nav.currentBackStackEntryAsState()
+    val currentRoute = current?.destination?.route
+    LaunchedEffect(panelRequested, currentRoute) {
+        if (!panelRequested || currentRoute == null) return@LaunchedEffect
+        if (currentRoute == Routes.GATE || currentRoute.startsWith(Routes.SETUP)) return@LaunchedEffect
+        CastPanelRequests.consume()
+        if (currentRoute != Routes.CAST) nav.navigate(Routes.CAST) { launchSingleTop = true }
+    }
 
     NavHost(navController = nav, startDestination = Routes.GATE) {
         composable(Routes.GATE) {
@@ -208,6 +232,22 @@ fun KanalNavHost() {
             LogsScreen(onBack = { nav.popBackStack() })
         }
 
+        composable(Routes.CAST) {
+            CastPanelScreen(
+                onBack = { if (!nav.popBackStack()) nav.navigateTop(Routes.HOME) },
+                onWatchHere = { kind, itemId ->
+                    // A player underneath sent it, and takes the stream back
+                    // by itself once the television stops.
+                    val below = nav.previousBackStackEntry?.destination?.route
+                    if (below?.startsWith("player/") == true) {
+                        nav.popBackStack()
+                    } else {
+                        nav.navigate(Routes.player(kind, itemId)) { popUpTo(Routes.CAST) { inclusive = true } }
+                    }
+                }
+            )
+        }
+
         composable(
             route = "movie/{movieId}",
             arguments = listOf(navArgument("movieId") { type = NavType.StringType })
@@ -257,13 +297,25 @@ private fun WithRail(
     selected: String,
     content: @Composable () -> Unit
 ) {
-    val onSelect: (String) -> Unit = { route -> if (route != selected) nav.navigateTop(route) }
+    val castVm: CastBarViewModel = hiltViewModel()
+    val cast by castVm.session.collectAsStateWithLifecycle()
+    val openPanel = { nav.navigate(Routes.CAST) { launchSingleTop = true } }
+    val onSelect: (String) -> Unit = { route ->
+        when (route) {
+            Routes.CAST -> openPanel()
+            selected -> Unit
+            else -> nav.navigateTop(route)
+        }
+    }
 
     if (isCompact) {
         // Upright on a phone there is no room beside the content, so the
         // destinations move to the bottom edge, within thumb reach.
         Column(Modifier.fillMaxSize()) {
             Box(Modifier.weight(1f)) { content() }
+            // Nine destinations already fill the bottom bar; the transmission
+            // gets a strip of its own, which also has room for the speed.
+            cast?.let { CastBar(it, onOpen = openPanel) }
             BottomNav(RAIL_ITEMS, selected, onSelect)
         }
     } else {
@@ -276,7 +328,7 @@ private fun WithRail(
         val contentEntry = remember { FocusRequester() }
         Row(Modifier.fillMaxSize()) {
             NavRail(
-                items = RAIL_ITEMS,
+                items = if (cast != null) RAIL_ITEMS + CAST_ITEM else RAIL_ITEMS,
                 selectedRoute = selected,
                 onSelect = onSelect,
                 modifier = Modifier.focusProperties { right = contentEntry }
