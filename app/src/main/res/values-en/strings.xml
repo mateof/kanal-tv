@@ -378,6 +378,27 @@
     <string name="cast_hint_701">The television was busy. Try again.</string>
     <string name="cast_hint_402">The television did not understand the request.</string>
     <string name="cast_hint_401">The television does not support this action.</string>
+    <string name="cast_via_phone">Through this phone</string>
+    <string name="cast_mode_auto">Automatic</string>
+    <string name="cast_mode_direct">Direct</string>
+    <string name="cast_mode_relay">Through the phone</string>
+    <string name="settings_cast_mode">Sending to other devices</string>
+    <string name="settings_cast_mode_desc">Direct: the TV asks the server for the stream. Through the phone: the phone acts as a bridge, for a TV that cannot reach the server (when you only reach it over a VPN, for instance). Automatic picks one and, if the TV cannot fetch the stream, tries again through the bridge.</string>
+    <string name="settings_cast_port">Bridge port</string>
+    <string name="settings_cast_port_auto">Any free port</string>
+    <string name="settings_cast_port_desc">Leave empty to use any free port. Only set one if your network or a firewall needs it (1024–65535).</string>
+    <string name="cast_relay_channel">Sending to other devices</string>
+    <string name="cast_relay_notification_title">Sending to %s</string>
+    <string name="cast_relay_notification_text">%s · the stream goes through this phone</string>
+    <string name="cast_relay_stop">Stop</string>
+    <string name="cast_relay_stopped">Stopped sending to %s</string>
+    <string name="cast_hint_no_lan">The phone has no address on the network the TV is on, so it cannot act as a bridge. If you are connected over a VPN, it probably has AllowedIPs = 0.0.0.0/0: the bridge needs a split tunnel that carries only the network of the server (%s).</string>
+    <string name="cast_hint_vpn_covers_tv">The VPN also takes the traffic to the TV, so the TV cannot receive anything from the phone. It probably has AllowedIPs = 0.0.0.0/0: the bridge needs a split tunnel that carries only the network of the server (%s).</string>
+    <string name="cast_hint_no_route">The phone cannot reach the server, so it cannot pass the stream on to the TV. Check that the VPN is connected. If it has AllowedIPs = 0.0.0.0/0, the bridge needs a split tunnel that carries the network of the server (%s).</string>
+    <string name="cast_hint_port_busy">Port %d is already in use. Leave the bridge port empty in the settings to use a free one.</string>
+    <string name="cast_hint_relay_hls">The server sent an HLS playlist, which cannot go through the phone. Choose MPEG-TS as the stream format.</string>
+    <string name="cast_hint_tv_gone">The TV stopped answering: it was switched off or left the network.</string>
+    <string name="cast_hint_lan_lost">The phone lost the local network, and the TV with it.</string>
     <string name="player_pip">Small window</string>
     <string name="player_back_10">Back 10 s</string>
     <string name="player_forward_10">Forward 10 s</string>

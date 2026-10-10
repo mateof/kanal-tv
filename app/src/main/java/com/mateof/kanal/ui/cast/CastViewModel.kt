@@ -2,13 +2,16 @@ package com.mateof.kanal.ui.cast
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-import com.mateof.kanal.R
+import com.mateof.kanal.cast.CastController
 import com.mateof.kanal.cast.CastDevice
+import com.mateof.kanal.cast.CastHints
+import com.mateof.kanal.cast.CastRequest
 import com.mateof.kanal.cast.UpnpClient
 import com.mateof.kanal.core.UiText
 import com.mateof.kanal.core.log.FileLogger
 import com.mateof.kanal.data.prefs.AppPreferences
 import com.mateof.kanal.data.repo.ContentRepository
+import com.mateof.kanal.data.repo.Playable
 import com.mateof.kanal.data.repo.PlaybackRepository
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -31,6 +34,8 @@ data class CastUiState(
     val devices: List<CastDevice> = emptyList(),
     val searching: Boolean = false,
     val sentTo: String? = null,
+    /** Whether the stream goes through this phone rather than straight from the server. */
+    val viaPhone: Boolean = false,
     val error: String? = null,
     val hint: UiText? = null
 ) {
@@ -52,6 +57,7 @@ class CastViewModel @Inject constructor(
     private val content: ContentRepository,
     private val playback: PlaybackRepository,
     private val upnp: UpnpClient,
+    private val cast: CastController,
     private val logger: FileLogger
 ) : ViewModel() {
 
@@ -60,6 +66,24 @@ class CastViewModel @Inject constructor(
 
     /** Devices the user typed in; they never come back from a scan. */
     private var manual: List<CastDevice> = emptyList()
+
+    /** The device last sent to, so a relay that ends can be matched to it. */
+    private var sentDevice: CastDevice? = null
+
+    init {
+        viewModelScope.launch {
+            cast.ended.collect { ended ->
+                if (ended.device.controlUrl != sentDevice?.controlUrl) return@collect
+                sentDevice = null
+                _state.value = _state.value.copy(
+                    sentTo = null,
+                    viaPhone = false,
+                    error = ended.problem,
+                    hint = ended.hint
+                )
+            }
+        }
+    }
 
     fun open(target: CastTarget, title: String) {
         _state.value = CastUiState(target = target, title = title, devices = _state.value.devices)
@@ -124,34 +148,38 @@ class CastViewModel @Inject constructor(
                 _state.value = _state.value.copy(searching = false, error = "No se encontró el contenido")
                 return@launch
             }
-            upnp.play(device, playable.first, playable.second)
-                .onSuccess {
-                    _state.value = _state.value.copy(searching = false, sentTo = device.name)
+            cast.send(device, CastRequest.from(playable))
+                .onSuccess { outcome ->
+                    sentDevice = device
+                    _state.value = _state.value.copy(
+                        searching = false,
+                        sentTo = device.name,
+                        viaPhone = outcome.viaPhone
+                    )
                 }
                 .onFailure { failure ->
                     logger.w("Cast", "No se pudo enviar a ${device.name}", failure)
-                    val detail = failure.message ?: "Error desconocido"
                     _state.value = _state.value.copy(
                         searching = false,
-                        error = detail,
-                        hint = hintFor(detail)
+                        error = failure.message ?: "Error desconocido",
+                        hint = CastHints.of(failure)
                     )
                 }
         }
     }
 
     fun stopSending() {
-        val device = _state.value.devices.firstOrNull { it.name == _state.value.sentTo }
+        val device = sentDevice ?: _state.value.devices.firstOrNull { it.name == _state.value.sentTo }
+        sentDevice = null
         viewModelScope.launch {
-            device?.let { upnp.stop(it) }
-            _state.value = _state.value.copy(sentTo = null)
+            device?.let { cast.stop(it) }
+            _state.value = _state.value.copy(sentTo = null, viaPhone = false)
         }
     }
 
-    /** @return the url to hand over and the title to announce. */
-    private suspend fun resolve(target: CastTarget): Pair<String, String>? {
+    private suspend fun resolve(target: CastTarget): Playable? {
         val source = prefs.activeSource.first() ?: return null
-        val playable = when (target) {
+        return when (target) {
             is CastTarget.Channel ->
                 content.channel(source.id, target.streamId)?.let { playback.forChannel(source, it) }
 
@@ -162,17 +190,6 @@ class CastViewModel @Inject constructor(
                 val series = content.seriesById(source.id, episode.seriesId)
                 playback.forEpisode(source, episode, series?.name.orEmpty())
             }
-        } ?: return null
-        return playable.url to playable.title
-    }
-
-    /** A UPnP code is exact but says nothing about what to do about it. */
-    private fun hintFor(detail: String): UiText? = when {
-        detail.contains("UPnP 716") -> UiText(R.string.cast_hint_716)
-        detail.contains("UPnP 714") -> UiText(R.string.cast_hint_714)
-        detail.contains("UPnP 701") -> UiText(R.string.cast_hint_701)
-        detail.contains("UPnP 402") -> UiText(R.string.cast_hint_402)
-        detail.contains("UPnP 401") -> UiText(R.string.cast_hint_401)
-        else -> null
+        }
     }
 }

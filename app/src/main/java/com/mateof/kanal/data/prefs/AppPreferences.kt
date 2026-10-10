@@ -38,6 +38,17 @@ enum class StreamFormat(@StringRes val labelRes: Int, val extension: String) {
     HLS(R.string.stream_format_hls, "m3u8")
 }
 
+/**
+ * How a stream reaches a television it is sent to: told the provider's address
+ * directly, or through a small server on this phone for a television that
+ * cannot reach the provider (a panel behind a VPN, say).
+ */
+enum class CastRouteMode(@StringRes val labelRes: Int) {
+    AUTO(R.string.cast_mode_auto),
+    DIRECT(R.string.cast_mode_direct),
+    RELAY(R.string.cast_mode_relay)
+}
+
 /** The order the channel list is shown in. */
 enum class ChannelSort(@StringRes val labelRes: Int, val key: String) {
     PROVIDER(R.string.sort_provider, "provider"),
@@ -100,7 +111,10 @@ data class Settings(
     /** Ceiling for the whole download folder, in GB. 0 means no ceiling. */
     val downloadLimitGb: Int = 0,
     /** Removes a download once it has been watched to the end. */
-    val downloadDeleteWatched: Boolean = false
+    val downloadDeleteWatched: Boolean = false,
+    val castRouteMode: CastRouteMode = CastRouteMode.AUTO,
+    /** Port the cast relay listens on; 0 lets the system pick a free one. */
+    val castRelayPort: Int = 0
 )
 
 const val DEFAULT_USER_AGENT = "VLC/3.0.20 LibVLC/3.0.20"
@@ -130,6 +144,8 @@ class AppPreferences @Inject constructor(
         val DOWNLOAD_WIFI_ONLY = booleanPreferencesKey("download_wifi_only")
         val DOWNLOAD_LIMIT_GB = intPreferencesKey("download_limit_gb")
         val DOWNLOAD_DELETE_WATCHED = booleanPreferencesKey("download_delete_watched")
+        val CAST_ROUTE_MODE = stringPreferencesKey("cast_route_mode")
+        val CAST_RELAY_PORT = intPreferencesKey("cast_relay_port")
 
         val STREAM_FORMAT = stringPreferencesKey("stream_format")
         val PREVIEW_ENABLED = booleanPreferencesKey("preview_enabled")
@@ -307,7 +323,11 @@ class AppPreferences @Inject constructor(
             } ?: ChannelSort.PROVIDER,
             downloadWifiOnly = prefs[Keys.DOWNLOAD_WIFI_ONLY] ?: true,
             downloadLimitGb = prefs[Keys.DOWNLOAD_LIMIT_GB] ?: 0,
-            downloadDeleteWatched = prefs[Keys.DOWNLOAD_DELETE_WATCHED] ?: false
+            downloadDeleteWatched = prefs[Keys.DOWNLOAD_DELETE_WATCHED] ?: false,
+            castRouteMode = prefs[Keys.CAST_ROUTE_MODE]?.let { name ->
+                CastRouteMode.entries.firstOrNull { it.name == name }
+            } ?: CastRouteMode.AUTO,
+            castRelayPort = prefs[Keys.CAST_RELAY_PORT] ?: 0
         )
     }
 
@@ -318,6 +338,8 @@ class AppPreferences @Inject constructor(
     val language: Flow<AppLanguage> = context.dataStore.data.map { AppLanguage.of(it[Keys.LANGUAGE]) }
 
     suspend fun setStreamFormat(value: StreamFormat) = edit { it[Keys.STREAM_FORMAT] = value.name }
+    suspend fun setCastRouteMode(value: CastRouteMode) = edit { it[Keys.CAST_ROUTE_MODE] = value.name }
+    suspend fun setCastRelayPort(value: Int) = edit { it[Keys.CAST_RELAY_PORT] = value }
     suspend fun setPreviewEnabled(value: Boolean) = edit { it[Keys.PREVIEW_ENABLED] = value }
     suspend fun setKeepLastChannel(value: Boolean) = edit { it[Keys.KEEP_LAST_CHANNEL] = value }
     suspend fun setResilientPlayback(value: Boolean) = edit { it[Keys.RESILIENT] = value }

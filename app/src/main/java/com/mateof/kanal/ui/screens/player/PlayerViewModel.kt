@@ -12,7 +12,10 @@ import androidx.media3.exoplayer.ExoPlayer
 import com.mateof.kanal.R
 import com.mateof.kanal.core.SleepTimer
 import com.mateof.kanal.core.UiText
+import com.mateof.kanal.cast.CastController
 import com.mateof.kanal.cast.CastDevice
+import com.mateof.kanal.cast.CastHints
+import com.mateof.kanal.cast.CastRequest
 import com.mateof.kanal.cast.UpnpClient
 import com.mateof.kanal.core.log.FileLogger
 import com.mateof.kanal.data.db.ChannelEntity
@@ -161,6 +164,8 @@ data class PlayerUiState(
     val castSearching: Boolean = false,
     /** Name of the device the stream was handed to, if any. */
     val castingTo: String? = null,
+    /** Whether the stream goes through this phone rather than straight from the server. */
+    val castViaPhone: Boolean = false,
     /** Why the last attempt failed, shown as-is: the UPnP code is the clue. */
     val castError: String? = null,
     /** Plain-language reading of the renderer's refusal, when it is known. */
@@ -197,6 +202,7 @@ class PlayerViewModel @Inject constructor(
     private val probe: StreamProbe,
     private val accounts: AccountRepository,
     private val upnp: UpnpClient,
+    private val cast: CastController,
     private val logger: FileLogger
 ) : ViewModel() {
 
@@ -255,7 +261,28 @@ class PlayerViewModel @Inject constructor(
     private var lastFrameAt = 0L
     private var frozenReloads = 0
 
+    /** The device the stream was handed to, so a relay that ends can be matched to it. */
+    private var castDevice: CastDevice? = null
+
     init {
+        // The relay can end without anyone here asking: the television went
+        // away, or the phone lost the network or the server. The picture
+        // comes back here, as with "bring it back".
+        viewModelScope.launch {
+            cast.ended.collect { ended ->
+                if (ended.device.controlUrl != castDevice?.controlUrl) return@collect
+                castDevice = null
+                val resumeFrom = _state.value.positionMs
+                _state.value = _state.value.copy(
+                    castingTo = null,
+                    castViaPhone = false,
+                    castError = ended.problem,
+                    castHint = ended.hint
+                )
+                delay(SLOT_RELEASE_MS)
+                resumeLocally(resumeFrom)
+            }
+        }
         // Followed rather than read once: changing them in the settings while a
         // film is paused behind should land without reopening anything.
         viewModelScope.launch {
@@ -949,9 +976,15 @@ class PlayerViewModel @Inject constructor(
             // Providers do not always free the slot the instant the socket goes.
             delay(SLOT_RELEASE_MS)
 
-            upnp.play(device, url, playable.title)
-                .onSuccess {
-                    _state.value = _state.value.copy(castingTo = device.name, castError = null, castHint = null)
+            cast.send(device, CastRequest.from(playable, url))
+                .onSuccess { outcome ->
+                    castDevice = device
+                    _state.value = _state.value.copy(
+                        castingTo = device.name,
+                        castViaPhone = outcome.viaPhone,
+                        castError = null,
+                        castHint = null
+                    )
                 }
                 .onFailure { failure ->
                     logger.w("Cast", "No se pudo enviar a ${device.name}", failure)
@@ -961,7 +994,7 @@ class PlayerViewModel @Inject constructor(
                     val detail = failure.message ?: "Error desconocido"
                     _state.value = _state.value.copy(
                         castError = detail,
-                        castHint = hintFor(detail)
+                        castHint = CastHints.of(failure)
                     )
                 }
         }
@@ -990,27 +1023,15 @@ class PlayerViewModel @Inject constructor(
     fun cancelSleep() = sleepTimer.cancel()
 
     fun stopCast() {
-        val device = _state.value.castDevices.firstOrNull { it.name == _state.value.castingTo }
+        val device = castDevice ?: _state.value.castDevices.firstOrNull { it.name == _state.value.castingTo }
+        castDevice = null
         val resumeFrom = _state.value.positionMs
         viewModelScope.launch {
-            device?.let { upnp.stop(it) }
-            _state.value = _state.value.copy(castingTo = null)
+            device?.let { cast.stop(it) }
+            _state.value = _state.value.copy(castingTo = null, castViaPhone = false)
             delay(SLOT_RELEASE_MS)
             resumeLocally(resumeFrom)
         }
-    }
-
-    /**
-     * A UPnP code is exact but says nothing about what to do. This turns the
-     * handful that actually come up into something the user can act on.
-     */
-    private fun hintFor(detail: String): UiText? = when {
-        detail.contains("UPnP 716") -> UiText(R.string.cast_hint_716)
-        detail.contains("UPnP 714") -> UiText(R.string.cast_hint_714)
-        detail.contains("UPnP 701") -> UiText(R.string.cast_hint_701)
-        detail.contains("UPnP 402") -> UiText(R.string.cast_hint_402)
-        detail.contains("UPnP 401") -> UiText(R.string.cast_hint_401)
-        else -> null
     }
 
     /** Restarts playback here after the connection was handed over or given up. */

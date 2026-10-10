@@ -2,6 +2,7 @@ package com.mateof.kanal.cast
 
 import com.mateof.kanal.core.log.FileLogger
 import com.mateof.kanal.data.net.HttpProvider
+import com.mateof.kanal.data.net.redactUrl
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import okhttp3.MediaType.Companion.toMediaType
@@ -21,8 +22,16 @@ data class CastDevice(
     val name: String,
     /** Absolute URL of the AVTransport service's control endpoint. */
     val controlUrl: String,
-    val id: String
-)
+    val id: String,
+    /**
+     * The device's own identity, which survives a new IP address or a different
+     * description path. What the relay decision is remembered against.
+     */
+    val udn: String = id
+) {
+    /** Where the renderer lives, which is also where its requests to the relay come from. */
+    val host: String get() = runCatching { URI(controlUrl).host }.getOrNull().orEmpty()
+}
 
 /**
  * Sends a stream to a DLNA/UPnP renderer on the same network.
@@ -114,7 +123,8 @@ class UpnpClient @Inject constructor(
             CastDevice(
                 name = tag(xml, "friendlyName") ?: URI(location).host,
                 controlUrl = URI(location).resolve(control).toString(),
-                id = location
+                id = location,
+                udn = tag(xml, "UDN") ?: location
             ).also { logger.i("Cast", "Aparato: ${it.name} -> ${it.controlUrl}") }
         }.onFailure { logger.w("Cast", "No se pudo leer la descripción de $location", it) }
             .getOrNull()
@@ -139,8 +149,8 @@ class UpnpClient @Inject constructor(
         return null
     }
 
-    /** Points the renderer at [url] and starts it. */
-    suspend fun play(device: CastDevice, url: String, title: String): Result<Unit> =
+    /** Points the renderer at [source] and starts it. */
+    suspend fun play(device: CastDevice, source: CastSource, title: String): Result<Unit> =
         withContext(Dispatchers.IO) {
             runCatching {
                 // Several televisions refuse a new URI while the transport still
@@ -150,14 +160,14 @@ class UpnpClient @Inject constructor(
 
                 fun setUri(metadata: String) = soap(device, "SetAVTransportURI", buildString {
                     append("<InstanceID>0</InstanceID>")
-                    append("<CurrentURI>").append(escape(url)).append("</CurrentURI>")
+                    append("<CurrentURI>").append(escape(source.url)).append("</CurrentURI>")
                     append("<CurrentURIMetaData>").append(metadata).append("</CurrentURIMetaData>")
                 })
 
                 // Metadata is where renderers are fussiest — a protocolInfo they
                 // dislike is enough for a refusal — so a rejection is retried
                 // with none at all, which many of them accept.
-                runCatching { setUri(escape(metadata(url, title))) }
+                runCatching { setUri(escape(metadata(source, title))) }
                     .onFailure { first ->
                         logger.w("Cast", "${device.name} rechazó los metadatos, se reintenta sin ellos: ${first.message}")
                         setUri("")
@@ -167,15 +177,26 @@ class UpnpClient @Inject constructor(
                 // The URL goes in the log too: if the renderer accepts the order
                 // and still shows nothing, the next thing to check is whether it
                 // can fetch that address at all, and that needs the address.
-                logger.i("Cast", "Enviado '$title' a ${device.name}: ${redact(url)}")
+                logger.i("Cast", "Enviado '$title' a ${device.name} (${source.route}): ${redactUrl(source.url)}")
             }
         }
 
     suspend fun stop(device: CastDevice): Result<Unit> = withContext(Dispatchers.IO) {
-        runCatching { soap(device, "Stop", "<InstanceID>0</InstanceID>") }
+        runCatching { soap(device, "Stop", "<InstanceID>0</InstanceID>"); Unit }
     }
 
-    private fun soap(device: CastDevice, action: String, body: String) {
+    /**
+     * What the renderer says it is doing — PLAYING, STOPPED, TRANSITIONING… —
+     * or a failure when it no longer answers at all. The relay uses it to tell
+     * a television that went away from one that is simply buffering.
+     */
+    suspend fun transportState(device: CastDevice): Result<String?> = withContext(Dispatchers.IO) {
+        runCatching {
+            tag(soap(device, "GetTransportInfo", "<InstanceID>0</InstanceID>"), "CurrentTransportState")
+        }
+    }
+
+    private fun soap(device: CastDevice, action: String, body: String): String {
         val envelope = """<?xml version="1.0" encoding="utf-8"?>
 <s:Envelope xmlns:s="http://schemas.xmlsoap.org/soap/envelope/" s:encodingStyle="http://schemas.xmlsoap.org/soap/encoding/">
 <s:Body><u:$action xmlns:u="$AV_TRANSPORT">$body</u:$action></s:Body></s:Envelope>"""
@@ -193,45 +214,27 @@ class UpnpClient @Inject constructor(
                 // A UPnP refusal carries its reason in the body. Reporting only
                 // the HTTP status leaves nothing to act on: 500 alone does not
                 // distinguish an unsupported format from a busy transport.
-                val code = tag(text, "errorCode")
-                val reason = tag(text, "errorDescription")
-                error(
-                    buildString {
-                        append("$action devolvió ${response.code}")
-                        if (code != null) append(" · UPnP $code")
-                        if (reason != null) append(" · $reason")
-                    }
+                throw UpnpException(
+                    action = action,
+                    httpCode = response.code,
+                    upnpCode = tag(text, "errorCode")?.toIntOrNull(),
+                    description = tag(text, "errorDescription")
                 )
             }
+            return text
         }
     }
 
     /** Minimal DIDL-Lite; renderers that ignore metadata still play the URL. */
-    private fun metadata(url: String, title: String): String =
+    private fun metadata(source: CastSource, title: String): String =
         """<DIDL-Lite xmlns="urn:schemas-upnp-org:metadata-1-0/DIDL-Lite/" """ +
             """xmlns:dc="http://purl.org/dc/elements/1.1/" """ +
             """xmlns:upnp="urn:schemas-upnp-org:metadata-1-0/upnp/">""" +
             """<item id="0" parentID="-1" restricted="1">""" +
             """<dc:title>${escape(title)}</dc:title>""" +
             """<upnp:class>object.item.videoItem</upnp:class>""" +
-            """<res protocolInfo="http-get:*:${mimeOf(url)}:${DLNA_FLAGS}">${escape(url)}</res>""" +
+            """<res protocolInfo="${Dlna.protocolInfo(source.mime, source.features)}">${escape(source.url)}</res>""" +
             """</item></DIDL-Lite>"""
-
-    /** Renderers match on this; announcing the wrong container gets refused. */
-    private fun mimeOf(url: String): String {
-        val path = url.substringBefore('?').lowercase()
-        return when {
-            path.endsWith(".m3u8") -> "application/x-mpegURL"
-            path.endsWith(".mp4") -> "video/mp4"
-            path.endsWith(".mkv") -> "video/x-matroska"
-            path.endsWith(".ts") -> "video/mp2t"
-            else -> "video/mpeg"
-        }
-    }
-
-    /** Keeps credentials out of a log the user may end up sharing. */
-    private fun redact(url: String): String =
-        url.replace(Regex("(password|pass|pwd)=[^&]*", RegexOption.IGNORE_CASE), "$1=***")
 
     private fun escape(value: String): String = value
         .replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
@@ -267,9 +270,6 @@ class UpnpClient @Inject constructor(
         const val SSDP_HOST = "239.255.255.250"
         const val SSDP_PORT = 1900
         const val AV_TRANSPORT = "urn:schemas-upnp-org:service:AVTransport:1"
-
-        /** Live stream, no seeking: what most renderers expect for IPTV. */
-        const val DLNA_FLAGS = "DLNA.ORG_OP=00;DLNA.ORG_FLAGS=01700000000000000000000000000000"
 
         /** Where renderers usually publish their description. */
         val COMMON_PATHS = listOf(

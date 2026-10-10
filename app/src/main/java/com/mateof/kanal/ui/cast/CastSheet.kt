@@ -121,6 +121,13 @@ fun CastSheet(
                     style = MaterialTheme.typography.titleSmall,
                     color = KanalColors.Accent
                 )
+                if (state.viaPhone) {
+                    Text(
+                        stringResource(R.string.cast_via_phone),
+                        style = MaterialTheme.typography.bodySmall,
+                        color = KanalColors.OnSurfaceMuted
+                    )
+                }
                 Spacer(Modifier.height(12.dp))
             }
 

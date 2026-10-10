@@ -12,9 +12,13 @@ import javax.inject.Singleton
 fun redactUrl(url: String): String =
     url.replace(CREDENTIAL_QUERY) { "${it.groupValues[1]}=***" }
         .replace(CREDENTIAL_PATH) { "/${it.groupValues[1]}/***/***/" }
+        .replace(RELAY_TOKEN) { "/cast/${it.groupValues[1]}***" }
 
 private val CREDENTIAL_QUERY = Regex("(username|password|user|pass)=([^&]*)", RegexOption.IGNORE_CASE)
 private val CREDENTIAL_PATH = Regex("/(live|movie|series|timeshift)/[^/]+/[^/]+/")
+
+/** The cast relay's session token: enough of it to match two log lines, not to reuse it. */
+private val RELAY_TOKEN = Regex("/cast/([0-9a-f]{4})[0-9a-f]+")
 
 /**
  * Records every request in the diagnostic log. Verbose mode adds the response

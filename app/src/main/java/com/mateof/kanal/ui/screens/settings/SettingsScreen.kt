@@ -57,6 +57,7 @@ import com.mateof.kanal.core.resolve
 import com.mateof.kanal.data.model.Source
 import com.mateof.kanal.data.prefs.BufferProfile
 import com.mateof.kanal.data.prefs.StreamFormat
+import com.mateof.kanal.data.prefs.CastRouteMode
 import com.mateof.kanal.data.repo.SyncState
 import com.mateof.kanal.data.prefs.ChannelSort
 import com.mateof.kanal.data.prefs.SubtitleLook
@@ -99,6 +100,9 @@ fun SettingsScreen(
     var pinDraft by remember { mutableStateOf("") }
 
     var userAgentDraft by remember(settings.userAgent) { mutableStateOf(settings.userAgent) }
+    var relayPortDraft by remember(settings.castRelayPort) {
+        mutableStateOf(settings.castRelayPort.takeIf { it > 0 }?.toString().orEmpty())
+    }
     var sleepDraft by remember(settings.sleepTimerMinutes) {
         mutableStateOf(settings.sleepTimerMinutes.toString())
     }
@@ -319,6 +323,32 @@ fun SettingsScreen(
                     modifier = if (isCompact) Modifier.fillMaxWidth() else Modifier.width(560.dp)
                 )
                 KanalButton(stringResource(R.string.common_save), { vm.setUserAgent(userAgentDraft) })
+            }
+        }
+        item {
+            OptionRow(
+                title = stringResource(R.string.settings_cast_mode),
+                description = stringResource(R.string.settings_cast_mode_desc),
+                options = CastRouteMode.entries.map { stringResource(it.labelRes) },
+                selectedIndex = CastRouteMode.entries.indexOf(settings.castRouteMode),
+                onSelect = { vm.setCastRouteMode(CastRouteMode.entries[it]) }
+            )
+        }
+        item {
+            FlowRow(
+                horizontalArrangement = Arrangement.spacedBy(16.dp),
+                verticalArrangement = Arrangement.spacedBy(10.dp)
+            ) {
+                KanalTextField(
+                    value = relayPortDraft,
+                    onValueChange = { relayPortDraft = it.filter(Char::isDigit).take(5) },
+                    label = stringResource(R.string.settings_cast_port),
+                    placeholder = stringResource(R.string.settings_cast_port_auto),
+                    supportingText = stringResource(R.string.settings_cast_port_desc),
+                    keyboardType = KeyboardType.Number,
+                    modifier = if (isCompact) Modifier.fillMaxWidth() else Modifier.width(320.dp)
+                )
+                KanalButton(stringResource(R.string.common_save), { vm.setCastRelayPort(relayPortDraft) })
             }
         }
 

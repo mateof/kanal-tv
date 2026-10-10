@@ -378,6 +378,27 @@
     <string name="cast_hint_701">La tele estaba ocupada. Inténtalo de nuevo.</string>
     <string name="cast_hint_402">La tele no entendió la petición.</string>
     <string name="cast_hint_401">La tele no admite esta acción.</string>
+    <string name="cast_via_phone">A través de este móvil</string>
+    <string name="cast_mode_auto">Automático</string>
+    <string name="cast_mode_direct">Directo</string>
+    <string name="cast_mode_relay">A través del móvil</string>
+    <string name="settings_cast_mode">Envío a otros aparatos</string>
+    <string name="settings_cast_mode_desc">Directo: la tele le pide la emisión al servidor. A través del móvil: el móvil hace de puente, para una tele que no llega al servidor (si solo lo alcanzas por VPN, por ejemplo). Automático elige solo y, si la tele no consigue descargar la emisión, lo reintenta por el puente.</string>
+    <string name="settings_cast_port">Puerto del puente</string>
+    <string name="settings_cast_port_auto">Cualquiera libre</string>
+    <string name="settings_cast_port_desc">Vacío para usar cualquier puerto libre. Fíjalo solo si la red o un cortafuegos lo necesitan (1024–65535).</string>
+    <string name="cast_relay_channel">Envío a otros aparatos</string>
+    <string name="cast_relay_notification_title">Enviando a %s</string>
+    <string name="cast_relay_notification_text">%s · la emisión pasa por este móvil</string>
+    <string name="cast_relay_stop">Detener</string>
+    <string name="cast_relay_stopped">Se dejó de enviar a %s</string>
+    <string name="cast_hint_no_lan">El móvil no tiene dirección en la red de la tele, así que no puede hacer de puente. Si estás conectado por VPN, probablemente tiene AllowedIPs = 0.0.0.0/0: el puente necesita un túnel dividido que lleve solo la red del servidor (%s).</string>
+    <string name="cast_hint_vpn_covers_tv">La VPN se lleva también el tráfico hacia la tele, así que la tele no puede recibir nada del móvil. Probablemente tiene AllowedIPs = 0.0.0.0/0: el puente necesita un túnel dividido que lleve solo la red del servidor (%s).</string>
+    <string name="cast_hint_no_route">El móvil no llega al servidor, así que no puede pasarle la emisión a la tele. Comprueba que la VPN está conectada. Si tiene AllowedIPs = 0.0.0.0/0, el puente necesita un túnel dividido que lleve la red del servidor (%s).</string>
+    <string name="cast_hint_port_busy">El puerto %d ya está en uso. Deja vacío el puerto del puente en los ajustes para usar uno libre.</string>
+    <string name="cast_hint_relay_hls">El servidor entregó una lista HLS, que no se puede pasar por el móvil. Elige MPEG-TS como formato de emisión.</string>
+    <string name="cast_hint_tv_gone">La tele dejó de responder: se apagó o salió de la red.</string>
+    <string name="cast_hint_lan_lost">El móvil perdió la red local, y con ella la tele.</string>
     <string name="player_pip">Ventana pequeña</string>
     <string name="player_back_10">Atrás 10 s</string>
     <string name="player_forward_10">Avanzar 10 s</string>

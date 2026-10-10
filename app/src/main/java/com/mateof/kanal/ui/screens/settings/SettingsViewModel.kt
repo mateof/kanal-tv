@@ -22,6 +22,7 @@ import com.mateof.kanal.data.prefs.AppPreferences
 import com.mateof.kanal.data.prefs.BufferProfile
 import com.mateof.kanal.data.prefs.Settings
 import com.mateof.kanal.data.prefs.StreamFormat
+import com.mateof.kanal.data.prefs.CastRouteMode
 import com.mateof.kanal.data.repo.SyncRepository
 import com.mateof.kanal.data.repo.SyncState
 import dagger.hilt.android.lifecycle.HiltViewModel
@@ -132,6 +133,16 @@ class SettingsViewModel @Inject constructor(
 
     fun setLanguage(value: AppLanguage) = viewModelScope.launch { prefs.setLanguage(value) }
     fun setStreamFormat(value: StreamFormat) = viewModelScope.launch { prefs.setStreamFormat(value) }
+    fun setCastRouteMode(value: CastRouteMode) = viewModelScope.launch { prefs.setCastRouteMode(value) }
+
+    /**
+     * Blank means "any free port". Below 1024 needs root and above 65535 does
+     * not exist, so those are left as they were rather than saved.
+     */
+    fun setCastRelayPort(text: String) = viewModelScope.launch {
+        val port = text.trim().ifEmpty { "0" }.toIntOrNull() ?: return@launch
+        if (port == 0 || port in 1024..65535) prefs.setCastRelayPort(port)
+    }
     fun setBufferProfile(value: BufferProfile) = viewModelScope.launch { prefs.setBufferProfile(value) }
     fun setPreview(value: Boolean) = viewModelScope.launch { prefs.setPreviewEnabled(value) }
     fun setKeepLastChannel(value: Boolean) = viewModelScope.launch { prefs.setKeepLastChannel(value) }

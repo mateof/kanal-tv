@@ -11,6 +11,13 @@
     <!-- Downloading a film takes longer than the system allows in the background. -->
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_DATA_SYNC" />
+    <!--
+      The cast relay serves a television from the foreground. connectedDevice
+      rather than dataSync, which Android 15 caps at six hours a day; it needs
+      one of a list of permissions, and CHANGE_NETWORK_STATE is a normal one.
+    -->
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_CONNECTED_DEVICE" />
+    <uses-permission android:name="android.permission.CHANGE_NETWORK_STATE" />
     <!-- Only used to drop an exported log file into Downloads on API < 29. -->
     <uses-permission
         android:name="android.permission.WRITE_EXTERNAL_STORAGE"
@@ -98,6 +105,11 @@
             android:name=".data.download.DownloadService"
             android:exported="false"
             android:foregroundServiceType="dataSync" />
+
+        <service
+            android:name=".cast.relay.CastRelayService"
+            android:exported="false"
+            android:foregroundServiceType="connectedDevice" />
 
         <receiver
             android:name=".reminders.ReminderReceiver"
