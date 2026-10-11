@@ -138,14 +138,16 @@ fun ChannelCard(
     watchers: Int = 0,
     width: Dp = 230.dp,
     onClick: () -> Unit,
-    onFocusState: (Boolean) -> Unit = {}
+    onFocusState: (Boolean) -> Unit = {},
+    onLongClick: (() -> Unit)? = null
 ) {
     FocusableSurface(
         onClick = onClick,
         modifier = modifier.width(width),
         color = KanalColors.Surface,
         focusedColor = KanalColors.SurfaceVariant,
-        onFocusState = onFocusState
+        onFocusState = onFocusState,
+        onLongClick = onLongClick
     ) { focused ->
         Column(Modifier.fillMaxWidth()) {
             Box(
@@ -256,14 +258,16 @@ fun ContinueCard(
     progress: Float,
     modifier: Modifier = Modifier,
     onClick: () -> Unit,
-    onFocusState: (Boolean) -> Unit = {}
+    onFocusState: (Boolean) -> Unit = {},
+    onLongClick: (() -> Unit)? = null
 ) {
     FocusableSurface(
         onClick = onClick,
         modifier = modifier.width(300.dp),
         color = KanalColors.Surface,
         focusedColor = KanalColors.SurfaceVariant,
-        onFocusState = onFocusState
+        onFocusState = onFocusState,
+        onLongClick = onLongClick
     ) { focused ->
         Column(Modifier.fillMaxWidth()) {
             Box(

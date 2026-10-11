@@ -1,5 +1,6 @@
 package com.mateof.kanal.ui.screens.search
 
+import com.mateof.kanal.ui.actions.WithChannelActions
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
@@ -91,99 +92,102 @@ fun SearchScreen(
     val results by vm.results.collectAsStateWithLifecycle()
     val searching by vm.searching.collectAsStateWithLifecycle()
 
-    LazyColumn(
-        modifier = Modifier.fillMaxSize(),
-        contentPadding = PaddingValues(top = 32.dp, bottom = 60.dp),
-        verticalArrangement = Arrangement.spacedBy(22.dp)
-    ) {
-        item {
-            Column(Modifier.padding(start = contentInset, end = contentInset)) {
-                Text(stringResource(R.string.nav_search), style = MaterialTheme.typography.headlineMedium, color = KanalColors.OnBackground)
-                Spacer(Modifier.height(16.dp))
-                SearchField(
-                    value = query,
-                    onValueChange = vm::onQueryChange,
-                    placeholder = stringResource(R.string.search_hint),
-                    modifier = Modifier.fillMaxWidth(0.6f)
-                )
-                if (searching) {
-                    Spacer(Modifier.height(10.dp))
-                    Text(
-                        stringResource(R.string.search_searching),
-                        style = MaterialTheme.typography.labelMedium,
-                        color = KanalColors.OnSurfaceFaint
+    WithChannelActions { onChannelActions ->
+        LazyColumn(
+            modifier = Modifier.fillMaxSize(),
+            contentPadding = PaddingValues(top = 32.dp, bottom = 60.dp),
+            verticalArrangement = Arrangement.spacedBy(22.dp)
+        ) {
+            item {
+                Column(Modifier.padding(start = contentInset, end = contentInset)) {
+                    Text(stringResource(R.string.nav_search), style = MaterialTheme.typography.headlineMedium, color = KanalColors.OnBackground)
+                    Spacer(Modifier.height(16.dp))
+                    SearchField(
+                        value = query,
+                        onValueChange = vm::onQueryChange,
+                        placeholder = stringResource(R.string.search_hint),
+                        modifier = Modifier.fillMaxWidth(0.6f)
                     )
-                } else if (query.trim().length >= 2) {
-                    Spacer(Modifier.height(10.dp))
-                    Text(
-                        "${results.total} resultados",
-                        style = MaterialTheme.typography.labelMedium,
-                        color = KanalColors.OnSurfaceFaint
-                    )
-                }
-            }
-        }
-
-        if (query.trim().length < 2) {
-            item {
-                MessageState(
-                    title = stringResource(R.string.search_min_letters),
-                    description = stringResource(R.string.search_help),
-                    icon = Icons.Outlined.Search,
-                    modifier = Modifier.height(340.dp)
-                )
-            }
-        } else if (results.isEmpty && !searching) {
-            item {
-                MessageState(
-                    title = stringResource(R.string.search_no_results),
-                    description = stringResource(R.string.search_try_other),
-                    icon = Icons.Outlined.Search,
-                    modifier = Modifier.height(340.dp)
-                )
-            }
-        }
-
-        if (results.channels.isNotEmpty()) {
-            item {
-                CardRow(title = stringResource(R.string.common_channels), trailing = "${results.channels.size}") {
-                    items(results.channels, key = { it.streamId }) { channel ->
-                        ChannelCard(
-                            name = channel.name,
-                            logoUrl = channel.logo,
-                            number = channel.number,
-                            onClick = { onOpenChannel(channel.streamId) }
+                    if (searching) {
+                        Spacer(Modifier.height(10.dp))
+                        Text(
+                            stringResource(R.string.search_searching),
+                            style = MaterialTheme.typography.labelMedium,
+                            color = KanalColors.OnSurfaceFaint
+                        )
+                    } else if (query.trim().length >= 2) {
+                        Spacer(Modifier.height(10.dp))
+                        Text(
+                            "${results.total} resultados",
+                            style = MaterialTheme.typography.labelMedium,
+                            color = KanalColors.OnSurfaceFaint
                         )
                     }
                 }
             }
-        }
-        if (results.movies.isNotEmpty()) {
-            item {
-                CardRow(title = stringResource(R.string.common_movies), trailing = "${results.movies.size}") {
-                    items(results.movies, key = { it.streamId }) { movie ->
-                        PosterCard(
-                            title = movie.name,
-                            imageUrl = movie.cover,
-                            subtitle = movie.categoryName,
-                            rating = movie.rating,
-                            onClick = { onOpenMovie(movie.streamId) }
-                        )
+
+            if (query.trim().length < 2) {
+                item {
+                    MessageState(
+                        title = stringResource(R.string.search_min_letters),
+                        description = stringResource(R.string.search_help),
+                        icon = Icons.Outlined.Search,
+                        modifier = Modifier.height(340.dp)
+                    )
+                }
+            } else if (results.isEmpty && !searching) {
+                item {
+                    MessageState(
+                        title = stringResource(R.string.search_no_results),
+                        description = stringResource(R.string.search_try_other),
+                        icon = Icons.Outlined.Search,
+                        modifier = Modifier.height(340.dp)
+                    )
+                }
+            }
+
+            if (results.channels.isNotEmpty()) {
+                item {
+                    CardRow(title = stringResource(R.string.common_channels), trailing = "${results.channels.size}") {
+                        items(results.channels, key = { it.streamId }) { channel ->
+                            ChannelCard(
+                                name = channel.name,
+                                logoUrl = channel.logo,
+                                number = channel.number,
+                                onClick = { onOpenChannel(channel.streamId) },
+                                onLongClick = { onChannelActions(channel.streamId, channel.name) }
+                            )
+                        }
                     }
                 }
             }
-        }
-        if (results.series.isNotEmpty()) {
-            item {
-                CardRow(title = stringResource(R.string.common_series), trailing = "${results.series.size}") {
-                    items(results.series, key = { it.seriesId }) { serie ->
-                        PosterCard(
-                            title = serie.name,
-                            imageUrl = serie.cover,
-                            subtitle = serie.categoryName,
-                            rating = serie.rating,
-                            onClick = { onOpenSeries(serie.seriesId) }
-                        )
+            if (results.movies.isNotEmpty()) {
+                item {
+                    CardRow(title = stringResource(R.string.common_movies), trailing = "${results.movies.size}") {
+                        items(results.movies, key = { it.streamId }) { movie ->
+                            PosterCard(
+                                title = movie.name,
+                                imageUrl = movie.cover,
+                                subtitle = movie.categoryName,
+                                rating = movie.rating,
+                                onClick = { onOpenMovie(movie.streamId) }
+                            )
+                        }
+                    }
+                }
+            }
+            if (results.series.isNotEmpty()) {
+                item {
+                    CardRow(title = stringResource(R.string.common_series), trailing = "${results.series.size}") {
+                        items(results.series, key = { it.seriesId }) { serie ->
+                            PosterCard(
+                                title = serie.name,
+                                imageUrl = serie.cover,
+                                subtitle = serie.categoryName,
+                                rating = serie.rating,
+                                onClick = { onOpenSeries(serie.seriesId) }
+                            )
+                        }
                     }
                 }
             }

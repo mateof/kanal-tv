@@ -1,5 +1,6 @@
 package com.mateof.kanal.ui.screens.guide
 
+import com.mateof.kanal.ui.actions.WithChannelActions
 import androidx.compose.foundation.background
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
@@ -84,161 +85,164 @@ fun GuideScreen(onPlay: (String) -> Unit) {
     val horizontal = rememberScrollState()
     val totalMinutes = ((state.windowEnd - state.windowStart) / 60_000L).toInt().coerceAtLeast(1)
 
-    Column(Modifier.fillMaxSize()) {
-        // --- Header: title, window controls, categories -----------------------
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(start = 16.dp, end = 24.dp, top = 20.dp, bottom = 10.dp),
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            Column(Modifier.weight(1f)) {
-                Text(stringResource(R.string.nav_guide), style = MaterialTheme.typography.headlineSmall, color = KanalColors.OnBackground)
-                Text(
-                    when {
-                        state.rows.isEmpty() -> ""
-                        compact -> "${state.rows.size} canales"
-                        else -> "${state.rows.size} canales · pulsa un programa para su ficha" +
-                            if (state.truncated) " · primeros ${GuideViewModel.CHANNEL_LIMIT}" else ""
-                    },
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis,
-                    style = MaterialTheme.typography.labelSmall,
-                    color = KanalColors.OnSurfaceFaint
-                )
-            }
-            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                KanalButton("−2 h", { vm.shiftWindow(-2) }, icon = Icons.Outlined.ChevronLeft)
-                KanalButton(stringResource(R.string.common_now), vm::resetToNow)
-                KanalButton("+2 h", { vm.shiftWindow(2) }, icon = Icons.Outlined.ChevronRight)
-            }
-        }
-
-        LazyRow(
-            contentPadding = PaddingValues(horizontal = 16.dp),
-            horizontalArrangement = Arrangement.spacedBy(8.dp)
-        ) {
-            item {
-                KanalChip(label = stringResource(R.string.common_all_m), selected = category.isEmpty(), onClick = { vm.selectCategory("") })
-            }
-            items(categories, key = { it.categoryId }) { item ->
-                KanalChip(
-                    label = item.name,
-                    selected = item.categoryId == category,
-                    onClick = { vm.selectCategory(item.categoryId) }
-                )
-            }
-        }
-        Spacer(Modifier.height(12.dp))
-
-        when {
-            state.loading -> LoadingState(stringResource(R.string.guide_building))
-
-            state.rows.isEmpty() -> MessageState(
-                title = stringResource(R.string.guide_no_channels),
-                description = stringResource(R.string.live_sync_hint),
-                icon = Icons.Outlined.LiveTv
-            )
-
-            !state.hasGuide -> MessageState(
-                title = stringResource(R.string.guide_no_guide_slot),
-                description = stringResource(R.string.guide_no_guide_body) + " " +
-                    stringResource(R.string.guide_no_guide_hint),
-                icon = Icons.Outlined.LiveTv
-            )
-
-            else -> {
-                // --- Time ruler ------------------------------------------------
-                Row(Modifier.fillMaxWidth()) {
-                    Spacer(Modifier.width(channelColumn + 16.dp))
-                    Box(
-                        Modifier
-                            .weight(1f)
-                            .horizontalScroll(horizontal)
-                    ) {
-                        TimeRuler(
-                            start = state.windowStart,
-                            totalMinutes = totalMinutes,
-                            minuteWidth = minuteWidth
-                        )
-                    }
+    WithChannelActions { onChannelActions ->
+        Column(Modifier.fillMaxSize()) {
+            // --- Header: title, window controls, categories -----------------------
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(start = 16.dp, end = 24.dp, top = 20.dp, bottom = 10.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Column(Modifier.weight(1f)) {
+                    Text(stringResource(R.string.nav_guide), style = MaterialTheme.typography.headlineSmall, color = KanalColors.OnBackground)
+                    Text(
+                        when {
+                            state.rows.isEmpty() -> ""
+                            compact -> "${state.rows.size} canales"
+                            else -> "${state.rows.size} canales · pulsa un programa para su ficha" +
+                                if (state.truncated) " · primeros ${GuideViewModel.CHANNEL_LIMIT}" else ""
+                        },
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                        style = MaterialTheme.typography.labelSmall,
+                        color = KanalColors.OnSurfaceFaint
+                    )
                 }
-                Spacer(Modifier.height(6.dp))
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    KanalButton("−2 h", { vm.shiftWindow(-2) }, icon = Icons.Outlined.ChevronLeft)
+                    KanalButton(stringResource(R.string.common_now), vm::resetToNow)
+                    KanalButton("+2 h", { vm.shiftWindow(2) }, icon = Icons.Outlined.ChevronRight)
+                }
+            }
 
-                // --- Rows ------------------------------------------------------
-                LazyColumn(
-                    modifier = Modifier.weight(1f),
-                    contentPadding = PaddingValues(start = 16.dp, end = 16.dp, bottom = 20.dp),
-                    verticalArrangement = Arrangement.spacedBy(6.dp)
-                ) {
-                    items(state.rows, key = { it.channel.streamId }) { row ->
-                        Row(Modifier.height(rowHeight)) {
-                            ChannelLabel(
-                                channel = row.channel,
-                                width = channelColumn,
-                                onClick = { onPlay(row.channel.streamId) }
+            LazyRow(
+                contentPadding = PaddingValues(horizontal = 16.dp),
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                item {
+                    KanalChip(label = stringResource(R.string.common_all_m), selected = category.isEmpty(), onClick = { vm.selectCategory("") })
+                }
+                items(categories, key = { it.categoryId }) { item ->
+                    KanalChip(
+                        label = item.name,
+                        selected = item.categoryId == category,
+                        onClick = { vm.selectCategory(item.categoryId) }
+                    )
+                }
+            }
+            Spacer(Modifier.height(12.dp))
+
+            when {
+                state.loading -> LoadingState(stringResource(R.string.guide_building))
+
+                state.rows.isEmpty() -> MessageState(
+                    title = stringResource(R.string.guide_no_channels),
+                    description = stringResource(R.string.live_sync_hint),
+                    icon = Icons.Outlined.LiveTv
+                )
+
+                !state.hasGuide -> MessageState(
+                    title = stringResource(R.string.guide_no_guide_slot),
+                    description = stringResource(R.string.guide_no_guide_body) + " " +
+                        stringResource(R.string.guide_no_guide_hint),
+                    icon = Icons.Outlined.LiveTv
+                )
+
+                else -> {
+                    // --- Time ruler ------------------------------------------------
+                    Row(Modifier.fillMaxWidth()) {
+                        Spacer(Modifier.width(channelColumn + 16.dp))
+                        Box(
+                            Modifier
+                                .weight(1f)
+                                .horizontalScroll(horizontal)
+                        ) {
+                            TimeRuler(
+                                start = state.windowStart,
+                                totalMinutes = totalMinutes,
+                                minuteWidth = minuteWidth
                             )
-                            Spacer(Modifier.width(16.dp))
-                            Box(
-                                Modifier
-                                    .weight(1f)
-                                    .horizontalScroll(horizontal)
-                            ) {
-                                ProgrammeStrip(
-                                    programmes = row.programmes,
-                                    windowStart = state.windowStart,
-                                    totalMinutes = totalMinutes,
-                                    minuteWidth = minuteWidth,
-                                    onFocused = { vm.onProgrammeFocused(row.channel, it) },
-                                    // Pulsar un programa abre su ficha; para ir al
-                                    // canal está su propio botón, a la izquierda.
-                                    onClick = { programme ->
-                                        detail = ProgrammeDetail(
-                                            programme = programme,
-                                            channelName = row.channel.name,
-                                            channelLogo = row.channel.logo,
-                                            channelStreamId = row.channel.streamId,
-                                            canReplay = row.channel.archiveDays > 0 &&
-                                                programme.stop < System.currentTimeMillis()
-                                        )
-                                    }
+                        }
+                    }
+                    Spacer(Modifier.height(6.dp))
+
+                    // --- Rows ------------------------------------------------------
+                    LazyColumn(
+                        modifier = Modifier.weight(1f),
+                        contentPadding = PaddingValues(start = 16.dp, end = 16.dp, bottom = 20.dp),
+                        verticalArrangement = Arrangement.spacedBy(6.dp)
+                    ) {
+                        items(state.rows, key = { it.channel.streamId }) { row ->
+                            Row(Modifier.height(rowHeight)) {
+                                ChannelLabel(
+                                    channel = row.channel,
+                                    width = channelColumn,
+                                    onClick = { onPlay(row.channel.streamId) },
+                                    onLongClick = { onChannelActions(row.channel.streamId, row.channel.name) }
                                 )
+                                Spacer(Modifier.width(16.dp))
+                                Box(
+                                    Modifier
+                                        .weight(1f)
+                                        .horizontalScroll(horizontal)
+                                ) {
+                                    ProgrammeStrip(
+                                        programmes = row.programmes,
+                                        windowStart = state.windowStart,
+                                        totalMinutes = totalMinutes,
+                                        minuteWidth = minuteWidth,
+                                        onFocused = { vm.onProgrammeFocused(row.channel, it) },
+                                        // Pulsar un programa abre su ficha; para ir al
+                                        // canal está su propio botón, a la izquierda.
+                                        onClick = { programme ->
+                                            detail = ProgrammeDetail(
+                                                programme = programme,
+                                                channelName = row.channel.name,
+                                                channelLogo = row.channel.logo,
+                                                channelStreamId = row.channel.streamId,
+                                                canReplay = row.channel.archiveDays > 0 &&
+                                                    programme.stop < System.currentTimeMillis()
+                                            )
+                                        }
+                                    )
+                                }
                             }
                         }
                     }
-                }
 
-                // --- Detail of whatever has focus ------------------------------
-                selected?.let { (channel, programme) ->
-                    SelectionDetail(channel, programme, compact)
+                    // --- Detail of whatever has focus ------------------------------
+                    selected?.let { (channel, programme) ->
+                        SelectionDetail(channel, programme, compact)
+                    }
                 }
             }
         }
-    }
 
-    detail?.let { open ->
-        val reminders by remindersVm.reminders.collectAsStateWithLifecycle()
-        ProgrammeDialog(
-            detail = open,
-            reminded = reminders.any {
-                it.channelId == open.channelStreamId &&
-                    it.title == open.programme.title &&
-                    it.startMillis == open.programme.start
-            },
-            onRemind = {
-                remindersVm.toggle(
-                    open.channelStreamId,
-                    open.channelName,
-                    open.programme.title,
-                    open.programme.start
-                )
-            },
-            onDismiss = { detail = null },
-            onGoToChannel = {
-                detail = null
-                onPlay(open.channelStreamId)
-            }
-        )
+        detail?.let { open ->
+            val reminders by remindersVm.reminders.collectAsStateWithLifecycle()
+            ProgrammeDialog(
+                detail = open,
+                reminded = reminders.any {
+                    it.channelId == open.channelStreamId &&
+                        it.title == open.programme.title &&
+                        it.startMillis == open.programme.start
+                },
+                onRemind = {
+                    remindersVm.toggle(
+                        open.channelStreamId,
+                        open.channelName,
+                        open.programme.title,
+                        open.programme.start
+                    )
+                },
+                onDismiss = { detail = null },
+                onGoToChannel = {
+                    detail = null
+                    onPlay(open.channelStreamId)
+                }
+            )
+        }
     }
 }
 
@@ -265,9 +269,15 @@ private fun TimeRuler(start: Long, totalMinutes: Int, minuteWidth: Dp) {
 }
 
 @Composable
-private fun ChannelLabel(channel: ChannelEntity, width: Dp, onClick: () -> Unit) {
+private fun ChannelLabel(
+    channel: ChannelEntity,
+    width: Dp,
+    onClick: () -> Unit,
+    onLongClick: () -> Unit
+) {
     FocusableSurface(
         onClick = onClick,
+        onLongClick = onLongClick,
         modifier = Modifier
             .width(width)
             .fillMaxWidth(),

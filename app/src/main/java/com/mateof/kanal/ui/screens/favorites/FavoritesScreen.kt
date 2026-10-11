@@ -1,5 +1,6 @@
 package com.mateof.kanal.ui.screens.favorites
 
+import com.mateof.kanal.ui.actions.WithChannelActions
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
@@ -86,76 +87,79 @@ fun FavoritesScreen(
 
     val empty = channels.isEmpty() && movies.isEmpty() && series.isEmpty()
 
-    LazyColumn(
-        modifier = Modifier.fillMaxSize(),
-        contentPadding = PaddingValues(top = 32.dp, bottom = 60.dp),
-        verticalArrangement = Arrangement.spacedBy(22.dp)
-    ) {
-        item {
-            Column(Modifier.padding(start = contentInset)) {
-                Text(stringResource(R.string.nav_favorites), style = MaterialTheme.typography.headlineMedium, color = KanalColors.OnBackground)
-                Spacer(Modifier.height(6.dp))
-                Text(
-                    "${channels.size} canales · ${movies.size} películas · ${series.size} series",
-                    style = MaterialTheme.typography.labelMedium,
-                    color = KanalColors.OnSurfaceFaint
-                )
-            }
-        }
-
-        if (empty) {
+    WithChannelActions { onChannelActions ->
+        LazyColumn(
+            modifier = Modifier.fillMaxSize(),
+            contentPadding = PaddingValues(top = 32.dp, bottom = 60.dp),
+            verticalArrangement = Arrangement.spacedBy(22.dp)
+        ) {
             item {
-                MessageState(
-                    title = stringResource(R.string.favorites_empty_title),
-                    description = stringResource(R.string.favorites_empty_body),
-                    icon = Icons.Filled.Star,
-                    modifier = Modifier.height(380.dp)
-                )
+                Column(Modifier.padding(start = contentInset)) {
+                    Text(stringResource(R.string.nav_favorites), style = MaterialTheme.typography.headlineMedium, color = KanalColors.OnBackground)
+                    Spacer(Modifier.height(6.dp))
+                    Text(
+                        "${channels.size} canales · ${movies.size} películas · ${series.size} series",
+                        style = MaterialTheme.typography.labelMedium,
+                        color = KanalColors.OnSurfaceFaint
+                    )
+                }
             }
-        }
 
-        if (channels.isNotEmpty()) {
-            item {
-                CardRow(title = stringResource(R.string.common_channels)) {
-                    items(channels, key = { it.streamId }) { channel ->
-                        ChannelCard(
-                            name = channel.name,
-                            logoUrl = channel.logo,
-                            number = channel.number,
-                            nowTitle = nowPlaying[channel.epgChannelId]?.title.orEmpty(),
-                            isFavorite = true,
-                            onClick = { onOpenChannel(channel.streamId) }
-                        )
+            if (empty) {
+                item {
+                    MessageState(
+                        title = stringResource(R.string.favorites_empty_title),
+                        description = stringResource(R.string.favorites_empty_body),
+                        icon = Icons.Filled.Star,
+                        modifier = Modifier.height(380.dp)
+                    )
+                }
+            }
+
+            if (channels.isNotEmpty()) {
+                item {
+                    CardRow(title = stringResource(R.string.common_channels)) {
+                        items(channels, key = { it.streamId }) { channel ->
+                            ChannelCard(
+                                name = channel.name,
+                                logoUrl = channel.logo,
+                                number = channel.number,
+                                nowTitle = nowPlaying[channel.epgChannelId]?.title.orEmpty(),
+                                isFavorite = true,
+                                onClick = { onOpenChannel(channel.streamId) },
+                                onLongClick = { onChannelActions(channel.streamId, channel.name) }
+                            )
+                        }
                     }
                 }
             }
-        }
-        if (movies.isNotEmpty()) {
-            item {
-                CardRow(title = stringResource(R.string.common_movies)) {
-                    items(movies, key = { it.streamId }) { movie ->
-                        PosterCard(
-                            title = movie.name,
-                            imageUrl = movie.cover,
-                            subtitle = movie.categoryName,
-                            rating = movie.rating,
-                            onClick = { onOpenMovie(movie.streamId) }
-                        )
+            if (movies.isNotEmpty()) {
+                item {
+                    CardRow(title = stringResource(R.string.common_movies)) {
+                        items(movies, key = { it.streamId }) { movie ->
+                            PosterCard(
+                                title = movie.name,
+                                imageUrl = movie.cover,
+                                subtitle = movie.categoryName,
+                                rating = movie.rating,
+                                onClick = { onOpenMovie(movie.streamId) }
+                            )
+                        }
                     }
                 }
             }
-        }
-        if (series.isNotEmpty()) {
-            item {
-                CardRow(title = stringResource(R.string.common_series)) {
-                    items(series, key = { it.seriesId }) { serie ->
-                        PosterCard(
-                            title = serie.name,
-                            imageUrl = serie.cover,
-                            subtitle = serie.categoryName,
-                            rating = serie.rating,
-                            onClick = { onOpenSeries(serie.seriesId) }
-                        )
+            if (series.isNotEmpty()) {
+                item {
+                    CardRow(title = stringResource(R.string.common_series)) {
+                        items(series, key = { it.seriesId }) { serie ->
+                            PosterCard(
+                                title = serie.name,
+                                imageUrl = serie.cover,
+                                subtitle = serie.categoryName,
+                                rating = serie.rating,
+                                onClick = { onOpenSeries(serie.seriesId) }
+                            )
+                        }
                     }
                 }
             }

@@ -1,5 +1,6 @@
 package com.mateof.kanal.ui.screens.home
 
+import com.mateof.kanal.ui.actions.WithChannelActions
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
@@ -87,199 +88,210 @@ fun HomeScreen(
         return
     }
 
-    LazyColumn(
-        modifier = Modifier.fillMaxSize(),
-        contentPadding = PaddingValues(
-            start = if (isCompact) 0.dp else 8.dp,
-            end = if (isCompact) 0.dp else Spacing.screenHorizontal,
-            top = Spacing.screenVertical,
-            bottom = 60.dp
-        ),
-        verticalArrangement = Arrangement.spacedBy(Spacing.section)
-    ) {
-        item {
-            HomeHeader(
-                sourceName = state.source?.name.orEmpty(),
-                channels = state.channels,
-                movies = state.movies,
-                series = state.series,
-                refreshing = refreshing,
-                sources = sources,
-                onPickSource = { pickingSource = true },
-                onRefresh = vm::refresh
+    WithChannelActions { onChannelActions ->
+        LazyColumn(
+            modifier = Modifier.fillMaxSize(),
+            contentPadding = PaddingValues(
+                start = if (isCompact) 0.dp else 8.dp,
+                end = if (isCompact) 0.dp else Spacing.screenHorizontal,
+                top = Spacing.screenVertical,
+                bottom = 60.dp
+            ),
+            verticalArrangement = Arrangement.spacedBy(Spacing.section)
+        ) {
+            item {
+                HomeHeader(
+                    sourceName = state.source?.name.orEmpty(),
+                    channels = state.channels,
+                    movies = state.movies,
+                    series = state.series,
+                    refreshing = refreshing,
+                    sources = sources,
+                    onPickSource = { pickingSource = true },
+                    onRefresh = vm::refresh
+                )
+            }
+
+            if (updateState.available != null) {
+                item {
+                    UpdateBanner(
+                        state = updateState,
+                        onUpdate = updateVm::downloadAndInstall,
+                        onDismiss = updateVm::dismiss
+                    )
+                }
+            }
+
+            if (refreshing) {
+                item {
+                    val label = (syncState as? SyncState.Running)?.step?.resolve() ?: stringResource(R.string.home_syncing)
+                    val progress = (syncState as? SyncState.Running)?.progress ?: -1f
+                    StepProgress(
+                        label,
+                        progress,
+                        Modifier.padding(start = contentInset, end = if (isCompact) contentInset else 200.dp)
+                    )
+                }
+            }
+
+            if (state.isEmpty && !refreshing) {
+                item {
+                    MessageState(
+                        title = stringResource(R.string.home_empty_title),
+                        description = stringResource(R.string.home_empty_body),
+                        icon = Icons.Outlined.LiveTv,
+                        modifier = Modifier.height(360.dp)
+                    ) {
+                        KanalButton(stringResource(R.string.home_sync_now), vm::refresh, tone = ButtonTone.Primary)
+                    }
+                }
+            }
+
+            // First of the rows on purpose: it is the only one that stops being
+            // true if you take too long, and joining costs the provider nothing
+            // because the connection is already open.
+            if (watchingNow.isNotEmpty()) {
+                item {
+                    CardRow(title = stringResource(R.string.home_watching_now)) {
+                        items(watchingNow, key = { it.channel.streamId }) { entry ->
+                            ChannelCard(
+                                name = entry.channel.name,
+                                logoUrl = entry.channel.logo,
+                                number = entry.channel.number,
+                                nowTitle = state.nowPlaying[entry.channel.epgChannelId]?.title.orEmpty(),
+                                watchers = entry.clients,
+                                onClick = { onOpenChannel(entry.channel.streamId) },
+                                onLongClick = { onChannelActions(entry.channel.streamId, entry.channel.name) }
+                            )
+                        }
+                    }
+                }
+            }
+
+            if (state.continueWatching.isNotEmpty()) {
+                item {
+                    CardRow(title = stringResource(R.string.home_continue)) {
+                        items(state.continueWatching, key = { it.key }) { entry ->
+                            ContinueCard(
+                                title = entry.name,
+                                subtitle = when (entry.kind) {
+                                    ContentKind.SERIES -> stringResource(R.string.home_kind_series)
+                                    ContentKind.MOVIE -> stringResource(R.string.home_kind_movie)
+                                    ContentKind.LIVE -> stringResource(R.string.home_kind_live)
+                                },
+                                imageUrl = entry.logo,
+                                progress = entry.progress,
+                                onClick = { onResume(entry.kind.name, entry.itemId) },
+                                // Only channels: films and series keep their actions on their own page.
+                                onLongClick = if (entry.kind == ContentKind.LIVE) {
+                                    { onChannelActions(entry.itemId, entry.name) }
+                                } else {
+                                    null
+                                }
+                            )
+                        }
+                    }
+                }
+            }
+
+            if (state.favoriteChannels.isNotEmpty()) {
+                item {
+                    CardRow(title = stringResource(R.string.home_favorite_channels), trailing = "${state.favoriteChannels.size}") {
+                        items(state.favoriteChannels, key = { it.streamId }) { channel ->
+                            ChannelCard(
+                                name = channel.name,
+                                logoUrl = channel.logo,
+                                number = channel.number,
+                                nowTitle = state.nowPlaying[channel.epgChannelId]?.title.orEmpty(),
+                                isFavorite = true,
+                                onClick = { onOpenChannel(channel.streamId) },
+                                onLongClick = { onChannelActions(channel.streamId, channel.name) }
+                            )
+                        }
+                    }
+                }
+            }
+
+            if (recentChannels.isNotEmpty()) {
+                item {
+                    CardRow(title = stringResource(R.string.home_recent)) {
+                        items(recentChannels, key = { it.streamId }) { channel ->
+                            ChannelCard(
+                                name = channel.name,
+                                logoUrl = channel.logo,
+                                number = channel.number,
+                                nowTitle = state.nowPlaying[channel.epgChannelId]?.title.orEmpty(),
+                                onClick = { onOpenChannel(channel.streamId) },
+                                onLongClick = { onChannelActions(channel.streamId, channel.name) }
+                            )
+                        }
+                    }
+                }
+            }
+
+            if (state.newMovies.isNotEmpty()) {
+                item {
+                    CardRow(title = stringResource(R.string.home_new_movies), trailing = stringResource(R.string.home_see_all)) {
+                        items(state.newMovies, key = { it.streamId }) { movie ->
+                            PosterCard(
+                                title = movie.name,
+                                imageUrl = movie.cover,
+                                subtitle = movie.categoryName,
+                                rating = movie.rating,
+                                onClick = { onOpenMovie(movie.streamId) }
+                            )
+                        }
+                    }
+                }
+            }
+
+            if (state.newSeries.isNotEmpty()) {
+                item {
+                    CardRow(title = stringResource(R.string.home_new_series), trailing = stringResource(R.string.home_see_all)) {
+                        items(state.newSeries, key = { it.seriesId }) { series ->
+                            PosterCard(
+                                title = series.name,
+                                imageUrl = series.cover,
+                                subtitle = series.categoryName,
+                                rating = series.rating,
+                                onClick = { onOpenSeries(series.seriesId) }
+                            )
+                        }
+                    }
+                }
+            }
+
+            if (!state.isEmpty) {
+                item {
+                    Row(
+                        modifier = Modifier.padding(start = contentInset, top = 8.dp),
+                        horizontalArrangement = Arrangement.spacedBy(14.dp)
+                    ) {
+                        KanalButton(stringResource(R.string.home_go_live), { onNavigate(Routes.LIVE) }, tone = ButtonTone.Primary)
+                        KanalButton(stringResource(R.string.nav_search), { onNavigate(Routes.SEARCH) })
+                        KanalButton(stringResource(R.string.nav_settings), { onNavigate(Routes.SETTINGS) })
+                    }
+                }
+            }
+        }
+        // After the list, never before: composed first it ends up underneath,
+        // with the buttons of the screen behind showing through the card.
+        if (pickingSource) {
+            ActionMenu(
+                title = stringResource(R.string.home_change_source),
+                onDismiss = { pickingSource = false },
+                actions = sources.map { source ->
+                    MenuAction(
+                        label = source.name,
+                        icon = Icons.Outlined.SwapHoriz,
+                        active = source.id == state.source?.id
+                    ) {
+                        vm.useSource(source.id)
+                        pickingSource = false
+                    }
+                }
             )
         }
-
-        if (updateState.available != null) {
-            item {
-                UpdateBanner(
-                    state = updateState,
-                    onUpdate = updateVm::downloadAndInstall,
-                    onDismiss = updateVm::dismiss
-                )
-            }
-        }
-
-        if (refreshing) {
-            item {
-                val label = (syncState as? SyncState.Running)?.step?.resolve() ?: stringResource(R.string.home_syncing)
-                val progress = (syncState as? SyncState.Running)?.progress ?: -1f
-                StepProgress(
-                    label,
-                    progress,
-                    Modifier.padding(start = contentInset, end = if (isCompact) contentInset else 200.dp)
-                )
-            }
-        }
-
-        if (state.isEmpty && !refreshing) {
-            item {
-                MessageState(
-                    title = stringResource(R.string.home_empty_title),
-                    description = stringResource(R.string.home_empty_body),
-                    icon = Icons.Outlined.LiveTv,
-                    modifier = Modifier.height(360.dp)
-                ) {
-                    KanalButton(stringResource(R.string.home_sync_now), vm::refresh, tone = ButtonTone.Primary)
-                }
-            }
-        }
-
-        // First of the rows on purpose: it is the only one that stops being
-        // true if you take too long, and joining costs the provider nothing
-        // because the connection is already open.
-        if (watchingNow.isNotEmpty()) {
-            item {
-                CardRow(title = stringResource(R.string.home_watching_now)) {
-                    items(watchingNow, key = { it.channel.streamId }) { entry ->
-                        ChannelCard(
-                            name = entry.channel.name,
-                            logoUrl = entry.channel.logo,
-                            number = entry.channel.number,
-                            nowTitle = state.nowPlaying[entry.channel.epgChannelId]?.title.orEmpty(),
-                            watchers = entry.clients,
-                            onClick = { onOpenChannel(entry.channel.streamId) }
-                        )
-                    }
-                }
-            }
-        }
-
-        if (state.continueWatching.isNotEmpty()) {
-            item {
-                CardRow(title = stringResource(R.string.home_continue)) {
-                    items(state.continueWatching, key = { it.key }) { entry ->
-                        ContinueCard(
-                            title = entry.name,
-                            subtitle = when (entry.kind) {
-                                ContentKind.SERIES -> stringResource(R.string.home_kind_series)
-                                ContentKind.MOVIE -> stringResource(R.string.home_kind_movie)
-                                ContentKind.LIVE -> stringResource(R.string.home_kind_live)
-                            },
-                            imageUrl = entry.logo,
-                            progress = entry.progress,
-                            onClick = { onResume(entry.kind.name, entry.itemId) }
-                        )
-                    }
-                }
-            }
-        }
-
-        if (state.favoriteChannels.isNotEmpty()) {
-            item {
-                CardRow(title = stringResource(R.string.home_favorite_channels), trailing = "${state.favoriteChannels.size}") {
-                    items(state.favoriteChannels, key = { it.streamId }) { channel ->
-                        ChannelCard(
-                            name = channel.name,
-                            logoUrl = channel.logo,
-                            number = channel.number,
-                            nowTitle = state.nowPlaying[channel.epgChannelId]?.title.orEmpty(),
-                            isFavorite = true,
-                            onClick = { onOpenChannel(channel.streamId) }
-                        )
-                    }
-                }
-            }
-        }
-
-        if (recentChannels.isNotEmpty()) {
-            item {
-                CardRow(title = stringResource(R.string.home_recent)) {
-                    items(recentChannels, key = { it.streamId }) { channel ->
-                        ChannelCard(
-                            name = channel.name,
-                            logoUrl = channel.logo,
-                            number = channel.number,
-                            nowTitle = state.nowPlaying[channel.epgChannelId]?.title.orEmpty(),
-                            onClick = { onOpenChannel(channel.streamId) }
-                        )
-                    }
-                }
-            }
-        }
-
-        if (state.newMovies.isNotEmpty()) {
-            item {
-                CardRow(title = stringResource(R.string.home_new_movies), trailing = stringResource(R.string.home_see_all)) {
-                    items(state.newMovies, key = { it.streamId }) { movie ->
-                        PosterCard(
-                            title = movie.name,
-                            imageUrl = movie.cover,
-                            subtitle = movie.categoryName,
-                            rating = movie.rating,
-                            onClick = { onOpenMovie(movie.streamId) }
-                        )
-                    }
-                }
-            }
-        }
-
-        if (state.newSeries.isNotEmpty()) {
-            item {
-                CardRow(title = stringResource(R.string.home_new_series), trailing = stringResource(R.string.home_see_all)) {
-                    items(state.newSeries, key = { it.seriesId }) { series ->
-                        PosterCard(
-                            title = series.name,
-                            imageUrl = series.cover,
-                            subtitle = series.categoryName,
-                            rating = series.rating,
-                            onClick = { onOpenSeries(series.seriesId) }
-                        )
-                    }
-                }
-            }
-        }
-
-        if (!state.isEmpty) {
-            item {
-                Row(
-                    modifier = Modifier.padding(start = contentInset, top = 8.dp),
-                    horizontalArrangement = Arrangement.spacedBy(14.dp)
-                ) {
-                    KanalButton(stringResource(R.string.home_go_live), { onNavigate(Routes.LIVE) }, tone = ButtonTone.Primary)
-                    KanalButton(stringResource(R.string.nav_search), { onNavigate(Routes.SEARCH) })
-                    KanalButton(stringResource(R.string.nav_settings), { onNavigate(Routes.SETTINGS) })
-                }
-            }
-        }
-    }
-    // After the list, never before: composed first it ends up underneath,
-    // with the buttons of the screen behind showing through the card.
-    if (pickingSource) {
-        ActionMenu(
-            title = stringResource(R.string.home_change_source),
-            onDismiss = { pickingSource = false },
-            actions = sources.map { source ->
-                MenuAction(
-                    label = source.name,
-                    icon = Icons.Outlined.SwapHoriz,
-                    active = source.id == state.source?.id
-                ) {
-                    vm.useSource(source.id)
-                    pickingSource = false
-                }
-            }
-        )
     }
 }
 
