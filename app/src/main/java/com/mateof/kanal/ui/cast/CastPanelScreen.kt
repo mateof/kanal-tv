@@ -1,5 +1,6 @@
 package com.mateof.kanal.ui.cast
 
+import com.mateof.kanal.cast.tvStateRes
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
@@ -516,12 +517,7 @@ private fun Sparkline(history: List<Long>, modifier: Modifier) {
 @Composable
 private fun tvStateLabel(state: String?): String = when (state) {
     null -> stringResource(R.string.cast_tv_state_unknown)
-    "PLAYING" -> stringResource(R.string.cast_tv_state_playing)
-    "TRANSITIONING" -> stringResource(R.string.cast_tv_state_transitioning)
-    "PAUSED_PLAYBACK" -> stringResource(R.string.cast_tv_state_paused)
-    "STOPPED" -> stringResource(R.string.cast_tv_state_stopped)
-    "NO_MEDIA_PRESENT" -> stringResource(R.string.cast_tv_state_no_media)
-    else -> state
+    else -> tvStateRes(state)?.let { stringResource(it) } ?: state
 }
 
 @Composable

@@ -1,5 +1,6 @@
 package com.mateof.kanal.cast.relay
 
+import com.mateof.kanal.core.resolve
 import android.annotation.SuppressLint
 import android.app.Notification
 import android.app.NotificationChannel
@@ -22,8 +23,12 @@ import androidx.core.app.ServiceCompat
 import androidx.core.content.ContextCompat
 import com.mateof.kanal.MainActivity
 import com.mateof.kanal.R
+import com.mateof.kanal.cast.CastController
 import com.mateof.kanal.cast.CastMonitor
+import com.mateof.kanal.cast.CastPhase
+import com.mateof.kanal.cast.CastSession
 import com.mateof.kanal.cast.UpnpClient
+import com.mateof.kanal.cast.tvStateRes
 import com.mateof.kanal.core.UiText
 import com.mateof.kanal.core.formatBitrate
 import com.mateof.kanal.core.formatBytes
@@ -35,20 +40,26 @@ import kotlinx.coroutines.Job
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
+import java.util.concurrent.atomic.AtomicBoolean
 import javax.inject.Inject
 
 /**
- * Keeps the phone serving the television while the relay runs.
+ * The notification of a send in progress, and whatever keeps it honest.
  *
- * In the foreground for the same reason as the downloads: nothing else survives
- * the screen going off for the length of a film. It also holds a Wi-Fi lock, or
- * the radio drops into power saving and the picture on the television stutters.
+ * Runs for every send, not only the relayed ones: the user wants to see at a
+ * glance what is on the television and stop it from there. In the foreground
+ * because nothing else survives the screen going off for the length of a film,
+ * and because a foreground notification goes away with the process — a plain
+ * ongoing one would outlive it and lie.
  *
- * It ends the relay when the television stops asking, stops answering, or the
- * phone loses the network the television is on. A provider that cannot be
- * reached ends it from inside the server, the moment a request fails.
+ * Through the relay it also holds a Wi-Fi lock, or the radio drops into power
+ * saving and the picture stutters, and ends the relay when the television
+ * stops asking, stops answering, or the phone loses its network. Sent directly
+ * there is no traffic to watch, so the television is asked what it is doing,
+ * and the send ends when it stops playing or answering.
  */
 @AndroidEntryPoint
 class CastRelayService : Service() {
@@ -56,6 +67,7 @@ class CastRelayService : Service() {
     @Inject lateinit var relay: CastRelay
     @Inject lateinit var upnp: UpnpClient
     @Inject lateinit var monitor: CastMonitor
+    @Inject lateinit var controller: CastController
     @Inject lateinit var logger: FileLogger
 
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
@@ -65,50 +77,64 @@ class CastRelayService : Service() {
     private var wakeLock: PowerManager.WakeLock? = null
     private var networkCallback: ConnectivityManager.NetworkCallback? = null
 
-    /** The relay session this instance was started for; see [CastRelay.generation]. */
+    /** The relay session this instance serves, if any; see [CastRelay.generation]. */
     @Volatile
     private var serving = -1
 
     @Volatile
     private var lastStartId = 0
 
+    /** A reconnect asked for from the notification, still on its way. */
+    private val reconnecting = AtomicBoolean(false)
+
+    /** The end already told in a notice, so it is told once. */
+    private var noticeFor: Long? = null
+
     override fun onBind(intent: Intent?): IBinder? = null
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
         lastStartId = startId
-        val running = relay.status.value as? RelayStatus.Running
         // Required promptly after startForegroundService, even when the answer
         // is to stop straight away.
-        enterForeground(running)
+        enterForeground()
 
-        if (intent?.action == ACTION_STOP) {
-            scope.launch {
-                running?.let { upnp.stop(it.device) }
-                relay.end(null, byUser = true)
+        when (intent?.action) {
+            ACTION_STOP -> {
+                scope.launch {
+                    if (monitor.session.value != null) {
+                        controller.stopCurrent()
+                    } else {
+                        (relay.status.value as? RelayStatus.Running)?.let { upnp.stop(it.device) }
+                        relay.end(null, byUser = true)
+                    }
+                    stopIfIdle(startId)
+                }
+                return START_NOT_STICKY
             }
-            return START_NOT_STICKY
+            ACTION_RECONNECT -> {
+                reconnecting.set(true)
+                scope.launch {
+                    try {
+                        controller.reconnect()
+                    } finally {
+                        reconnecting.set(false)
+                        stopIfIdle(lastStartId)
+                    }
+                }
+            }
         }
-        if (running == null) {
+
+        if (!wanted()) {
             stopSelf(startId)
             return START_NOT_STICKY
         }
-
-        serving = relay.generation
-        holdLocks()
-        watchNetwork(running)
+        adoptRelay()
         if (follower?.isActive != true) {
             follower = scope.launch {
-                relay.status.collect { status ->
-                    if (status is RelayStatus.Running) return@collect
-                    // Not one about to be sent again by itself: the controller
-                    // posts the notice if that fails too.
-                    relay.lastEnded?.takeIf { it.problem != null && !it.recoverable }
-                        ?.let { postEndNotice(this@CastRelayService, it) }
-                    // A new send sets Running *before* starting this service
-                    // again, so: read the id, then make sure nothing reopened.
-                    // stopSelf(id) is ignored if a newer start has arrived since.
-                    val id = lastStartId
-                    if (relay.status.value !is RelayStatus.Running) stopSelf(id)
+                relay.status.combine(monitor.session) { _, session -> session }.collect { session ->
+                    if (session?.phase == CastPhase.ENDED) noticeEnd(session)
+                    refreshNotification()
+                    stopIfIdle(lastStartId)
                 }
             }
         }
@@ -122,58 +148,147 @@ class CastRelayService : Service() {
         scope.cancel()
         // Whatever stopped the service, nothing must keep listening behind it —
         // but a newer session belongs to a newer start, not to this one.
-        relay.closeIfStill(serving, "servicio detenido")
+        if (serving >= 0) relay.closeIfStill(serving, "servicio detenido")
         super.onDestroy()
     }
 
+    /**
+     * Something to show: a relay running, or a send that is playing or being
+     * sent again. One that ended leaves a notice instead.
+     */
+    private fun wanted(): Boolean {
+        if (relay.status.value is RelayStatus.Running || reconnecting.get()) return true
+        val phase = monitor.session.value?.phase ?: return false
+        return phase == CastPhase.ACTIVE || phase == CastPhase.RECONNECTING
+    }
+
+    /**
+     * Stops unless there is still something to show. A new send sets its
+     * state *before* starting this service again, and stopSelf(id) is ignored
+     * once a newer start has arrived, so a send replacing another survives it.
+     */
+    private fun stopIfIdle(startId: Int) {
+        if (!wanted()) stopSelf(startId)
+    }
+
+    /** Takes on the relay that is running now, which may be newer than the one this started for. */
+    private fun adoptRelay() {
+        val running = relay.status.value as? RelayStatus.Running
+        if (running == null) {
+            releaseLocks()
+            return
+        }
+        serving = relay.generation
+        holdLocks()
+        watchNetwork(running)
+    }
+
     private suspend fun watch() {
-        var lastPoll = System.currentTimeMillis()
+        var lastPoll = 0L
         var misses = 0
         var lastState: String? = null
+        var stoppedPolls = 0
+        var sawPlaying = false
+        var orphanTicks = 0
+        // The send being watched: anything counted about the previous one starts over.
+        var watching: Long? = null
         while (scope.isActive) {
             delay(TICK_MS)
-            val running = relay.status.value as? RelayStatus.Running ?: return
-            val idle = relay.idleMs() ?: return
-            refreshNotification(running)
-            if (idle > CUT_QUIET_MS && relay.cutAndAbandoned()) {
-                // A television whose live stream was cut tends to stop rather
-                // than ask again; waiting the full minute only lengthens the
-                // black screen before sending it again.
-                relay.end(
-                    "el servidor cortó la emisión y la tele no volvió a pedirla",
-                    recoverable = true
-                )
-                return
+            val session = monitor.session.value
+            val running = relay.status.value as? RelayStatus.Running
+            if (session?.connectedAt != watching) {
+                watching = session?.connectedAt
+                misses = 0
+                lastState = null
+                stoppedPolls = 0
+                sawPlaying = false
+                orphanTicks = 0
+                lastPoll = System.currentTimeMillis()
             }
-            if (idle > IDLE_LIMIT_MS) {
-                // Not a problem to report: usually the television was switched
-                // off or told to play something else.
-                logger.i("Cast", "La tele lleva ${idle / 1000} s sin pedir la emisión")
-                relay.end(null)
-                return
+            refreshNotification()
+            if (running != null) {
+                // Started again from the background, a relay may not have
+                // come through onStartCommand: take it on here.
+                if (serving != relay.generation) adoptRelay()
+                val idle = relay.idleMs() ?: continue
+                if (idle > CUT_QUIET_MS && relay.cutAndAbandoned()) {
+                    // A television whose live stream was cut tends to stop rather
+                    // than ask again; waiting the full minute only lengthens the
+                    // black screen before sending it again.
+                    relay.end(
+                        "el servidor cortó la emisión y la tele no volvió a pedirla",
+                        recoverable = true
+                    )
+                    continue
+                }
+                if (idle > IDLE_LIMIT_MS) {
+                    // Not a problem to report: usually the television was switched
+                    // off or told to play something else.
+                    logger.i("Cast", "La tele lleva ${idle / 1000} s sin pedir la emisión")
+                    relay.end(null)
+                    continue
+                }
+            } else if (session == null || session.phase != CastPhase.ACTIVE) {
+                continue
+            } else if (session.viaPhone) {
+                // Relayed, with no relay: the end is normally on its way to the
+                // controller. If it never arrives the notification would stay
+                // up for nothing, so after a while it is ended from here.
+                if (++orphanTicks >= ORPHAN_TICKS) controller.endWatched(null, null)
+                continue
             }
+            val device = running?.device ?: session?.device ?: continue
             val now = System.currentTimeMillis()
             if (now - lastPoll < POLL_MS) continue
             lastPoll = now
-            upnp.transportState(running.device)
+            upnp.transportState(device)
                 .onSuccess { state ->
                     misses = 0
                     // Only changes: an evening of PLAYING every fifteen seconds
                     // would bury everything else in the log.
-                    if (state != lastState) logger.d("Cast", "${running.device.name}: $state")
+                    if (state != lastState) logger.d("Cast", "${device.name}: $state")
                     lastState = state
                     monitor.tvState(state)
+                    if (running != null || session == null) return@onSuccess
+                    // Sent directly, the television's word is all there is.
+                    when (state) {
+                        "PLAYING" -> {
+                            sawPlaying = true
+                            stoppedPolls = 0
+                        }
+                        "STOPPED", "NO_MEDIA_PRESENT" -> {
+                            stoppedPolls++
+                            // webOS holds a send in TRANSITIONING for half a
+                            // minute and may say STOPPED on the way in.
+                            val settled = sawPlaying || now - session.connectedAt > DIRECT_GRACE_MS
+                            if (stoppedPolls >= STOPPED_POLLS && settled) {
+                                logger.i("Cast", "${device.name} ha dejado de reproducir ($state)")
+                                controller.endWatched(null, null)
+                            }
+                        }
+                        else -> stoppedPolls = 0
+                    }
                 }
                 .onFailure { error ->
                     misses++
-                    logger.w("Cast", "${running.device.name} no contesta ($misses/$MAX_MISSES): ${error.message}")
+                    logger.w("Cast", "${device.name} no contesta ($misses/$MAX_MISSES): ${error.message}")
                     monitor.tvSilent(misses, MAX_MISSES, error.message)
                     if (misses >= MAX_MISSES) {
-                        relay.end("la tele dejó de responder", UiText(R.string.cast_hint_tv_gone))
-                        return
+                        val problem = "la tele dejó de responder"
+                        val hint = UiText(R.string.cast_hint_tv_gone)
+                        if (running != null) relay.end(problem, hint) else controller.endWatched(problem, hint)
                     }
                 }
         }
+    }
+
+    private fun noticeEnd(session: CastSession) {
+        val problem = session.endProblem ?: return
+        if (noticeFor == session.endedAt) return
+        noticeFor = session.endedAt
+        // The advice, in the language of the interface; what went wrong
+        // underneath is written for the log and stays on the panel.
+        postEndNotice(this, session.device.name, session.endHint?.resolve(this) ?: problem)
     }
 
     private fun watchNetwork(running: RelayStatus.Running) {
@@ -226,50 +341,73 @@ class CastRelayService : Service() {
         wakeLock = null
     }
 
-    private fun enterForeground(running: RelayStatus.Running?) {
+    private fun enterForeground() {
         val type = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
             ServiceInfo.FOREGROUND_SERVICE_TYPE_CONNECTED_DEVICE
         } else {
             0
         }
-        runCatching { ServiceCompat.startForeground(this, NOTIFICATION_ID, notification(running), type) }
-            .onFailure { logger.w("Cast", "No se pudo poner el relay en primer plano", it) }
+        runCatching { ServiceCompat.startForeground(this, NOTIFICATION_ID, notification(), type) }
+            .onFailure { logger.w("Cast", "No se pudo poner el envío en primer plano", it) }
     }
 
-    /** Speed and total in the notification, so a glance at the phone says it is working. */
-    private fun refreshNotification(running: RelayStatus.Running) {
+    /** Redrawn every tick, so a glance at the phone says what the television is doing. */
+    private fun refreshNotification() {
+        if (!wanted()) return
         val manager = getSystemService(NotificationManager::class.java) ?: return
-        runCatching { manager.notify(NOTIFICATION_ID, notification(running)) }
+        runCatching { manager.notify(NOTIFICATION_ID, notification()) }
     }
 
-    private fun notification(running: RelayStatus.Running?): Notification {
+    private fun notification(): Notification {
         ensureChannel(this)
+        val running = relay.status.value as? RelayStatus.Running
+        val session = monitor.session.value
+        val device = session?.device?.name ?: running?.device?.name.orEmpty()
+        val title = session?.request?.title ?: running?.title.orEmpty()
+        val reconnecting = session?.phase == CastPhase.RECONNECTING
+
+        val text = when {
+            reconnecting && session != null && session.attempt > 0 -> getString(
+                R.string.cast_notification_attempt,
+                title,
+                session.attempt,
+                CastController.MAX_AUTO_ATTEMPTS
+            )
+            reconnecting -> title
+            session != null && session.viaPhone && session.servedBytes > 0 -> getString(
+                R.string.cast_relay_notification_stats,
+                title,
+                formatBitrate(session.rateBytes),
+                formatBytes(session.servedBytes)
+            )
+            running != null || session?.viaPhone == true -> getString(R.string.cast_relay_notification_text, title)
+            else -> getString(R.string.cast_notification_direct, title)
+        }
+        val state = session?.tvState?.takeIf { !reconnecting }?.let { raw ->
+            tvStateRes(raw)?.let { getString(it) } ?: raw
+        }
         val stop = PendingIntent.getService(
             this,
             1,
             Intent(this, CastRelayService::class.java).setAction(ACTION_STOP),
             PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT
         )
-        val session = monitor.session.value?.takeIf { it.device == running?.device && it.servedBytes > 0 }
-        val text = if (session != null) {
-            getString(
-                R.string.cast_relay_notification_stats,
-                running?.title.orEmpty(),
-                formatBitrate(session.rateBytes),
-                formatBytes(session.servedBytes)
-            )
-        } else {
-            getString(R.string.cast_relay_notification_text, running?.title.orEmpty())
-        }
         return NotificationCompat.Builder(this, CHANNEL_ID)
-            .setContentTitle(getString(R.string.cast_relay_notification_title, running?.device?.name.orEmpty()))
+            .setContentTitle(
+                getString(
+                    if (reconnecting) R.string.cast_notification_reconnecting else R.string.cast_relay_notification_title,
+                    device
+                )
+            )
             .setContentText(text)
+            .setSubText(state)
             .setSmallIcon(R.drawable.ic_kanal_mark)
             .setOngoing(true)
             .setOnlyAlertOnce(true)
             .setSilent(true)
+            .setCategory(NotificationCompat.CATEGORY_TRANSPORT)
             .setContentIntent(openPanel(this))
-            .addAction(0, getString(R.string.cast_relay_stop), stop)
+            .addAction(0, getString(R.string.cast_action_stop), stop)
             .build()
     }
 
@@ -278,6 +416,7 @@ class CastRelayService : Service() {
         private const val NOTIFICATION_ID = 4712
         private const val NOTICE_ID = 4713
         private const val ACTION_STOP = "com.mateof.kanal.CAST_RELAY_STOP"
+        private const val ACTION_RECONNECT = "com.mateof.kanal.CAST_RECONNECT"
         private const val TICK_MS = 5_000L
         private const val POLL_MS = 15_000L
         private const val MAX_MISSES = 3
@@ -288,23 +427,40 @@ class CastRelayService : Service() {
         /** After the server cut the stream: a television that means to ask again does so at once. */
         private const val CUT_QUIET_MS = 8_000L
 
+        /** A relayed send whose relay is gone, given this many ticks for the end to arrive. */
+        private const val ORPHAN_TICKS = 3
+
+        /** Sent directly: two polls in a row saying it stopped, so a blip does not end it. */
+        private const val STOPPED_POLLS = 2
+
+        /** Sent directly: how long a television may sit stopped before it is believed. */
+        private const val DIRECT_GRACE_MS = 60_000L
+
         fun start(context: Context) {
             runCatching {
                 ContextCompat.startForegroundService(context, Intent(context, CastRelayService::class.java))
             }
         }
 
-        /** Left behind after the service is gone, so a failure is not silent. */
-        fun postEndNotice(context: Context, ended: RelayEnded) {
+        /** Left behind after the send is gone, so a failure is not silent, with a way to try again. */
+        fun postEndNotice(context: Context, deviceName: String, text: String) {
             val manager = context.getSystemService(NotificationManager::class.java) ?: return
             ensureChannel(context)
+            val intent = Intent(context, CastRelayService::class.java).setAction(ACTION_RECONNECT)
+            val flags = PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT
+            val reconnect = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                PendingIntent.getForegroundService(context, 2, intent, flags)
+            } else {
+                PendingIntent.getService(context, 2, intent, flags)
+            }
             val notice = NotificationCompat.Builder(context, CHANNEL_ID)
-                .setContentTitle(context.getString(R.string.cast_relay_stopped, ended.device.name))
-                .setContentText(ended.problem)
-                .setStyle(NotificationCompat.BigTextStyle().bigText(ended.problem))
+                .setContentTitle(context.getString(R.string.cast_relay_stopped, deviceName))
+                .setContentText(text)
+                .setStyle(NotificationCompat.BigTextStyle().bigText(text))
                 .setSmallIcon(R.drawable.ic_kanal_mark)
                 .setAutoCancel(true)
                 .setContentIntent(openPanel(context))
+                .addAction(0, context.getString(R.string.cast_action_reconnect), reconnect)
                 .build()
             runCatching { manager.notify(NOTICE_ID, notice) }
         }

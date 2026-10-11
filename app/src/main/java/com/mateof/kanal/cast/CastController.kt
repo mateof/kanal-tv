@@ -51,7 +51,9 @@ data class CastRequest(
     val userAgent: String,
     val live: Boolean,
     /** Where it sits in the catalogue, for the transmission panel. */
-    val origin: CastOrigin? = null
+    val origin: CastOrigin? = null,
+    /** Overrides the route in the settings: "try through the phone" after Directo failed. */
+    val route: CastRouteMode? = null
 ) {
     companion object {
         fun from(playable: Playable, directUrl: String = playable.url): CastRequest {
@@ -220,6 +222,18 @@ class CastController @Inject constructor(
         scope.launch { stopCurrent() }
     }
 
+    /**
+     * A send the notification service saw stop. Sent directly, the television
+     * stopped playing it or answering; through the phone, a relay that is
+     * gone without having said so. Ended like a relay that stopped by itself.
+     */
+    fun endWatched(problem: String?, hint: UiText?) {
+        val session = monitor.session.value ?: return
+        if (session.phase != CastPhase.ACTIVE) return
+        if (session.viaPhone && relay.running(session.generation)) return
+        onRelayEnded(RelayEnded(session.device, problem, hint, session.generation))
+    }
+
     /** Forgets a send that stopped by itself, once the user has seen it. */
     fun dismiss() {
         if (monitor.session.value?.phase == CastPhase.ENDED) monitor.clear()
@@ -234,8 +248,8 @@ class CastController @Inject constructor(
                     // to be given something else either way.
                     relay.close(if (resumed) "se reenvía a ${device.name}" else "nuevo envío a ${device.name}")
                     val settings = prefs.settings.first()
-                    when (settings.castRouteMode) {
-                        CastRouteMode.DIRECT -> direct(device, request)
+                    when (request.route ?: settings.castRouteMode) {
+                        CastRouteMode.DIRECT -> onlyDirect(device, request)
                         CastRouteMode.RELAY -> relayed(device, request, CastSource.ROUTE_RELAY, settings.castRelayPort)
                         CastRouteMode.AUTO -> automatic(device, request, settings.castRelayPort)
                     }
@@ -243,6 +257,9 @@ class CastController @Inject constructor(
                     .onSuccess {
                         CastRelayService.clearEndNotice(context)
                         monitor.started(device, request, it, resumed)
+                        // Sent directly there is no relay to start it: the
+                        // notification is there for every send.
+                        CastRelayService.start(context)
                     }
                     .onFailure { logger.w("Cast", "No se pudo enviar '${request.title}' a ${device.name}: ${it.message}") }
             }
@@ -286,9 +303,7 @@ class CastController @Inject constructor(
         }
         logger.w("Cast", "Se deja de reconectar con ${session.device.name} tras $MAX_AUTO_ATTEMPTS intentos")
         monitor.failed(reason, hint)
-        val final = RelayEnded(session.device, reason, hint, session.generation)
-        CastRelayService.postEndNotice(context, final)
-        _ended.tryEmit(final)
+        _ended.tryEmit(RelayEnded(session.device, reason, hint, session.generation))
     }
 
     private fun cancelAutomatic() {
@@ -345,6 +360,20 @@ class CastController @Inject constructor(
                 throw CastFailure(failure, unavailable)
             }
         }
+    }
+
+    /**
+     * Directo, as chosen in the settings: no fallback. A television that will
+     * not fetch from the server — webOS answers 716 within a tenth of a second
+     * for a Dispatcharr channel it then plays fine through the relay — gets
+     * that said plainly, rather than the hint about busy connections.
+     */
+    private suspend fun onlyDirect(device: CastDevice, request: CastRequest): CastOutcome = try {
+        direct(device, request)
+    } catch (failure: Exception) {
+        if (!CastRouting.shouldFallBack(failure)) throw failure
+        val relayWorked = memory[RouteMemory.Key(device.udn, hostOf(request.directUrl).orEmpty())] == CastRoute.RELAY
+        throw DirectRefused(failure, relayWorked)
     }
 
     private suspend fun direct(device: CastDevice, request: CastRequest): CastOutcome {

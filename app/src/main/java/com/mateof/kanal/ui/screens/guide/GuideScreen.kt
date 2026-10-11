@@ -1,5 +1,6 @@
 package com.mateof.kanal.ui.screens.guide
 
+import androidx.compose.ui.res.pluralStringResource
 import com.mateof.kanal.ui.actions.WithChannelActions
 import androidx.compose.foundation.background
 import androidx.compose.foundation.horizontalScroll
@@ -99,9 +100,16 @@ fun GuideScreen(onPlay: (String) -> Unit) {
                     Text(
                         when {
                             state.rows.isEmpty() -> ""
-                            compact -> "${state.rows.size} canales"
-                            else -> "${state.rows.size} canales · pulsa un programa para su ficha" +
-                                if (state.truncated) " · primeros ${GuideViewModel.CHANNEL_LIMIT}" else ""
+                            compact -> pluralStringResource(R.plurals.count_channels, state.rows.size, state.rows.size)
+                            else -> listOfNotNull(
+                                pluralStringResource(R.plurals.count_channels, state.rows.size, state.rows.size),
+                                stringResource(R.string.guide_open_hint),
+                                if (state.truncated) {
+                                    stringResource(R.string.guide_first_n, GuideViewModel.CHANNEL_LIMIT)
+                                } else {
+                                    null
+                                }
+                            ).joinToString(" · ")
                         },
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis,
@@ -335,7 +343,7 @@ private fun ProgrammeStrip(
             contentAlignment = Alignment.CenterStart
         ) {
             Text(
-                "  Sin guía",
+                "  " + stringResource(R.string.common_no_guide),
                 style = MaterialTheme.typography.labelSmall,
                 color = KanalColors.OnSurfaceFaint
             )

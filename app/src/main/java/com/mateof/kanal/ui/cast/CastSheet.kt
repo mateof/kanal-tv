@@ -62,7 +62,8 @@ fun CastSheet(
     onPick: (CastDevice) -> Unit,
     onAdd: (String) -> Unit,
     onStop: () -> Unit,
-    onClose: () -> Unit
+    onClose: () -> Unit,
+    onTryRelay: () -> Unit = {}
 ) {
     if (!state.open) return
 
@@ -145,12 +146,18 @@ fun CastSheet(
                         color = KanalColors.OnSurfaceMuted
                     )
                 }
-                Spacer(Modifier.height(6.dp))
-                Text(
-                    reason,
-                    style = MaterialTheme.typography.labelSmall,
-                    color = KanalColors.OnSurfaceFaint
-                )
+                if (reason.isNotBlank()) {
+                    Spacer(Modifier.height(6.dp))
+                    Text(
+                        reason,
+                        style = MaterialTheme.typography.labelSmall,
+                        color = KanalColors.OnSurfaceFaint
+                    )
+                }
+                if (state.canTryRelay) {
+                    Spacer(Modifier.height(10.dp))
+                    KanalButton(stringResource(R.string.cast_try_via_phone), onTryRelay, tone = ButtonTone.Primary)
+                }
                 Spacer(Modifier.height(12.dp))
             }
 

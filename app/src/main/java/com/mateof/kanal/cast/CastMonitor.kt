@@ -1,5 +1,6 @@
 package com.mateof.kanal.cast
 
+import androidx.annotation.StringRes
 import com.mateof.kanal.R
 import com.mateof.kanal.cast.relay.CastRelay
 import com.mateof.kanal.cast.relay.RelayEnded
@@ -22,6 +23,17 @@ import javax.inject.Inject
 import javax.inject.Singleton
 
 enum class CastPhase { ACTIVE, RECONNECTING, ENDED }
+
+/** How to word a UPnP transport state, or null for one without a name of its own. */
+@StringRes
+fun tvStateRes(state: String): Int? = when (state) {
+    "PLAYING" -> R.string.cast_tv_state_playing
+    "TRANSITIONING" -> R.string.cast_tv_state_transitioning
+    "PAUSED_PLAYBACK" -> R.string.cast_tv_state_paused
+    "STOPPED" -> R.string.cast_tv_state_stopped
+    "NO_MEDIA_PRESENT" -> R.string.cast_tv_state_no_media
+    else -> null
+}
 
 data class CastIncident(
     val at: Long,

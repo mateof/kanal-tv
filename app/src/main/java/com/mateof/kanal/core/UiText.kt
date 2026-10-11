@@ -1,5 +1,6 @@
 package com.mateof.kanal.core
 
+import android.content.Context
 import androidx.annotation.PluralsRes
 import androidx.annotation.StringRes
 import androidx.compose.runtime.Composable
@@ -22,6 +23,18 @@ data class UiText(
 
 /** An argument that has to agree in number with what it counts. */
 data class Plural(@PluralsRes val res: Int, val count: Int)
+
+/** For the few places outside a composition: a notification, a service. */
+fun UiText.resolve(context: Context): String {
+    if (args.isEmpty()) return context.getString(res)
+    val resolved = args.map { arg ->
+        when (arg) {
+            is Plural -> context.resources.getQuantityString(arg.res, arg.count, arg.count)
+            else -> arg
+        }
+    }
+    return context.getString(res, *resolved.toTypedArray())
+}
 
 @Composable
 fun UiText.resolve(): String {

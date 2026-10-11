@@ -555,4 +555,27 @@
     <string name="settings_downloads_limit_hint">Once the downloads add up to this, no more are taken.</string>
     <string name="settings_downloads_no_limit">No limit</string>
     <string name="settings_downloads_gb">%1$d GB</string>
+    <string name="guide_open_hint">press a programme to see its details</string>
+    <string name="guide_first_n">the first %d</string>
+    <string name="cast_no_answer_at_address">Nothing answers at that address.</string>
+    <string name="cast_content_missing">The content was not found in the catalogue.</string>
+    <string name="cast_hint_direct_refused">The TV could not download the stream straight from the server. Some TVs (many LGs, for instance) only accept it through the phone. Automatic does that by itself.</string>
+    <string name="cast_hint_direct_refused_relay_ok">This TV does not accept it straight from the server, but a while ago it did receive it through the phone. Automatic does that by itself.</string>
+    <string name="cast_try_via_phone">Try through this phone</string>
+    <string name="cast_notification_reconnecting">Reconnecting to %s…</string>
+    <string name="cast_notification_attempt">%1$s · attempt %2$d of %3$d</string>
+    <string name="cast_notification_direct">%s · from the server to the TV</string>
+    <string name="probe_status_said">The server answered %1$d: %2$s</string>
+    <string name="probe_status">The server answered %d.</string>
+    <string name="probe_empty">The server accepted the connection but sent nothing.</string>
+    <string name="probe_text_message">The server sent back a text message instead of video.</string>
+    <string name="probe_text">The server sent back text instead of video.</string>
+    <plurals name="count_results">
+        <item quantity="one">%d result</item>
+        <item quantity="other">%d results</item>
+    </plurals>
+    <plurals name="live_replay_days">
+        <item quantity="one">Replay %d day</item>
+        <item quantity="other">Replay %d days</item>
+    </plurals>
 </resources>

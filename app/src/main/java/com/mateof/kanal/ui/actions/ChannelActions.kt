@@ -34,7 +34,8 @@ fun WithChannelActions(
             onPick = castVm::sendTo,
             onAdd = castVm::addByAddress,
             onStop = castVm::stopSending,
-            onClose = castVm::close
+            onClose = castVm::close,
+            onTryRelay = castVm::sendViaPhone
         )
         // Last, so it is drawn over the rows rather than behind them.
         ItemActionsSheet(

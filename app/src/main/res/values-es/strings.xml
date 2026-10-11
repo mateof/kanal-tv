@@ -555,4 +555,27 @@
     <string name="settings_downloads_limit_hint">Cuando el conjunto de descargas llegue aquí, no se añaden más.</string>
     <string name="settings_downloads_no_limit">Sin límite</string>
     <string name="settings_downloads_gb">%1$d GB</string>
+    <string name="guide_open_hint">pulsa un programa para ver su ficha</string>
+    <string name="guide_first_n">los primeros %d</string>
+    <string name="cast_no_answer_at_address">No responde nada en esa dirección.</string>
+    <string name="cast_content_missing">No se encontró el contenido en el catálogo.</string>
+    <string name="cast_hint_direct_refused">La tele no consiguió descargar la emisión directamente del servidor. Hay teles (muchas LG, por ejemplo) que sólo la aceptan a través del móvil. En Automático se hace solo.</string>
+    <string name="cast_hint_direct_refused_relay_ok">Esta tele no la acepta directamente del servidor, pero hace un rato sí la recibió a través del móvil. En Automático se hace solo.</string>
+    <string name="cast_try_via_phone">Probar a través del móvil</string>
+    <string name="cast_notification_reconnecting">Reconectando con %s…</string>
+    <string name="cast_notification_attempt">%1$s · intento %2$d de %3$d</string>
+    <string name="cast_notification_direct">%s · del servidor a la tele</string>
+    <string name="probe_status_said">El servidor respondió %1$d: %2$s</string>
+    <string name="probe_status">El servidor respondió %d.</string>
+    <string name="probe_empty">El servidor aceptó la conexión pero no envió nada.</string>
+    <string name="probe_text_message">El servidor devolvió un mensaje de texto en lugar de vídeo.</string>
+    <string name="probe_text">El servidor devolvió texto en lugar de vídeo.</string>
+    <plurals name="count_results">
+        <item quantity="one">%d resultado</item>
+        <item quantity="other">%d resultados</item>
+    </plurals>
+    <plurals name="live_replay_days">
+        <item quantity="one">Repetición %d día</item>
+        <item quantity="other">Repetición %d días</item>
+    </plurals>
 </resources>

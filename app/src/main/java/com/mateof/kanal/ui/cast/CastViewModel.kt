@@ -1,5 +1,8 @@
 package com.mateof.kanal.ui.cast
 
+import com.mateof.kanal.data.prefs.CastRouteMode
+import com.mateof.kanal.cast.DirectRefused
+import com.mateof.kanal.R
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.mateof.kanal.cast.CastController
@@ -38,6 +41,8 @@ data class CastUiState(
     val viaPhone: Boolean = false,
     val error: String? = null,
     val hint: UiText? = null,
+    /** Directo failed in a way the relay gets past: offer it. */
+    val canTryRelay: Boolean = false,
     /** Something is (or was, until it stopped by itself) on another device: the panel has it. */
     val transmission: Boolean = false
 ) {
@@ -74,6 +79,9 @@ class CastViewModel @Inject constructor(
 
     /** Kept after it stops, so a resend from the panel can be matched to it. */
     private var lastDevice: CastDevice? = null
+
+    /** The device a send just failed on, for "try through the phone". */
+    private var failedDevice: CastDevice? = null
 
     init {
         viewModelScope.launch {
@@ -149,7 +157,8 @@ class CastViewModel @Inject constructor(
             if (device == null) {
                 _state.value = _state.value.copy(
                     searching = false,
-                    error = "No responde en esa dirección"
+                    error = address.trim(),
+                    hint = UiText(R.string.cast_no_answer_at_address)
                 )
             } else {
                 manual = (manual + device).distinctBy { it.controlUrl }
@@ -162,16 +171,25 @@ class CastViewModel @Inject constructor(
         }
     }
 
-    fun sendTo(device: CastDevice) {
+    /** After Directo failed: the same thing, to the same television, through this phone. */
+    fun sendViaPhone() {
+        failedDevice?.let { sendTo(it, CastRouteMode.RELAY) }
+    }
+
+    fun sendTo(device: CastDevice, route: CastRouteMode? = null) {
         val target = _state.value.target ?: return
         viewModelScope.launch {
-            _state.value = _state.value.copy(searching = true, error = null, hint = null)
+            _state.value = _state.value.copy(searching = true, error = null, hint = null, canTryRelay = false)
             val playable = resolve(target)
             if (playable == null) {
-                _state.value = _state.value.copy(searching = false, error = "No se encontró el contenido")
+                _state.value = _state.value.copy(
+                    searching = false,
+                    error = "",
+                    hint = UiText(R.string.cast_content_missing)
+                )
                 return@launch
             }
-            cast.send(device, CastRequest.from(playable))
+            cast.send(device, CastRequest.from(playable).copy(route = route))
                 .onSuccess { outcome ->
                     sentDevice = device
                     lastDevice = device
@@ -183,10 +201,12 @@ class CastViewModel @Inject constructor(
                 }
                 .onFailure { failure ->
                     logger.w("Cast", "No se pudo enviar a ${device.name}", failure)
+                    failedDevice = device
                     _state.value = _state.value.copy(
                         searching = false,
-                        error = failure.message ?: "Error desconocido",
-                        hint = CastHints.of(failure)
+                        error = failure.message ?: failure.javaClass.simpleName,
+                        hint = CastHints.of(failure),
+                        canTryRelay = failure is DirectRefused
                     )
                 }
         }

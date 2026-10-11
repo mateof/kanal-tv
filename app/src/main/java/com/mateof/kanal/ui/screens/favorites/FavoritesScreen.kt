@@ -1,5 +1,6 @@
 package com.mateof.kanal.ui.screens.favorites
 
+import androidx.compose.ui.res.pluralStringResource
 import com.mateof.kanal.ui.actions.WithChannelActions
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -98,7 +99,11 @@ fun FavoritesScreen(
                     Text(stringResource(R.string.nav_favorites), style = MaterialTheme.typography.headlineMedium, color = KanalColors.OnBackground)
                     Spacer(Modifier.height(6.dp))
                     Text(
-                        "${channels.size} canales · ${movies.size} películas · ${series.size} series",
+                        listOf(
+                            pluralStringResource(R.plurals.count_channels, channels.size, channels.size),
+                            pluralStringResource(R.plurals.count_movies, movies.size, movies.size),
+                            pluralStringResource(R.plurals.count_series, series.size, series.size)
+                        ).joinToString(" · "),
                         style = MaterialTheme.typography.labelMedium,
                         color = KanalColors.OnSurfaceFaint
                     )

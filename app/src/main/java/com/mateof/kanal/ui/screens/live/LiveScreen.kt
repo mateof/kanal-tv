@@ -1,5 +1,6 @@
 package com.mateof.kanal.ui.screens.live
 
+import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.background
@@ -229,7 +230,8 @@ fun LiveScreen(
             onPick = castVm::sendTo,
             onAdd = castVm::addByAddress,
             onStop = castVm::stopSending,
-            onClose = castVm::close
+            onClose = castVm::close,
+            onTryRelay = castVm::sendViaPhone
         )
         ItemActionsSheet(
             vm = actionsVm,
@@ -427,7 +429,8 @@ fun LiveScreen(
             onPick = castVm::sendTo,
             onAdd = castVm::addByAddress,
             onStop = castVm::stopSending,
-            onClose = castVm::close
+            onClose = castVm::close,
+            onTryRelay = castVm::sendViaPhone
         )
         // Last in the box, so it is drawn over the list rather than behind it.
         ItemActionsSheet(
@@ -771,7 +774,10 @@ private fun DetailPane(
                     if (isNotEmpty()) append(" · ")
                     append(channel.categoryName)
                 }
-                if (channel.archiveDays > 0) append(" · Repetición ${channel.archiveDays} días")
+                if (channel.archiveDays > 0) {
+                    append(" · ")
+                    append(pluralStringResource(R.plurals.live_replay_days, channel.archiveDays, channel.archiveDays))
+                }
             },
             style = MaterialTheme.typography.labelMedium,
             color = KanalColors.OnSurfaceFaint

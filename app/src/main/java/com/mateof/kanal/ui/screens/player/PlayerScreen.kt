@@ -683,7 +683,7 @@ fun PlayerScreen(
                 state.errorDetail?.let { detail ->
                     Spacer(Modifier.height(10.dp))
                     Text(
-                        detail,
+                        detail.resolve(),
                         style = MaterialTheme.typography.bodyMedium,
                         color = KanalColors.OnSurfaceMuted,
                         textAlign = TextAlign.Center
@@ -997,7 +997,8 @@ fun PlayerScreen(
                 onPick = { device -> vm.castTo(device); mode = Mode.Watching },
                 onBringBack = { vm.stopCast() },
                 onAdd = { vm.addCastDevice(it) },
-                onClose = { mode = Mode.Menu }
+                onClose = { mode = Mode.Menu },
+                onTryRelay = { vm.castViaPhone(); mode = Mode.Watching }
             )
         }
 
@@ -1487,7 +1488,8 @@ private fun CastSheet(
     onPick: (CastDevice) -> Unit,
     onBringBack: () -> Unit,
     onAdd: (String) -> Unit,
-    onClose: () -> Unit
+    onClose: () -> Unit,
+    onTryRelay: () -> Unit
 ) {
     var address by remember { mutableStateOf("") }
     Column(
@@ -1541,6 +1543,10 @@ private fun CastSheet(
                 style = MaterialTheme.typography.labelSmall,
                 color = KanalColors.OnSurfaceFaint
             )
+            if (state.castCanTryRelay) {
+                Spacer(Modifier.height(10.dp))
+                KanalButton(stringResource(R.string.cast_try_via_phone), onTryRelay, tone = ButtonTone.Primary)
+            }
             Spacer(Modifier.height(12.dp))
         }
 

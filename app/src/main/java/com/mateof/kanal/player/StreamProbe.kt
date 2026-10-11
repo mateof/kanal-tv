@@ -1,5 +1,7 @@
 package com.mateof.kanal.player
 
+import com.mateof.kanal.core.UiText
+import com.mateof.kanal.R
 import com.mateof.kanal.core.log.FileLogger
 import com.mateof.kanal.data.net.HttpProvider
 import com.mateof.kanal.data.net.redactUrl
@@ -32,7 +34,7 @@ private const val NOT_READY_MAX_BYTES = 1024
  */
 data class ProbeReport(
     val code: Int,
-    val message: String?,
+    val message: UiText?,
     val notReady: Boolean
 )
 
@@ -57,7 +59,7 @@ class StreamProbe @Inject constructor(
      * @return a short phrase for the screen, or null when nothing useful came
      *   of it. The detail always goes to the log either way.
      */
-    suspend fun describe(url: String, userAgent: String): String? = inspect(url, userAgent)?.message
+    suspend fun describe(url: String, userAgent: String): UiText? = inspect(url, userAgent)?.message
 
     suspend fun inspect(url: String, userAgent: String): ProbeReport? = withContext(Dispatchers.IO) {
         val safeUrl = redactUrl(url)
@@ -140,18 +142,18 @@ class StreamProbe @Inject constructor(
     }
 
     /** The line the user sees under the error, when there is something to say. */
-    private fun verdict(code: Int, type: String, body: ByteArray): String? = when {
+    private fun verdict(code: Int, type: String, body: ByteArray): UiText? = when {
         code !in 200..299 -> spoken(body)
-            ?.let { "El servidor respondió $code: $it" }
-            ?: "El servidor respondió $code."
+            ?.let { UiText(R.string.probe_status_said, code, it) }
+            ?: UiText(R.string.probe_status, code)
 
-        body.isEmpty() -> "El servidor aceptó la conexión pero no envió nada."
+        body.isEmpty() -> UiText(R.string.probe_empty)
         body[0] == '<'.code.toByte() || body[0] == '{'.code.toByte() ->
-            spoken(body) ?: "El servidor devolvió un mensaje de texto en lugar de vídeo."
+            spoken(body)?.let { UiText(R.string.verbatim, it) } ?: UiText(R.string.probe_text_message)
 
         looksLikeTs(body) -> null
         type.startsWith("text/") ->
-            spoken(body) ?: "El servidor devolvió texto en lugar de vídeo."
+            spoken(body)?.let { UiText(R.string.verbatim, it) } ?: UiText(R.string.probe_text)
 
         else -> null
     }

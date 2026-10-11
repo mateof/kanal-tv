@@ -1,5 +1,6 @@
 package com.mateof.kanal.ui.screens.search
 
+import androidx.compose.ui.res.pluralStringResource
 import com.mateof.kanal.ui.actions.WithChannelActions
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -118,7 +119,7 @@ fun SearchScreen(
                     } else if (query.trim().length >= 2) {
                         Spacer(Modifier.height(10.dp))
                         Text(
-                            "${results.total} resultados",
+                            pluralStringResource(R.plurals.count_results, results.total, results.total),
                             style = MaterialTheme.typography.labelMedium,
                             color = KanalColors.OnSurfaceFaint
                         )

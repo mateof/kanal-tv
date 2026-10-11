@@ -1,5 +1,7 @@
 package com.mateof.kanal.ui.screens.player
 
+import com.mateof.kanal.data.prefs.CastRouteMode
+import com.mateof.kanal.cast.DirectRefused
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import androidx.media3.common.C
@@ -170,8 +172,10 @@ data class PlayerUiState(
     val castError: String? = null,
     /** Plain-language reading of the renderer's refusal, when it is known. */
     val castHint: UiText? = null,
+    /** Directo failed in a way the relay gets past: offer it. */
+    val castCanTryRelay: Boolean = false,
     /** What the server actually answered, when a stream would not play. */
-    val errorDetail: String? = null,
+    val errorDetail: UiText? = null,
     /** Set when the reason is simply that the account has no free connection. */
     val errorAccount: AccountStatus? = null,
     /** Counting down to the next episode, or null when nothing follows. */
@@ -266,6 +270,9 @@ class PlayerViewModel @Inject constructor(
 
     /** Kept after it stops, so a resend from the panel can be matched to it. */
     private var lastCastDevice: CastDevice? = null
+
+    /** The device a send just failed on, for "try through the phone". */
+    private var failedCastDevice: CastDevice? = null
 
     init {
         // The relay can end without anyone here asking: the television went
@@ -693,7 +700,7 @@ class PlayerViewModel @Inject constructor(
     }
 
     /** The old path: another format, a reconnection, or an error on screen. */
-    private fun giveUpOrRetry(error: PlaybackException, detail: String?) {
+    private fun giveUpOrRetry(error: PlaybackException, detail: UiText?) {
         if (tryNextCandidate(error)) return
         if (scheduleReconnect(error)) return
         logger.e("Player", "Sin más formatos que probar", error)
@@ -968,7 +975,8 @@ class PlayerViewModel @Inject constructor(
             _state.value = if (device == null) {
                 _state.value.copy(
                     castSearching = false,
-                    castError = "No responde en esa dirección"
+                    castError = address.trim(),
+                    castHint = UiText(R.string.cast_no_answer_at_address)
                 )
             } else {
                 _state.value.copy(
@@ -990,7 +998,12 @@ class PlayerViewModel @Inject constructor(
      * at the URL and hides the real cause. Pausing is not enough either, since a
      * paused player keeps its connection open.
      */
-    fun castTo(device: CastDevice) {
+    /** After Directo failed: the same thing, to the same television, through this phone. */
+    fun castViaPhone() {
+        failedCastDevice?.let { castTo(it, CastRouteMode.RELAY) }
+    }
+
+    fun castTo(device: CastDevice, route: CastRouteMode? = null) {
         val playable = _state.value.playable ?: return
         val url = candidates.getOrNull(candidateIndex) ?: playable.url
         viewModelScope.launch {
@@ -999,7 +1012,8 @@ class PlayerViewModel @Inject constructor(
             // Providers do not always free the slot the instant the socket goes.
             delay(SLOT_RELEASE_MS)
 
-            cast.send(device, CastRequest.from(playable, url))
+            _state.value = _state.value.copy(castCanTryRelay = false)
+            cast.send(device, CastRequest.from(playable, url).copy(route = route))
                 .onSuccess { outcome ->
                     castDevice = device
                     lastCastDevice = device
@@ -1015,10 +1029,12 @@ class PlayerViewModel @Inject constructor(
                     resumeLocally(resumeFrom)
                     // Shown verbatim on purpose: "no se pudo enviar" is useless
                     // when the renderer already said exactly what it objects to.
-                    val detail = failure.message ?: "Error desconocido"
+                    val detail = failure.message ?: failure.javaClass.simpleName
+                    failedCastDevice = device
                     _state.value = _state.value.copy(
                         castError = detail,
-                        castHint = CastHints.of(failure)
+                        castHint = CastHints.of(failure),
+                        castCanTryRelay = failure is DirectRefused
                     )
                 }
         }

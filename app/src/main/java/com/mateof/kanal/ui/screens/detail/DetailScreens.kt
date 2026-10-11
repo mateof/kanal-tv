@@ -251,7 +251,8 @@ fun MovieDetailScreen(
             onPick = castVm::sendTo,
             onAdd = castVm::addByAddress,
             onStop = castVm::stopSending,
-            onClose = castVm::close
+            onClose = castVm::close,
+            onTryRelay = castVm::sendViaPhone
         )
     }
 }
@@ -466,7 +467,8 @@ fun SeriesDetailScreen(
             onPick = castVm::sendTo,
             onAdd = castVm::addByAddress,
             onStop = castVm::stopSending,
-            onClose = castVm::close
+            onClose = castVm::close,
+            onTryRelay = castVm::sendViaPhone
         )
     }
 }

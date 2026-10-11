@@ -562,4 +562,29 @@
     <string name="settings_downloads_limit_hint">Cando o conxunto de descargas chegue aquí, non se engaden máis.</string>
     <string name="settings_downloads_no_limit">Sen límite</string>
     <string name="settings_downloads_gb">%1$d GB</string>
+    <string name="guide_open_hint">preme un programa para ver a súa ficha</string>
+    <string name="guide_first_n">as primeiras %d</string>
+    <string name="cast_no_answer_at_address">Non responde nada nese enderezo.</string>
+    <string name="cast_content_missing">Non se atopou o contido no catálogo.</string>
+    <string name="cast_hint_direct_refused">A tele non conseguiu descargar a emisión directamente do servidor. Hai teles (moitas LG, por exemplo) que só a aceptan a través do móbil. En Automático faise só.</string>
+    <string name="cast_hint_direct_refused_relay_ok">Esta tele non a acepta directamente do servidor, pero hai un pouco si a recibiu a través do móbil. En Automático faise só.</string>
+    <string name="cast_try_via_phone">Probar a través do móbil</string>
+    <string name="cast_notification_reconnecting">Reconectando con %s…</string>
+    <string name="cast_notification_attempt">%1$s · intento %2$d de %3$d</string>
+    <string name="cast_notification_direct">%s · do servidor á tele</string>
+    <string name="probe_status_said">O servidor respondeu %1$d: %2$s</string>
+    <string name="probe_status">O servidor respondeu %d.</string>
+    <string name="probe_empty">O servidor aceptou a conexión pero non enviou nada.</string>
+    <string name="probe_text_message">O servidor devolveu unha mensaxe de texto en lugar de vídeo.</string>
+    <string name="probe_text">O servidor devolveu texto en lugar de vídeo.</string>
+    <plurals name="count_results">
+        <item quantity="one">%d resultado</item>
+        <item quantity="other">%d resultados</item>
+    </plurals>
+    <plurals name="live_replay_days">
+        <item quantity="one">Repetición %d día</item>
+        <item quantity="other">Repetición %d días</item>
+    </plurals>
+    <!-- What a server said, shown as it said it. -->
+    <string name="verbatim" translatable="false">%s</string>
 </resources>

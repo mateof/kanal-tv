@@ -17,12 +17,22 @@ class RelayUnavailable(message: String, val hint: UiText) : IOException(message)
 class CastFailure(direct: Throwable, val relay: RelayUnavailable) :
     IOException("${direct.message} · tampoco a través del móvil: ${relay.message}", direct)
 
+/**
+ * "Directo" was chosen in the settings and the television would not fetch the
+ * stream from the server. [relayWorked]: the same television took it from the
+ * same server through the phone earlier on.
+ */
+class DirectRefused(cause: Throwable, val relayWorked: Boolean) : IOException(cause.message, cause)
+
 /** Turns a failed send into something the user can act on. */
 object CastHints {
 
     fun of(error: Throwable): UiText? = when (error) {
         is RelayUnavailable -> error.hint
         is CastFailure -> error.relay.hint
+        is DirectRefused -> UiText(
+            if (error.relayWorked) R.string.cast_hint_direct_refused_relay_ok else R.string.cast_hint_direct_refused
+        )
         is RelayStopped -> error.hint ?: forDetail(error.message.orEmpty())
         else -> forDetail(error.message.orEmpty())
     }
