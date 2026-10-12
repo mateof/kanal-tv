@@ -370,7 +370,7 @@
     <string name="cast_bring_back">Traer de vuelta</string>
     <string name="cast_failed">No se pudo enviar a ese aparato.</string>
     <string name="cast_address">Dirección del aparato</string>
-    <string name="cast_address_hint">Si no aparece en la lista: su IP, o la URL de su descripción.</string>
+    <string name="cast_address_hint">Si no aparece en la lista: su IP (también la de otro aparato con Kanal), o la URL de su descripción.</string>
     <string name="cast_add">Añadir</string>
 
     <string name="cast_hint_716">La tele no pudo descargar la emisión. Suele ser el límite de conexiones del proveedor —si ya la estás viendo aquí, esa conexión está ocupada— o que la tele no admita emisiones en directo. Prueba a enviarle una película.</string>
@@ -577,5 +577,44 @@
     <plurals name="live_replay_days">
         <item quantity="one">Repetición %d día</item>
         <item quantity="other">Repetición %d días</item>
+    </plurals>
+    <!-- Other devices with Kanal -->
+    <string name="link_send_local_only">Esto sólo está descargado en este aparato y el servidor no tiene una dirección que enviar.</string>
+    <string name="link_send_failed">«%1$s» no contestó. ¿Sigue Kanal abierto allí y en la misma red?</string>
+    <string name="link_none_hint">Otro aparato con Kanal aparece aquí si tiene Kanal abierto y está en la misma red.</string>
+    <string name="link_group_kanal">Con Kanal</string>
+    <string name="link_group_dlna">DLNA</string>
+    <string name="link_now_playing">Viendo: %1$s</string>
+    <string name="link_form_tv">Televisión</string>
+    <string name="link_form_tablet">Tableta</string>
+    <string name="link_form_phone">Móvil</string>
+    <string name="link_offer_from">Desde «%1$s» (%2$s)</string>
+    <string name="link_offer_hint">Llevan usuario y contraseña: acéptalas sólo si las mandas tú. Si ya tienes una igual, se actualiza.</string>
+    <string name="link_offer_accept">Añadir</string>
+    <string name="link_offer_reject">Rechazar</string>
+    <string name="link_received">%1$s envía «%2$s»</string>
+    <string name="link_this_device">Este aparato y otros con Kanal</string>
+    <string name="link_visible">Visible para otros aparatos con Kanal</string>
+    <string name="link_visible_desc">Mientras Kanal está abierto, otros aparatos de tu red pueden encontrarlo, mandarle algo que reproducir y ofrecerle fuentes (que habrá que aceptar aquí).</string>
+    <string name="link_device_name">Nombre de este aparato</string>
+    <string name="link_device_name_desc">Vacío usa el del sistema: %1$s</string>
+    <string name="link_seen_as">Los demás lo ven como «%1$s» en %2$s</string>
+    <string name="link_no_network">Ahora mismo no está en ninguna red local.</string>
+    <string name="link_hidden">Oculto: otros aparatos no lo encontrarán.</string>
+    <string name="link_send_sources">Enviar fuentes a otro aparato</string>
+    <string name="link_send_sources_desc">Elige qué fuentes y a qué aparato; allí tendrán que aceptarlas. Viajan por tu red local sin cifrar.</string>
+    <string name="link_no_sources">No hay fuentes que enviar.</string>
+    <string name="link_waiting_answer">Esperando a que acepten en «%1$s»…</string>
+    <string name="link_none">No se encuentra ningún aparato con Kanal.</string>
+    <string name="link_address_hint">IP del otro aparato, p. ej. 192.168.1.40</string>
+    <string name="link_no_kanal_at">No hay ningún Kanal contestando en %1$s.</string>
+    <string name="link_pick_sources">Elige al menos una fuente.</string>
+    <string name="link_sources_refused">«%1$s» rechazó las fuentes, o nadie contestó a tiempo.</string>
+    <string name="link_sources_done">Enviadas a «%1$s». Nuevas: %2$d · actualizadas: %3$d.</string>
+    <string name="setup_from_other_device">¿Ya tienes Kanal en el móvil?</string>
+    <string name="setup_from_other_device_desc">Mándale las fuentes desde allí: Ajustes → Fuentes → Enviar fuentes a otro aparato. Este aparato aparece como «%1$s» (%2$s).</string>
+    <plurals name="link_offer_title">
+        <item quantity="one">Te quieren enviar una fuente</item>
+        <item quantity="other">Te quieren enviar %d fuentes</item>
     </plurals>
 </resources>

@@ -40,6 +40,7 @@ import com.mateof.kanal.ui.components.KanalChip
 import com.mateof.kanal.ui.components.KanalTextField
 import com.mateof.kanal.ui.components.StepProgress
 import com.mateof.kanal.ui.isCompact
+import com.mateof.kanal.ui.link.LinkSettingsViewModel
 import com.mateof.kanal.ui.theme.KanalColors
 import com.mateof.kanal.ui.theme.Spacing
 
@@ -123,6 +124,30 @@ private fun SetupIntro(isEditing: Boolean, compact: Boolean) {
             style = MaterialTheme.typography.bodySmall,
             color = KanalColors.OnSurfaceFaint
         )
+    }
+    // Typing a server, a user and a password with a remote is the worst part
+    // of setting up a television; a phone that already has them can send them.
+    if (!isEditing) {
+        val link: LinkSettingsViewModel = hiltViewModel()
+        val device by link.device.collectAsStateWithLifecycle()
+        if (device.visible) {
+            Spacer(Modifier.height(if (compact) 12.dp else 24.dp))
+            Text(
+                stringResource(R.string.setup_from_other_device),
+                style = MaterialTheme.typography.titleSmall,
+                color = KanalColors.Accent
+            )
+            Spacer(Modifier.height(6.dp))
+            Text(
+                stringResource(
+                    R.string.setup_from_other_device_desc,
+                    device.shownName,
+                    device.addresses.joinToString(", ").ifBlank { "—" }
+                ),
+                style = MaterialTheme.typography.bodySmall,
+                color = KanalColors.OnSurfaceMuted
+            )
+        }
     }
 }
 

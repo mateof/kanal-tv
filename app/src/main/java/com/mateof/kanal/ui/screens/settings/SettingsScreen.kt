@@ -71,6 +71,8 @@ import com.mateof.kanal.ui.components.SettingSwitchRow
 import com.mateof.kanal.ui.components.StepProgress
 import com.mateof.kanal.ui.components.UpdateViewModel
 import com.mateof.kanal.ui.contentInset
+import com.mateof.kanal.ui.link.LinkSettingsViewModel
+import com.mateof.kanal.ui.link.ThisDeviceCard
 import com.mateof.kanal.ui.isCompact
 import com.mateof.kanal.ui.theme.KanalColors
 
@@ -81,6 +83,7 @@ fun SettingsScreen(
     onOpenLogs: () -> Unit
 ) {
     val vm: SettingsViewModel = hiltViewModel()
+    val linkVm: LinkSettingsViewModel = hiltViewModel()
     val updateVm: UpdateViewModel = hiltViewModel()
 
     val settings by vm.settings.collectAsStateWithLifecycle()
@@ -222,6 +225,8 @@ fun SettingsScreen(
                 )
             }
         }
+
+        item { ThisDeviceCard(linkVm, onSendSources = linkVm::openSend) }
 
         item {
             Column {

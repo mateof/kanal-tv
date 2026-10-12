@@ -370,7 +370,7 @@
     <string name="cast_bring_back">Bring it back</string>
     <string name="cast_failed">Could not send it to that device.</string>
     <string name="cast_address">Device address</string>
-    <string name="cast_address_hint">If it is not listed: its IP, or the URL of its description.</string>
+    <string name="cast_address_hint">If it is not listed: its IP (another device with Kanal too), or the URL of its description.</string>
     <string name="cast_add">Add</string>
 
     <string name="cast_hint_716">The television could not fetch the stream. Usually the connection limit of the provider (if you are already watching it here, that connection is taken), or a television that does not accept live streams. Try sending it a film.</string>
@@ -577,5 +577,44 @@
     <plurals name="live_replay_days">
         <item quantity="one">Replay %d day</item>
         <item quantity="other">Replay %d days</item>
+    </plurals>
+    <!-- Other devices with Kanal -->
+    <string name="link_send_local_only">This is only downloaded on this device; the server has no address to send.</string>
+    <string name="link_send_failed">“%1$s” did not answer. Is Kanal still open there, on the same network?</string>
+    <string name="link_none_hint">Another device with Kanal shows up here when Kanal is open on it and it is on the same network.</string>
+    <string name="link_group_kanal">With Kanal</string>
+    <string name="link_group_dlna">DLNA</string>
+    <string name="link_now_playing">Watching: %1$s</string>
+    <string name="link_form_tv">TV</string>
+    <string name="link_form_tablet">Tablet</string>
+    <string name="link_form_phone">Phone</string>
+    <string name="link_offer_from">From “%1$s” (%2$s)</string>
+    <string name="link_offer_hint">They carry a username and password: only accept them if you sent them. One you already have is updated.</string>
+    <string name="link_offer_accept">Add</string>
+    <string name="link_offer_reject">Decline</string>
+    <string name="link_received">%1$s sent “%2$s”</string>
+    <string name="link_this_device">This device and others with Kanal</string>
+    <string name="link_visible">Visible to other devices with Kanal</string>
+    <string name="link_visible_desc">While Kanal is open, other devices on your network can find it, send it something to play and offer it sources (which have to be accepted here).</string>
+    <string name="link_device_name">Name of this device</string>
+    <string name="link_device_name_desc">Empty uses the system one: %1$s</string>
+    <string name="link_seen_as">Others see it as “%1$s” at %2$s</string>
+    <string name="link_no_network">Not on any local network right now.</string>
+    <string name="link_hidden">Hidden: other devices will not find it.</string>
+    <string name="link_send_sources">Send sources to another device</string>
+    <string name="link_send_sources_desc">Pick which sources and which device; they will have to be accepted there. They travel over your local network unencrypted.</string>
+    <string name="link_no_sources">There are no sources to send.</string>
+    <string name="link_waiting_answer">Waiting for “%1$s” to accept…</string>
+    <string name="link_none">No device with Kanal found.</string>
+    <string name="link_address_hint">The other device’s IP, e.g. 192.168.1.40</string>
+    <string name="link_no_kanal_at">No Kanal answering at %1$s.</string>
+    <string name="link_pick_sources">Pick at least one source.</string>
+    <string name="link_sources_refused">“%1$s” declined the sources, or nobody answered in time.</string>
+    <string name="link_sources_done">Sent to “%1$s”. New: %2$d · updated: %3$d.</string>
+    <string name="setup_from_other_device">Already have Kanal on your phone?</string>
+    <string name="setup_from_other_device_desc">Send the sources from there: Settings → Sources → Send sources to another device. This device shows up as “%1$s” (%2$s).</string>
+    <plurals name="link_offer_title">
+        <item quantity="one">Someone wants to send you a source</item>
+        <item quantity="other">Someone wants to send you %d sources</item>
     </plurals>
 </resources>

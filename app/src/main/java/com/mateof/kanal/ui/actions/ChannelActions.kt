@@ -32,6 +32,7 @@ fun WithChannelActions(
             state = castState,
             onSearch = castVm::search,
             onPick = castVm::sendTo,
+            onPickPeer = castVm::sendToPeer,
             onAdd = castVm::addByAddress,
             onStop = castVm::stopSending,
             onClose = castVm::close,

@@ -34,6 +34,11 @@ import androidx.navigation.compose.rememberNavController
 import androidx.navigation.navArgument
 import androidx.hilt.navigation.compose.hiltViewModel
 import com.mateof.kanal.R
+import android.widget.Toast
+import androidx.compose.ui.platform.LocalContext
+import com.mateof.kanal.ui.link.IncomingLinkViewModel
+import com.mateof.kanal.ui.link.IncomingSourcesDialog
+import com.mateof.kanal.ui.link.SendSourcesSheet
 import com.mateof.kanal.ui.cast.CastBar
 import com.mateof.kanal.ui.cast.CastBarViewModel
 import com.mateof.kanal.ui.cast.CastPanelRequests
@@ -114,6 +119,42 @@ fun KanalNavHost() {
         if (currentRoute != Routes.CAST) nav.navigate(Routes.CAST) { launchSingleTop = true }
     }
 
+    // Another device with Kanal sent something to play, or took it back.
+    val link: IncomingLinkViewModel = hiltViewModel()
+    val incoming by link.play.collectAsStateWithLifecycle()
+    val offer by link.offer.collectAsStateWithLifecycle()
+    val context = LocalContext.current
+    LaunchedEffect(incoming, currentRoute) {
+        val play = incoming ?: return@LaunchedEffect
+        if (currentRoute == null || currentRoute == Routes.GATE) return@LaunchedEffect
+        link.consumePlay()
+        Toast.makeText(
+            context,
+            context.getString(R.string.link_received, play.from, play.title),
+            Toast.LENGTH_LONG
+        ).show()
+        // One player at a time: whatever was playing gives way to what arrived.
+        if (currentRoute.startsWith("player/")) nav.popBackStack()
+        nav.navigate(Routes.player(play.kind, play.itemId, play.start))
+    }
+    LaunchedEffect(Unit) {
+        link.stops.collect {
+            val route = nav.currentBackStackEntry?.destination?.route
+            if (route?.startsWith("player/") == true) nav.popBackStack()
+        }
+    }
+    // Sources that arrived on a device with none yet: straight in, as after
+    // adding one by hand. Home syncs a source that has never been synced.
+    val imported by link.imported.collectAsStateWithLifecycle()
+    LaunchedEffect(imported, currentRoute) {
+        if (!imported || currentRoute == null || currentRoute == Routes.GATE) return@LaunchedEffect
+        link.consumeImported()
+        if (currentRoute.startsWith(Routes.SETUP)) {
+            nav.navigate(Routes.HOME) { popUpTo(0) { inclusive = true } }
+        }
+    }
+
+    Box(Modifier.fillMaxSize()) {
     NavHost(navController = nav, startDestination = Routes.GATE) {
         composable(Routes.GATE) {
             GateScreen(
@@ -220,11 +261,15 @@ fun KanalNavHost() {
 
         composable(Routes.SETTINGS) {
             WithRail(nav, Routes.SETTINGS) {
-                SettingsScreen(
-                    onAddSource = { nav.navigate(Routes.setup()) },
-                    onEditSource = { id -> nav.navigate(Routes.setup(id)) },
-                    onOpenLogs = { nav.navigate(Routes.LOGS) }
-                )
+                Box(Modifier.fillMaxSize()) {
+                    SettingsScreen(
+                        onAddSource = { nav.navigate(Routes.setup()) },
+                        onEditSource = { id -> nav.navigate(Routes.setup(id)) },
+                        onOpenLogs = { nav.navigate(Routes.LOGS) }
+                    )
+                    // Same view model as the card that opens it: one per screen.
+                    SendSourcesSheet()
+                }
             }
         }
 
@@ -284,10 +329,16 @@ fun KanalNavHost() {
                 startMillis = entry.arguments?.getLong("start") ?: 0L,
                 onBack = { liveChannelId ->
                     nav.previousBackStackEntry?.savedStateHandle?.set(RESUMED_CHANNEL, liveChannelId)
-                    nav.popBackStack()
+                    // Sent from another device onto the setup screen: there is
+                    // nothing behind it but setup, which is where it goes.
+                    if (!nav.popBackStack()) nav.navigate(Routes.GATE)
                 }
             )
         }
+    }
+    offer?.let { pending ->
+        IncomingSourcesDialog(pending, onAnswer = { accept -> link.answer(pending, accept) })
+    }
     }
 }
 

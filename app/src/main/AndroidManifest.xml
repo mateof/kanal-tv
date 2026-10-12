@@ -18,6 +18,8 @@
     -->
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_CONNECTED_DEVICE" />
     <uses-permission android:name="android.permission.CHANGE_NETWORK_STATE" />
+    <!-- Some Wi-Fi drivers drop the broadcasts other devices with Kanal use to find this one. -->
+    <uses-permission android:name="android.permission.CHANGE_WIFI_MULTICAST_STATE" />
     <!-- Only used to drop an exported log file into Downloads on API < 29. -->
     <uses-permission
         android:name="android.permission.WRITE_EXTERNAL_STORAGE"

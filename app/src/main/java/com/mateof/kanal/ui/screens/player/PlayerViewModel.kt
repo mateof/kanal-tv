@@ -48,6 +48,12 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
+import com.mateof.kanal.link.KIND_REMOTE
+import com.mateof.kanal.link.KanalPeer
+import com.mateof.kanal.link.LinkClient
+import com.mateof.kanal.link.LinkInbox
+import com.mateof.kanal.link.NowPlaying
+import kotlinx.coroutines.async
 import javax.inject.Inject
 
 /** How many silent reconnections before the user is told something is wrong. */
@@ -163,6 +169,8 @@ data class PlayerUiState(
     /** Non-zero while silently reconnecting after a dropout. */
     val reconnectAttempt: Int = 0,
     val castDevices: List<CastDevice> = emptyList(),
+    /** Other devices with Kanal open on the network. */
+    val castPeers: List<KanalPeer> = emptyList(),
     val castSearching: Boolean = false,
     /** Name of the device the stream was handed to, if any. */
     val castingTo: String? = null,
@@ -207,6 +215,8 @@ class PlayerViewModel @Inject constructor(
     private val accounts: AccountRepository,
     private val upnp: UpnpClient,
     private val cast: CastController,
+    private val inbox: LinkInbox,
+    private val link: LinkClient,
     private val logger: FileLogger
 ) : ViewModel() {
 
@@ -274,7 +284,19 @@ class PlayerViewModel @Inject constructor(
     /** The device a send just failed on, for "try through the phone". */
     private var failedCastDevice: CastDevice? = null
 
+    /** Another Kanal the stream was handed to, which plays it by itself. */
+    private var castPeer: KanalPeer? = null
+
     init {
+        // The device that sent this here took it back: let go of the stream
+        // completely, rather than parking it in the preview as leaving
+        // normally would.
+        viewModelScope.launch {
+            inbox.stops.collect {
+                keepChannelOnExit = false
+                player?.stop()
+            }
+        }
         // The relay can end without anyone here asking: the television went
         // away, or the phone lost the network or the server. The picture
         // comes back here, as with "bring it back".
@@ -331,6 +353,18 @@ class PlayerViewModel @Inject constructor(
         loadedKey = key
 
         viewModelScope.launch {
+            // Sent from another device as a bare url: there may be no source
+            // here at all, and nothing to zap through.
+            if (kind == KIND_REMOTE) {
+                val playable = inbox.remote(itemId)
+                if (playable == null) {
+                    _state.value = _state.value.copy(loading = false, error = UiText(R.string.error_not_found))
+                } else {
+                    start(playable)
+                }
+                return@launch
+            }
+
             val current = prefs.activeSource.first()
             if (current == null) {
                 _state.value = _state.value.copy(loading = false, error = UiText(R.string.error_no_source))
@@ -338,7 +372,11 @@ class PlayerViewModel @Inject constructor(
             }
             source = current
 
-            val playable = resolve(current, kind, itemId, startMillis)
+            val resolved = resolve(current, kind, itemId, startMillis)
+            // A film sent from another device carries on from where it was there.
+            val playable = inbox.takeStartPosition(kind, itemId)
+                ?.let { position -> resolved?.copy(startPositionMs = position) }
+                ?: resolved
             if (playable == null) {
                 _state.value = _state.value.copy(loading = false, error = UiText(R.string.error_not_found))
                 return@launch
@@ -462,6 +500,7 @@ class PlayerViewModel @Inject constructor(
             reconnectAttempt = 0
         )
         logger.i("Player", "Reproduciendo '${playable.title}'")
+        inbox.reportNowPlaying(NowPlaying(playable.title, playable.startPositionMs, playable.isLive))
 
         loadGuide(playable)
         watchFavorites(playable)
@@ -482,7 +521,7 @@ class PlayerViewModel @Inject constructor(
     private fun watchFavorites(playable: Playable) {
         favoritesJob?.cancel()
         val kind = playable.kind
-        if (kind != ContentKind.LIVE && kind != ContentKind.MOVIE) {
+        if ((kind != ContentKind.LIVE && kind != ContentKind.MOVIE) || playable.sourceId.isBlank()) {
             _state.value = _state.value.copy(canFavorite = false, isFavorite = false)
             return
         }
@@ -574,6 +613,11 @@ class PlayerViewModel @Inject constructor(
                         recordProgress()
                     }
                     watchForFrozenPicture(exo)
+                    _state.value.playable?.let { playing ->
+                        inbox.reportNowPlaying(
+                            NowPlaying(playing.title, exo.currentPosition.coerceAtLeast(0), playing.isLive)
+                        )
+                    }
                     _state.value = _state.value.copy(
                         positionMs = exo.currentPosition.coerceAtLeast(0),
                         durationMs = exo.duration.takeIf { it > 0 } ?: 0L,
@@ -962,8 +1006,13 @@ class PlayerViewModel @Inject constructor(
         if (_state.value.castSearching) return
         viewModelScope.launch {
             _state.value = _state.value.copy(castSearching = true)
+            val peers = async { link.discover() }
             val found = upnp.discover()
-            _state.value = _state.value.copy(castDevices = found, castSearching = false)
+            _state.value = _state.value.copy(
+                castDevices = found,
+                castPeers = peers.await(),
+                castSearching = false
+            )
         }
     }
 
@@ -971,6 +1020,15 @@ class PlayerViewModel @Inject constructor(
     fun addCastDevice(address: String) {
         viewModelScope.launch {
             _state.value = _state.value.copy(castSearching = true, castError = null, castHint = null)
+            // Another Kanal answers on its own port; a television on UPnP's.
+            link.probe(address)?.let { peer ->
+                prefs.rememberLinkAddress(address.trim())
+                _state.value = _state.value.copy(
+                    castSearching = false,
+                    castPeers = (_state.value.castPeers + peer).distinctBy { it.id }
+                )
+                return@launch
+            }
             val device = upnp.describeManual(address)
             _state.value = if (device == null) {
                 _state.value.copy(
@@ -1040,6 +1098,44 @@ class PlayerViewModel @Inject constructor(
         }
     }
 
+    /**
+     * Hands what is playing to another Kanal, which opens it in its own
+     * player. Local playback stops first for the same reason as with a
+     * television: the account may only allow one connection, and the other
+     * device is about to ask for it.
+     */
+    fun castToPeer(peer: KanalPeer) {
+        val playable = _state.value.playable ?: return
+        viewModelScope.launch {
+            val position = player?.currentPosition ?: 0L
+            val command = link.commandFor(playable, source?.takeIf { it.id == playable.sourceId }, position)
+            if (command.urls.isEmpty()) {
+                _state.value = _state.value.copy(castError = "", castHint = UiText(R.string.link_send_local_only))
+                return@launch
+            }
+            player?.stop()
+            delay(SLOT_RELEASE_MS)
+            link.play(peer, command)
+                .onSuccess {
+                    castPeer = peer
+                    _state.value = _state.value.copy(
+                        castingTo = peer.name,
+                        castViaPhone = false,
+                        castError = null,
+                        castHint = null
+                    )
+                }
+                .onFailure { failure ->
+                    resumeLocally(position)
+                    _state.value = _state.value.copy(
+                        castError = failure.message ?: failure.javaClass.simpleName,
+                        castHint = UiText(R.string.link_send_failed, peer.name),
+                        castCanTryRelay = false
+                    )
+                }
+        }
+    }
+
     /** Stops the other device and takes the stream back here. */
     /** True while the app is the little floating window. */
     val inPip: StateFlow<Boolean> = pip.active
@@ -1063,6 +1159,18 @@ class PlayerViewModel @Inject constructor(
     fun cancelSleep() = sleepTimer.cancel()
 
     fun stopCast() {
+        castPeer?.let { peer ->
+            castPeer = null
+            viewModelScope.launch {
+                // A film comes back at the point the other device had reached.
+                val there = link.stop(peer).getOrNull()?.positionMs ?: 0L
+                val resumeFrom = if (there > 0) there else _state.value.positionMs
+                _state.value = _state.value.copy(castingTo = null, castViaPhone = false)
+                delay(SLOT_RELEASE_MS)
+                resumeLocally(resumeFrom)
+            }
+            return
+        }
         val device = castDevice ?: _state.value.castDevices.firstOrNull { it.name == _state.value.castingTo }
         castDevice = null
         val resumeFrom = _state.value.positionMs
@@ -1410,6 +1518,8 @@ class PlayerViewModel @Inject constructor(
 
     private fun recordProgress() {
         val playable = _state.value.playable ?: return
+        // Sent from another device and not from a source here: nothing to file it under.
+        if (playable.sourceId.isBlank()) return
         val exo = player ?: return
         val position = exo.currentPosition
         val duration = exo.duration.takeIf { it > 0 } ?: 0L
@@ -1441,6 +1551,7 @@ class PlayerViewModel @Inject constructor(
     }
 
     override fun onCleared() {
+        inbox.reportNowPlaying(null)
         pip.clearVideo()
         recordProgress()
         reconnectJob?.cancel()
@@ -1448,7 +1559,8 @@ class PlayerViewModel @Inject constructor(
         val exo = player
         // A live channel is handed to the preview instead of being torn down;
         // anything else has nowhere to go and is released.
-        if (exo != null && _state.value.playable?.isLive == true && keepChannelOnExit) {
+        val keep = keepChannelOnExit && !inbox.stoppedRecently()
+        if (exo != null && _state.value.playable?.isLive == true && keep) {
             handover.park(exo, streamKey, signature, listener)
         } else {
             exo?.release()

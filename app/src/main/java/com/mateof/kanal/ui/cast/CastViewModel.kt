@@ -22,6 +22,9 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
+import com.mateof.kanal.link.KanalPeer
+import com.mateof.kanal.link.LinkClient
+import kotlinx.coroutines.async
 import javax.inject.Inject
 
 /** What is being offered to the network, named rather than resolved up front. */
@@ -35,6 +38,8 @@ data class CastUiState(
     val target: CastTarget? = null,
     val title: String = "",
     val devices: List<CastDevice> = emptyList(),
+    /** Other devices with Kanal open on the network. */
+    val peers: List<KanalPeer> = emptyList(),
     val searching: Boolean = false,
     val sentTo: String? = null,
     /** Whether the stream goes through this phone rather than straight from the server. */
@@ -65,6 +70,7 @@ class CastViewModel @Inject constructor(
     private val playback: PlaybackRepository,
     private val upnp: UpnpClient,
     private val cast: CastController,
+    private val link: LinkClient,
     private val logger: FileLogger
 ) : ViewModel() {
 
@@ -82,6 +88,9 @@ class CastViewModel @Inject constructor(
 
     /** The device a send just failed on, for "try through the phone". */
     private var failedDevice: CastDevice? = null
+
+    /** Another Kanal the item was sent to, so "bring it back" can stop it there. */
+    private var sentPeer: KanalPeer? = null
 
     init {
         viewModelScope.launch {
@@ -117,7 +126,12 @@ class CastViewModel @Inject constructor(
     }
 
     fun open(target: CastTarget, title: String) {
-        _state.value = CastUiState(target = target, title = title, devices = _state.value.devices)
+        _state.value = CastUiState(
+            target = target,
+            title = title,
+            devices = _state.value.devices,
+            peers = _state.value.peers
+        )
         viewModelScope.launch {
             loadRemembered()
             search()
@@ -145,7 +159,13 @@ class CastViewModel @Inject constructor(
         if (_state.value.searching) return
         viewModelScope.launch {
             _state.value = _state.value.copy(searching = true, error = null, hint = null)
+            // Kanal answers in under two seconds, UPnP takes three: the
+            // devices with Kanal show up first rather than waiting for the rest.
+            val peers = async {
+                link.discover().also { _state.value = _state.value.copy(peers = it) }
+            }
             val found = upnp.discover()
+            peers.await()
             _state.value = _state.value.copy(devices = merge(found), searching = false)
         }
     }
@@ -153,6 +173,14 @@ class CastViewModel @Inject constructor(
     fun addByAddress(address: String) {
         viewModelScope.launch {
             _state.value = _state.value.copy(searching = true, error = null, hint = null)
+            link.probe(address)?.let { peer ->
+                prefs.rememberLinkAddress(address.trim())
+                _state.value = _state.value.copy(
+                    searching = false,
+                    peers = (_state.value.peers + peer).distinctBy { it.id }
+                )
+                return@launch
+            }
             val device = upnp.describeManual(address)
             if (device == null) {
                 _state.value = _state.value.copy(
@@ -212,7 +240,54 @@ class CastViewModel @Inject constructor(
         }
     }
 
+    /** Another Kanal opens it in its own player, from its own catalogue if it can. */
+    fun sendToPeer(peer: KanalPeer) {
+        val target = _state.value.target ?: return
+        viewModelScope.launch {
+            _state.value = _state.value.copy(searching = true, error = null, hint = null, canTryRelay = false)
+            val source = prefs.activeSource.first()
+            val playable = resolve(target)
+            if (playable == null) {
+                _state.value = _state.value.copy(
+                    searching = false,
+                    error = "",
+                    hint = UiText(R.string.cast_content_missing)
+                )
+                return@launch
+            }
+            val command = link.commandFor(playable, source)
+            if (command.urls.isEmpty()) {
+                _state.value = _state.value.copy(
+                    searching = false,
+                    error = "",
+                    hint = UiText(R.string.link_send_local_only)
+                )
+                return@launch
+            }
+            link.play(peer, command)
+                .onSuccess {
+                    sentPeer = peer
+                    _state.value = _state.value.copy(searching = false, sentTo = peer.name, viaPhone = false)
+                }
+                .onFailure { failure ->
+                    _state.value = _state.value.copy(
+                        searching = false,
+                        error = failure.message ?: failure.javaClass.simpleName,
+                        hint = UiText(R.string.link_send_failed, peer.name)
+                    )
+                }
+        }
+    }
+
     fun stopSending() {
+        sentPeer?.let { peer ->
+            sentPeer = null
+            viewModelScope.launch {
+                link.stop(peer)
+                _state.value = _state.value.copy(sentTo = null, viaPhone = false)
+            }
+            return
+        }
         val device = sentDevice ?: _state.value.devices.firstOrNull { it.name == _state.value.sentTo }
         sentDevice = null
         viewModelScope.launch {

@@ -55,6 +55,25 @@ class NetworkInspector @Inject constructor(
         return null
     }
 
+    /**
+     * Every IPv4 address this device has on a network that is not a VPN: where
+     * other devices in the house can reach it, and where a broadcast to them
+     * has to leave from.
+     */
+    fun lanLinks(): List<LanLink> {
+        val manager = connectivity ?: return emptyList()
+        return networks().flatMap { network ->
+            val caps = manager.getNetworkCapabilities(network) ?: return@flatMap emptyList()
+            if (caps.hasTransport(NetworkCapabilities.TRANSPORT_VPN)) return@flatMap emptyList()
+            val props = manager.getLinkProperties(network) ?: return@flatMap emptyList()
+            props.linkAddresses
+                .filter { it.address is Inet4Address && !it.address.isLoopbackAddress }
+                .map { link ->
+                    LanLink(network, link.address, Subnet(link.address, link.prefixLength), props.interfaceName)
+                }
+        }
+    }
+
     /** Every unicast route of every network this app can use, VPNs marked. */
     fun routes(): List<NetRoute> {
         val manager = connectivity ?: return emptyList()

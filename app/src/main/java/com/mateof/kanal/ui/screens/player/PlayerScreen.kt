@@ -118,6 +118,8 @@ import androidx.media3.ui.PlayerView
 import androidx.compose.ui.res.stringResource
 import com.mateof.kanal.R
 import com.mateof.kanal.cast.CastDevice
+import com.mateof.kanal.link.KanalPeer
+import com.mateof.kanal.ui.cast.CastDeviceList
 import com.mateof.kanal.data.db.ChannelEntity
 import com.mateof.kanal.core.resolve
 import com.mateof.kanal.core.formatClock
@@ -284,7 +286,8 @@ fun PlayerScreen(
     }
 
     val isLive = state.playable?.isLive == true
-    fun liveChannelId(): String? = state.playable?.takeIf { it.isLive }?.itemId
+    // Something sent from another device is not in the list here, so there is nothing to hand back.
+    fun liveChannelId(): String? = state.playable?.takeIf { it.isLive && it.sourceId.isNotBlank() }?.itemId
 
     fun poke() {
         osdVisible = true
@@ -995,6 +998,7 @@ fun PlayerScreen(
                 focusRequester = castFocus,
                 onSearch = vm::searchCastDevices,
                 onPick = { device -> vm.castTo(device); mode = Mode.Watching },
+                onPickPeer = { peer -> vm.castToPeer(peer); mode = Mode.Watching },
                 onBringBack = { vm.stopCast() },
                 onAdd = { vm.addCastDevice(it) },
                 onClose = { mode = Mode.Menu },
@@ -1486,6 +1490,7 @@ private fun CastSheet(
     focusRequester: FocusRequester,
     onSearch: () -> Unit,
     onPick: (CastDevice) -> Unit,
+    onPickPeer: (KanalPeer) -> Unit,
     onBringBack: () -> Unit,
     onAdd: (String) -> Unit,
     onClose: () -> Unit,
@@ -1550,50 +1555,14 @@ private fun CastSheet(
             Spacer(Modifier.height(12.dp))
         }
 
-        Box(Modifier.weight(1f)) {
-            when {
-                state.castSearching -> Text(
-                    stringResource(R.string.cast_searching),
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = KanalColors.OnSurfaceMuted
-                )
-
-                state.castDevices.isEmpty() -> Column {
-                    Text(
-                        stringResource(R.string.cast_none),
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = KanalColors.OnSurfaceMuted
-                    )
-                    Spacer(Modifier.height(8.dp))
-                    Text(
-                        stringResource(R.string.cast_none_hint),
-                        style = MaterialTheme.typography.bodySmall,
-                        color = KanalColors.OnSurfaceFaint
-                    )
-                }
-
-                else -> LazyColumn(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                    items(state.castDevices, key = { it.id }) { device ->
-                        FocusableSurface(
-                            onClick = { onPick(device) },
-                            modifier = Modifier.fillMaxWidth(),
-                            shape = RoundedCornerShape(12.dp),
-                            color = KanalColors.Surface,
-                            focusedColor = KanalColors.Accent
-                        ) { focused ->
-                            Text(
-                                device.name,
-                                style = MaterialTheme.typography.bodyMedium,
-                                color = if (focused) Color(0xFF06231F) else KanalColors.OnBackground,
-                                modifier = Modifier
-                                    .align(Alignment.CenterStart)
-                                    .padding(horizontal = 16.dp, vertical = 14.dp)
-                            )
-                        }
-                    }
-                }
-            }
-        }
+        CastDeviceList(
+            peers = state.castPeers,
+            devices = state.castDevices,
+            searching = state.castSearching,
+            onPickPeer = onPickPeer,
+            onPickDevice = onPick,
+            modifier = Modifier.weight(1f)
+        )
 
         Spacer(Modifier.height(12.dp))
         FlowRow(

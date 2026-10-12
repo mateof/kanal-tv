@@ -377,7 +377,7 @@
     <string name="cast_bring_back">Traer de volta</string>
     <string name="cast_failed">Non se puido enviar a ese aparato.</string>
     <string name="cast_address">Enderezo do aparato</string>
-    <string name="cast_address_hint">Se non aparece na lista: a súa IP, ou a URL da súa descrición.</string>
+    <string name="cast_address_hint">Se non aparece na lista: a súa IP (tamén a doutro aparato con Kanal), ou a URL da súa descrición.</string>
     <string name="cast_add">Engadir</string>
 
     <string name="cast_hint_716">A tele non puido descargar a emisión. Adoita ser o límite de conexións do provedor —se xa a está a ver aquí, esa conexión está ocupada— ou que a tele non admita emisións en directo. Proba a enviarlle unha película.</string>
@@ -587,4 +587,43 @@
     </plurals>
     <!-- What a server said, shown as it said it. -->
     <string name="verbatim" translatable="false">%s</string>
+    <!-- Other devices with Kanal -->
+    <string name="link_send_local_only">Isto só está descargado neste aparato e o servidor non ten un enderezo que enviar.</string>
+    <string name="link_send_failed">«%1$s» non contestou. Segue Kanal aberto alí e na mesma rede?</string>
+    <string name="link_none_hint">Outro aparato con Kanal aparece aquí se ten Kanal aberto e está na mesma rede.</string>
+    <string name="link_group_kanal">Con Kanal</string>
+    <string name="link_group_dlna">DLNA</string>
+    <string name="link_now_playing">Vendo: %1$s</string>
+    <string name="link_form_tv">Televisión</string>
+    <string name="link_form_tablet">Tableta</string>
+    <string name="link_form_phone">Móbil</string>
+    <string name="link_offer_from">Desde «%1$s» (%2$s)</string>
+    <string name="link_offer_hint">Levan usuario e contrasinal: acéptaas só se as mandas ti. Se xa tes unha igual, actualízase.</string>
+    <string name="link_offer_accept">Engadir</string>
+    <string name="link_offer_reject">Rexeitar</string>
+    <string name="link_received">%1$s envía «%2$s»</string>
+    <string name="link_this_device">Este aparato e outros con Kanal</string>
+    <string name="link_visible">Visible para outros aparatos con Kanal</string>
+    <string name="link_visible_desc">Mentres Kanal está aberto, outros aparatos da túa rede poden atopalo, mandarlle algo que reproducir e ofrecerlle fontes (que haberá que aceptar aquí).</string>
+    <string name="link_device_name">Nome deste aparato</string>
+    <string name="link_device_name_desc">Baleiro usa o do sistema: %1$s</string>
+    <string name="link_seen_as">Os demais veno como «%1$s» en %2$s</string>
+    <string name="link_no_network">Agora mesmo non está en ningunha rede local.</string>
+    <string name="link_hidden">Oculto: outros aparatos non o atoparán.</string>
+    <string name="link_send_sources">Enviar fontes a outro aparato</string>
+    <string name="link_send_sources_desc">Escolle que fontes e a que aparato; alí terán que aceptalas. Viaxan pola túa rede local sen cifrar.</string>
+    <string name="link_no_sources">Non hai fontes que enviar.</string>
+    <string name="link_waiting_answer">Agardando a que acepten en «%1$s»…</string>
+    <string name="link_none">Non se atopa ningún aparato con Kanal.</string>
+    <string name="link_address_hint">IP do outro aparato, p. ex. 192.168.1.40</string>
+    <string name="link_no_kanal_at">Non hai ningún Kanal contestando en %1$s.</string>
+    <string name="link_pick_sources">Escolle polo menos unha fonte.</string>
+    <string name="link_sources_refused">«%1$s» rexeitou as fontes, ou ninguén contestou a tempo.</string>
+    <string name="link_sources_done">Enviadas a «%1$s». Novas: %2$d · actualizadas: %3$d.</string>
+    <string name="setup_from_other_device">Xa tes Kanal no móbil?</string>
+    <string name="setup_from_other_device_desc">Mándalle as fontes desde alí: Axustes → Fontes → Enviar fontes a outro aparato. Este aparato aparece como «%1$s» (%2$s).</string>
+    <plurals name="link_offer_title">
+        <item quantity="one">Queren enviarche unha fonte</item>
+        <item quantity="other">Queren enviarche %d fontes</item>
+    </plurals>
 </resources>

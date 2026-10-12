@@ -40,6 +40,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.mateof.kanal.R
 import com.mateof.kanal.cast.CastDevice
+import com.mateof.kanal.link.KanalPeer
 import com.mateof.kanal.core.resolve
 import com.mateof.kanal.ui.components.ButtonTone
 import com.mateof.kanal.ui.components.FocusableSurface
@@ -60,6 +61,7 @@ fun CastSheet(
     state: CastUiState,
     onSearch: () -> Unit,
     onPick: (CastDevice) -> Unit,
+    onPickPeer: (KanalPeer) -> Unit,
     onAdd: (String) -> Unit,
     onStop: () -> Unit,
     onClose: () -> Unit,
@@ -161,50 +163,14 @@ fun CastSheet(
                 Spacer(Modifier.height(12.dp))
             }
 
-            Box(Modifier.weight(1f)) {
-                when {
-                    state.searching -> Text(
-                        stringResource(R.string.cast_searching),
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = KanalColors.OnSurfaceMuted
-                    )
-
-                    state.devices.isEmpty() -> Column {
-                        Text(
-                            stringResource(R.string.cast_none),
-                            style = MaterialTheme.typography.bodyMedium,
-                            color = KanalColors.OnSurfaceMuted
-                        )
-                        Spacer(Modifier.height(8.dp))
-                        Text(
-                            stringResource(R.string.cast_none_hint),
-                            style = MaterialTheme.typography.bodySmall,
-                            color = KanalColors.OnSurfaceFaint
-                        )
-                    }
-
-                    else -> LazyColumn(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                        items(state.devices, key = { it.id }) { device ->
-                            FocusableSurface(
-                                onClick = { onPick(device) },
-                                modifier = Modifier.fillMaxWidth(),
-                                shape = RoundedCornerShape(12.dp),
-                                color = KanalColors.Surface,
-                                focusedColor = KanalColors.Accent
-                            ) { focused ->
-                                Text(
-                                    device.name,
-                                    style = MaterialTheme.typography.bodyMedium,
-                                    color = if (focused) Color(0xFF06231F) else KanalColors.OnBackground,
-                                    modifier = Modifier
-                                        .align(Alignment.CenterStart)
-                                        .padding(horizontal = 16.dp, vertical = 14.dp)
-                                )
-                            }
-                        }
-                    }
-                }
-            }
+            CastDeviceList(
+                peers = state.peers,
+                devices = state.devices,
+                searching = state.searching,
+                onPickPeer = onPickPeer,
+                onPickDevice = onPick,
+                modifier = Modifier.weight(1f)
+            )
 
             Spacer(Modifier.height(12.dp))
             FlowRow(

@@ -114,7 +114,11 @@ data class Settings(
     val downloadDeleteWatched: Boolean = false,
     val castRouteMode: CastRouteMode = CastRouteMode.AUTO,
     /** Port the cast relay listens on; 0 lets the system pick a free one. */
-    val castRelayPort: Int = 0
+    val castRelayPort: Int = 0,
+    /** Whether other devices with Kanal can find this one and send it things. */
+    val linkVisible: Boolean = true,
+    /** The name other devices see; empty means the one the system has. */
+    val linkDeviceName: String = ""
 )
 
 const val DEFAULT_USER_AGENT = "VLC/3.0.20 LibVLC/3.0.20"
@@ -166,6 +170,10 @@ class AppPreferences @Inject constructor(
         val STILL_WATCHING = booleanPreferencesKey("still_watching")
         val SUBTITLES = booleanPreferencesKey("subtitles_enabled")
         val CAST_ADDRESSES = stringPreferencesKey("cast_addresses")
+        val LINK_VISIBLE = booleanPreferencesKey("link_visible")
+        val LINK_DEVICE_NAME = stringPreferencesKey("link_device_name")
+        val LINK_DEVICE_ID = stringPreferencesKey("link_device_id")
+        val LINK_ADDRESSES = stringPreferencesKey("link_addresses")
     }
 
     // --- Sources -------------------------------------------------------------
@@ -327,7 +335,9 @@ class AppPreferences @Inject constructor(
             castRouteMode = prefs[Keys.CAST_ROUTE_MODE]?.let { name ->
                 CastRouteMode.entries.firstOrNull { it.name == name }
             } ?: CastRouteMode.AUTO,
-            castRelayPort = prefs[Keys.CAST_RELAY_PORT] ?: 0
+            castRelayPort = prefs[Keys.CAST_RELAY_PORT] ?: 0,
+            linkVisible = prefs[Keys.LINK_VISIBLE] ?: true,
+            linkDeviceName = prefs[Keys.LINK_DEVICE_NAME] ?: ""
         )
     }
 
@@ -340,6 +350,8 @@ class AppPreferences @Inject constructor(
     suspend fun setStreamFormat(value: StreamFormat) = edit { it[Keys.STREAM_FORMAT] = value.name }
     suspend fun setCastRouteMode(value: CastRouteMode) = edit { it[Keys.CAST_ROUTE_MODE] = value.name }
     suspend fun setCastRelayPort(value: Int) = edit { it[Keys.CAST_RELAY_PORT] = value }
+    suspend fun setLinkVisible(value: Boolean) = edit { it[Keys.LINK_VISIBLE] = value }
+    suspend fun setLinkDeviceName(value: String) = edit { it[Keys.LINK_DEVICE_NAME] = value.trim() }
     suspend fun setPreviewEnabled(value: Boolean) = edit { it[Keys.PREVIEW_ENABLED] = value }
     suspend fun setKeepLastChannel(value: Boolean) = edit { it[Keys.KEEP_LAST_CHANNEL] = value }
     suspend fun setResilientPlayback(value: Boolean) = edit { it[Keys.RESILIENT] = value }
@@ -515,6 +527,34 @@ class AppPreferences @Inject constructor(
             val all = decode<List<String>>(prefs[Keys.CAST_ADDRESSES], emptyList()).toMutableList()
             if (!all.contains(address)) all += address
             prefs[Keys.CAST_ADDRESSES] = json.encodeToString(all)
+        }
+    }
+
+    /**
+     * This installation's id among other devices with Kanal. Made up the first
+     * time it is asked for, so a device can recognise its own answer to a
+     * broadcast and the list can tell two devices with the same name apart.
+     */
+    suspend fun linkDeviceId(): String {
+        context.dataStore.data.first()[Keys.LINK_DEVICE_ID]?.let { return it }
+        var id = ""
+        context.dataStore.edit { prefs ->
+            id = prefs[Keys.LINK_DEVICE_ID] ?: java.util.UUID.randomUUID().toString()
+            prefs[Keys.LINK_DEVICE_ID] = id
+        }
+        return id
+    }
+
+    /** Devices with Kanal added by address, for networks that drop broadcasts. */
+    val linkAddresses: Flow<List<String>> = context.dataStore.data.map { prefs ->
+        decode(prefs[Keys.LINK_ADDRESSES], emptyList())
+    }
+
+    suspend fun rememberLinkAddress(address: String) {
+        context.dataStore.edit { prefs ->
+            val all = decode<List<String>>(prefs[Keys.LINK_ADDRESSES], emptyList()).toMutableList()
+            if (!all.contains(address)) all += address
+            prefs[Keys.LINK_ADDRESSES] = json.encodeToString(all)
         }
     }
 
