@@ -36,6 +36,9 @@ class FocusReturn(
 
     private val requester = FocusRequester()
 
+    /** When this visit started asking; a target that never shows up is dropped. */
+    private var firstAttemptAt = 0L
+
     /**
      * Called as the user opens an item, before navigating away. [anchorIndex]
      * and [anchorOffset] are the list's own first-visible position, not the
@@ -64,23 +67,45 @@ class FocusReturn(
      *
      * [scrollTo] is the list's own scroller — a plain list and a grid do not
      * share a type, so the screen passes its own.
+     *
+     * Once it lands, the target is forgotten. Screens call this again every
+     * time the paged list grows, and a target left behind turned every new
+     * page into a jump back to the item opened last: scroll far enough down to
+     * load more and the list snapped up to where the user had been before.
      */
     suspend fun restore(scrollTo: (suspend (Int, Int) -> Unit)? = null) {
         if (target == null) return
+        val now = System.currentTimeMillis()
+        if (firstAttemptAt == 0L) firstAttemptAt = now
+        if (now - firstAttemptAt > GIVE_UP_MS) {
+            forget()
+            return
+        }
         val index = indexState.value
         val offset = offsetState.value
         repeat(ATTEMPTS) {
             if (scrollTo != null && index >= 0) {
                 runCatching { scrollTo(index, offset) }
             }
-            if (runCatching { requester.requestFocus() }.isSuccess) return
+            if (runCatching { requester.requestFocus() }.isSuccess) {
+                forget()
+                return
+            }
             delay(INTERVAL_MS)
         }
+    }
+
+    private fun forget() {
+        state.value = null
+        indexState.value = -1
+        offsetState.value = 0
+        firstAttemptAt = 0L
     }
 
     private companion object {
         const val ATTEMPTS = 14
         const val INTERVAL_MS = 45L
+        const val GIVE_UP_MS = 4_000L
     }
 }
 
