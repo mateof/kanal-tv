@@ -5,7 +5,12 @@ import androidx.media3.common.C
 import androidx.media3.common.MediaItem
 import androidx.media3.common.MimeTypes
 import androidx.media3.common.util.UnstableApi
+import androidx.media3.datasource.DataSource
+import androidx.media3.datasource.DataSpec
 import androidx.media3.datasource.DefaultDataSource
+import androidx.media3.datasource.HttpDataSource
+import androidx.media3.datasource.TransferListener
+import java.io.InterruptedIOException
 import androidx.media3.datasource.okhttp.OkHttpDataSource
 import androidx.media3.exoplayer.DefaultLoadControl
 import androidx.media3.exoplayer.DefaultRenderersFactory
@@ -51,8 +56,9 @@ class PlayerFactory @Inject constructor(
         resilient: Boolean = false,
         subtitles: Boolean = false
     ): ExoPlayer {
-        val httpFactory = OkHttpDataSource.Factory(http.client)
+        val okHttp = OkHttpDataSource.Factory(http.client)
             .setUserAgent(userAgent)
+        val httpFactory = DataSource.Factory { PatientDataSource(okHttp.createDataSource(), logger) }
 
         // The hardware decoders always go first. Putting FFmpeg ahead of them
         // was tried and reverted: ExoPlayer paces video off the audio clock, and
@@ -187,6 +193,71 @@ private class TsWithoutSniffing(
         } else {
             fallback.createExtractors(uri, responseHeaders)
         }
+    }
+}
+
+/**
+ * Asks again, after a moment, when the server refuses a request that comes
+ * straight after one it accepted.
+ *
+ * A seek in a file — and resuming a film is one, right after the header has
+ * been read — closes the connection and opens another at the new offset. An
+ * account with a single connection has often not let go of the first one yet,
+ * and the second is refused (403 against a fixture that behaves like that).
+ * The loader's own retry then starts the load over from where it began and
+ * makes the same jump, so the player never failed and never played: it sat
+ * there loading, and the only way to watch was from the start.
+ *
+ * Only after a first success: a refusal on the very first request is the
+ * server's real answer, and repeating it only opens more sessions.
+ */
+@UnstableApi
+private class PatientDataSource(
+    private val upstream: HttpDataSource,
+    private val logger: FileLogger
+) : DataSource {
+    private var openedBefore = false
+
+    override fun addTransferListener(transferListener: TransferListener) =
+        upstream.addTransferListener(transferListener)
+
+    override fun open(dataSpec: DataSpec): Long {
+        var attempt = 0
+        while (true) {
+            try {
+                return upstream.open(dataSpec).also { openedBefore = true }
+            } catch (refused: HttpDataSource.InvalidResponseCodeException) {
+                if (!openedBefore || attempt >= SLOT_WAITS_MS.size || refused.responseCode in FINAL_CODES) throw refused
+                val wait = SLOT_WAITS_MS[attempt++]
+                logger.d(
+                    "Player",
+                    "HTTP ${refused.responseCode} al pedir el byte ${dataSpec.position}; " +
+                        "se vuelve a pedir en $wait ms ($attempt/${SLOT_WAITS_MS.size})"
+                )
+                runCatching { upstream.close() }
+                try {
+                    Thread.sleep(wait)
+                } catch (_: InterruptedException) {
+                    Thread.currentThread().interrupt()
+                    throw InterruptedIOException()
+                }
+            }
+        }
+    }
+
+    override fun read(buffer: ByteArray, offset: Int, length: Int): Int = upstream.read(buffer, offset, length)
+
+    override fun getUri(): Uri? = upstream.uri
+
+    override fun getResponseHeaders(): Map<String, List<String>> = upstream.responseHeaders
+
+    override fun close() = upstream.close()
+
+    private companion object {
+        /** About six seconds in all, which is longer than a panel takes to notice a closed connection. */
+        val SLOT_WAITS_MS = longArrayOf(400, 800, 1_200, 1_600, 2_000)
+        /** Gone, or a range past the end: asking again cannot change those. */
+        val FINAL_CODES = setOf(404, 410, 416)
     }
 }
 

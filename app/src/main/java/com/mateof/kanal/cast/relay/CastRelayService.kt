@@ -221,7 +221,9 @@ class CastRelayService : Service() {
                     )
                     continue
                 }
-                if (idle > IDLE_LIMIT_MS) {
+                // A paused television may hang up and ask again, with a range,
+                // when it carries on: that silence is not it having gone.
+                if (idle > IDLE_LIMIT_MS && session?.tvState != "PAUSED_PLAYBACK") {
                     // Not a problem to report: usually the television was switched
                     // off or told to play something else.
                     logger.i("Cast", "La tele lleva ${idle / 1000} s sin pedir la emisión")

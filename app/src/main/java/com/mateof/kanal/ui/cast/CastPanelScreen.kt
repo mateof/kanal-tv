@@ -25,6 +25,10 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.ContentCopy
+import androidx.compose.material.icons.outlined.Forward30
+import androidx.compose.material.icons.outlined.Pause
+import androidx.compose.material.icons.outlined.PlayArrow
+import androidx.compose.material.icons.outlined.Replay30
 import androidx.compose.material.icons.outlined.PhoneAndroid
 import androidx.compose.material.icons.outlined.Refresh
 import androidx.compose.material.icons.outlined.Stop
@@ -68,6 +72,7 @@ import com.mateof.kanal.core.resolve
 import com.mateof.kanal.data.db.EpgEntity
 import com.mateof.kanal.ui.components.ButtonTone
 import com.mateof.kanal.ui.components.KanalButton
+import com.mateof.kanal.ui.components.SeekBar
 import com.mateof.kanal.ui.isCompact
 import com.mateof.kanal.ui.screenPadding
 import com.mateof.kanal.ui.theme.KanalColors
@@ -138,6 +143,16 @@ fun CastPanelScreen(
             onBack = onBack
         )
         Spacer(Modifier.height(20.dp))
+
+        if (current.phase == CastPhase.ACTIVE && !current.request.live) {
+            PlaybackCard(
+                session = current,
+                onTogglePause = vm::togglePause,
+                onSeekBy = vm::seekBy,
+                onSeekTo = vm::seekTo
+            )
+            Spacer(Modifier.height(14.dp))
+        }
 
         if (isCompact) {
             SpeedCard(current)
@@ -288,6 +303,93 @@ private fun Actions(
         )
     }
 }
+
+/**
+ * Pause and seek for a film or an episode on the television.
+ *
+ * Not a [Card]: that one takes the focus itself so the remote can scroll to
+ * it, and here the bar and the buttons already do.
+ */
+@Composable
+private fun PlaybackCard(
+    session: CastSession,
+    onTogglePause: () -> Unit,
+    onSeekBy: (Long) -> Unit,
+    onSeekTo: (Long) -> Unit
+) {
+    val shape = RoundedCornerShape(16.dp)
+    val elapsed = session.position?.elapsedMs
+    val duration = session.position?.durationMs
+    val paused = session.tvState == "PAUSED_PLAYBACK"
+    Column(
+        Modifier
+            .fillMaxWidth()
+            .clip(shape)
+            .background(KanalColors.Surface)
+            .padding(horizontal = 18.dp, vertical = 14.dp)
+    ) {
+        Text(
+            stringResource(R.string.cast_section_playback),
+            style = MaterialTheme.typography.titleSmall,
+            color = KanalColors.OnSurfaceMuted
+        )
+        Spacer(Modifier.height(6.dp))
+        if (elapsed != null && duration != null && duration > 0) {
+            var scrubbing by remember { mutableStateOf<Long?>(null) }
+            SeekBar(
+                positionMs = elapsed,
+                durationMs = duration,
+                onSeek = onSeekTo,
+                onScrub = { scrubbing = it }
+            )
+            Text(
+                "${formatPosition(scrubbing ?: elapsed)} / ${formatPosition(duration)}",
+                style = MaterialTheme.typography.labelMedium,
+                color = if (scrubbing != null) KanalColors.Accent else KanalColors.OnSurfaceMuted
+            )
+        } else {
+            Text(
+                stringResource(R.string.cast_playback_no_position),
+                style = MaterialTheme.typography.labelMedium,
+                color = KanalColors.OnSurfaceMuted
+            )
+        }
+        Spacer(Modifier.height(12.dp))
+        FlowRow(
+            horizontalArrangement = Arrangement.spacedBy(10.dp),
+            verticalArrangement = Arrangement.spacedBy(10.dp)
+        ) {
+            KanalButton(stringResource(R.string.cast_playback_back), onClick = { onSeekBy(-SKIP_MS) }, icon = Icons.Outlined.Replay30)
+            KanalButton(
+                stringResource(if (paused) R.string.cast_playback_resume else R.string.cast_playback_pause),
+                onClick = onTogglePause,
+                icon = if (paused) Icons.Outlined.PlayArrow else Icons.Outlined.Pause,
+                tone = ButtonTone.Primary
+            )
+            KanalButton(stringResource(R.string.cast_playback_forward), onClick = { onSeekBy(SKIP_MS) }, icon = Icons.Outlined.Forward30)
+        }
+        Spacer(Modifier.height(10.dp))
+        // DLNA's transport has no command for picking a track, so the honest
+        // place to say it is next to the controls that do exist.
+        Text(
+            stringResource(R.string.cast_playback_tracks_note),
+            style = MaterialTheme.typography.labelSmall,
+            color = KanalColors.OnSurfaceFaint
+        )
+    }
+}
+
+/** "1:02:05" or "12:05": the clock a film is measured in, not the "1 h 2 min" of a duration. */
+private fun formatPosition(ms: Long): String {
+    val total = ms / 1_000
+    val hours = total / 3_600
+    val minutes = total / 60 % 60
+    val seconds = total % 60
+    return if (hours > 0) "%d:%02d:%02d".format(Locale.ROOT, hours, minutes, seconds)
+    else "%d:%02d".format(Locale.ROOT, minutes, seconds)
+}
+
+private const val SKIP_MS = 30_000L
 
 @Composable
 private fun BackButton(onBack: () -> Unit, focusFirst: Boolean = false) {

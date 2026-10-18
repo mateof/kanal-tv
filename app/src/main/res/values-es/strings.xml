@@ -408,6 +408,14 @@
     <string name="cast_phase_ended">Se dejó de enviar a %s</string>
     <string name="cast_section_speed">Velocidad</string>
     <string name="cast_section_tv">Tele</string>
+    <string name="cast_section_playback">Reproducción</string>
+    <string name="cast_playback_pause">Pausa</string>
+    <string name="cast_playback_resume">Reanudar</string>
+    <string name="cast_playback_back">−30 s</string>
+    <string name="cast_playback_forward">+30 s</string>
+    <string name="cast_playback_no_position">La tele no dice por dónde va, así que no hay barra de progreso.</string>
+    <string name="cast_playback_tracks_note">El idioma del audio y de los subtítulos se elige con el mando de la tele: DLNA no tiene ninguna orden para eso.</string>
+    <string name="cast_event_control_refused">La tele no aceptó la orden</string>
     <string name="cast_section_connection">Conexión</string>
     <string name="cast_section_events">Incidencias</string>
     <string name="cast_stat_current">Ahora</string>

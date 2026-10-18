@@ -58,6 +58,22 @@ class CastPanelViewModel @Inject constructor(
 
     fun dismiss() = cast.dismiss()
 
+    fun togglePause() {
+        viewModelScope.launch { cast.togglePause() }
+    }
+
+    fun seekTo(positionMs: Long) {
+        viewModelScope.launch { cast.seek(positionMs.coerceAtLeast(0)) }
+    }
+
+    /** From where the television last said it was; nothing to go by, nothing to do. */
+    fun seekBy(deltaMs: Long) {
+        val position = session.value?.position ?: return
+        val elapsed = position.elapsedMs ?: 0L
+        val end = position.durationMs?.takeIf { it > 0 } ?: Long.MAX_VALUE
+        seekTo((elapsed + deltaMs).coerceAtMost(end))
+    }
+
     /**
      * Stops the television, then hands over. The pause matters for the same
      * reason as when sending: with a single-connection account the phone is

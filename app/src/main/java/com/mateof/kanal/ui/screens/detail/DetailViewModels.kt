@@ -29,6 +29,7 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
@@ -88,6 +89,16 @@ class MovieDetailViewModel @Inject constructor(
                 resumeMs = prefs.resumePositionOf("${ContentKind.MOVIE.name}:${source.id}:$movieId"),
                 loading = false
             )
+            // Followed rather than read once: this page stays underneath the
+            // player, and coming back to it offered to carry on from where the
+            // film was before it was watched.
+            val key = "${ContentKind.MOVIE.name}:${source.id}:$movieId"
+            launch {
+                prefs.history
+                    .map { items -> items.firstOrNull { it.key == key && !it.isFinished }?.positionMs ?: 0L }
+                    .distinctUntilChanged()
+                    .collect { position -> _state.value = _state.value.copy(resumeMs = position) }
+            }
 
             if (source.type != SourceType.XTREAM) return@launch
             // The catalogue listing has no plot or cast; get_vod_info does.

@@ -79,6 +79,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.mutableLongStateOf
 import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.getValue
@@ -133,6 +134,8 @@ import com.mateof.kanal.ui.components.ChannelGuide
 import com.mateof.kanal.ui.components.MenuAction
 import com.mateof.kanal.ui.components.ButtonTone
 import com.mateof.kanal.ui.components.FocusableSurface
+import com.mateof.kanal.ui.components.HeldSeek
+import com.mateof.kanal.ui.components.SEEK_SETTLE_MS
 import com.mateof.kanal.ui.components.KanalButton
 import com.mateof.kanal.ui.components.KanalTextField
 import com.mateof.kanal.ui.components.ProgrammeDetail
@@ -189,6 +192,18 @@ fun PlayerScreen(
     var resizeMode by remember { mutableIntStateOf(AspectRatioFrameLayout.RESIZE_MODE_FIT) }
     // Set when OK opens the control bar, cleared when its key-up is swallowed.
     var swallowCentreUp by remember { mutableStateOf(false) }
+    // Where the arrows have taken a film while watching. The player only goes
+    // there once the key is let go: seeking on every repeat restarted the
+    // download at each step, and the next repeat moved it again.
+    var seekTarget by remember { mutableStateOf<Long?>(null) }
+    var seekCommitAt by remember { mutableLongStateOf(0L) }
+    val heldSeek = remember { HeldSeek() }
+    LaunchedEffect(seekCommitAt) {
+        if (seekCommitAt == 0L) return@LaunchedEffect
+        delay(SEEK_SETTLE_MS)
+        seekTarget?.let(vm::seekTo)
+        seekTarget = null
+    }
 
     val stageFocus = remember { FocusRequester() }
     val tracksFocus = remember { FocusRequester() }
@@ -502,6 +517,11 @@ fun PlayerScreen(
             .focusRequester(stageFocus)
             .focusable()
             .onKeyEvent { event ->
+                val arrow = event.key == Key.DirectionLeft || event.key == Key.DirectionRight
+                if (event.type == KeyEventType.KeyUp && arrow && seekTarget != null) {
+                    seekCommitAt = System.currentTimeMillis()
+                    return@onKeyEvent true
+                }
                 if (event.type != KeyEventType.KeyDown) return@onKeyEvent false
 
                 // The strip is a list of its own and answers the arrows itself;
@@ -537,15 +557,16 @@ fun PlayerScreen(
                         true
                     }
 
-                    Key.DirectionLeft -> {
+                    Key.DirectionLeft, Key.DirectionRight -> {
                         poke()
-                        if (!isLive) vm.seekBy(-10_000)
-                        true
-                    }
-
-                    Key.DirectionRight -> {
-                        poke()
-                        if (!isLive) vm.seekBy(10_000)
+                        if (!isLive) {
+                            val direction = if (event.key == Key.DirectionLeft) -1 else 1
+                            val from = seekTarget ?: state.positionMs
+                            val end = state.durationMs.takeIf { it > 0 } ?: Long.MAX_VALUE
+                            seekTarget = (from + direction * heldSeek.step(event.nativeKeyEvent.repeatCount))
+                                .coerceIn(0L, end)
+                            seekCommitAt = 0L
+                        }
                         true
                     }
 
@@ -555,7 +576,13 @@ fun PlayerScreen(
                     // key; the repeats arrive either way. A short press just
                     // brings the title and the guide back.
                     Key.DirectionCenter, Key.Enter -> {
-                        if (event.nativeKeyEvent.repeatCount > 0) {
+                        val pending = seekTarget
+                        if (pending != null) {
+                            seekTarget = null
+                            seekCommitAt = 0L
+                            vm.seekTo(pending)
+                            poke()
+                        } else if (event.nativeKeyEvent.repeatCount > 0) {
                             swallowCentreUp = true
                             openMenu()
                         } else {
@@ -752,6 +779,7 @@ fun PlayerScreen(
             ) {
                 Osd(
                     state = state,
+                    pendingSeekMs = seekTarget,
                     onSeekTo = { target -> vm.seekTo(target); poke() }
                 )
             }
@@ -1227,6 +1255,8 @@ private fun ChannelTile(
 @Composable
 private fun Osd(
     state: PlayerUiState,
+    /** Where the arrows have taken the film while watching, not yet sought to. */
+    pendingSeekMs: Long?,
     onSeekTo: (Long) -> Unit
 ) {
     val playable = state.playable ?: return
@@ -1361,12 +1391,13 @@ private fun Osd(
                 }
             }
         } else if (state.durationMs > 0) {
-            var scrubbing by remember { mutableStateOf<Long?>(null) }
+            var scrubbed by remember { mutableStateOf<Long?>(null) }
+            val scrubbing = scrubbed ?: pendingSeekMs
             SeekBar(
-                positionMs = state.positionMs,
+                positionMs = pendingSeekMs ?: state.positionMs,
                 durationMs = state.durationMs,
                 onSeek = { target -> onSeekTo(target) },
-                onScrub = { scrubbing = it },
+                onScrub = { scrubbed = it },
                 modifier = Modifier.fillMaxWidth()
             )
             Spacer(Modifier.height(4.dp))

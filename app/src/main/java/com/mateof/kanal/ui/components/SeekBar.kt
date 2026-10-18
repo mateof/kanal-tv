@@ -65,8 +65,7 @@ fun SeekBar(
 
     // Non-null while the user is moving it; the player is still where it was.
     var scrubMs by remember { mutableStateOf<Long?>(null) }
-    var stepMs by remember { mutableLongStateOf(BASE_STEP_MS) }
-    var lastKeyAt by remember { mutableLongStateOf(0L) }
+    val held = remember { HeldSeek() }
     var commitAt by remember { mutableLongStateOf(0L) }
 
     val shownMs = scrubMs ?: positionMs
@@ -74,13 +73,16 @@ fun SeekBar(
 
     LaunchedEffect(scrubMs) { onScrub(scrubMs) }
 
-    // Settle: a pause in the key presses commits the seek without needing OK.
+    // Settle: a pause after the key is let go commits the seek without needing
+    // OK. Counted from the key-up, never from a key-down: the first repeat of a
+    // held key arrives half a second after the press, and a settle timed from
+    // the press committed in that gap — the player started buffering, and the
+    // next repeat moved it again.
     LaunchedEffect(commitAt) {
         if (commitAt == 0L) return@LaunchedEffect
-        kotlinx.coroutines.delay(SETTLE_MS)
+        kotlinx.coroutines.delay(SEEK_SETTLE_MS)
         scrubMs?.let { target ->
             scrubMs = null
-            stepMs = BASE_STEP_MS
             onSeek(target)
         }
     }
@@ -91,25 +93,16 @@ fun SeekBar(
         label = "seekBarHeight"
     )
 
-    fun nudge(direction: Int) {
-        val now = System.currentTimeMillis()
-        // Holding the key accelerates: ten seconds a press is unusable across a
-        // two-hour film, and a fixed large step cannot land on a scene.
-        stepMs = if (now - lastKeyAt < ACCELERATE_WITHIN_MS) {
-            (stepMs * 3 / 2).coerceAtMost(MAX_STEP_MS)
-        } else {
-            BASE_STEP_MS
-        }
-        lastKeyAt = now
+    fun nudge(direction: Int, repeat: Int) {
         val from = scrubMs ?: positionMs
-        scrubMs = (from + direction * stepMs).coerceIn(0L, durationMs)
-        commitAt = now
+        scrubMs = (from + direction * held.step(repeat)).coerceIn(0L, durationMs)
+        commitAt = 0L
     }
 
     fun commitNow() {
         val target = scrubMs ?: return
         scrubMs = null
-        stepMs = BASE_STEP_MS
+        commitAt = 0L
         onSeek(target)
     }
 
@@ -120,10 +113,16 @@ fun SeekBar(
             .focusRequester(focus)
             .focusable(interactionSource = interactions)
             .onKeyEvent { event ->
+                val arrow = event.key == Key.DirectionLeft || event.key == Key.DirectionRight
+                if (event.type == KeyEventType.KeyUp && arrow && scrubMs != null) {
+                    commitAt = System.currentTimeMillis()
+                    return@onKeyEvent true
+                }
                 if (event.type != KeyEventType.KeyDown) return@onKeyEvent false
+                val repeat = event.nativeKeyEvent.repeatCount
                 when (event.key) {
-                    Key.DirectionLeft -> { nudge(-1); true }
-                    Key.DirectionRight -> { nudge(1); true }
+                    Key.DirectionLeft -> { nudge(-1, repeat); true }
+                    Key.DirectionRight -> { nudge(1, repeat); true }
                     Key.DirectionCenter, Key.Enter -> {
                         if (scrubMs != null) { commitNow(); true } else false
                     }
@@ -194,7 +193,45 @@ fun SeekBar(
 /** Unfilled part of the track, dark enough to read over any picture. */
 private val TRACK_COLOUR = Color(0x59000000)
 
-private const val BASE_STEP_MS = 10_000L
-private const val MAX_STEP_MS = 120_000L
-private const val ACCELERATE_WITHIN_MS = 450L
-private const val SETTLE_MS = 550L
+/** How long after the last key-up a scrub is committed; more presses in between add to it. */
+const val SEEK_SETTLE_MS = 700L
+
+/**
+ * How far one key-down of a seek moves.
+ *
+ * A press is ten seconds. Holding moves at a speed that grows with how long the
+ * key has been down, and the speed is per second held rather than per repeat:
+ * repeats arrive every 50 ms on one remote and every 100 on another, and the
+ * old step, which grew by half on every repeat, reached two minutes a repeat
+ * within half a second and crossed a film before the user could let go.
+ */
+class HeldSeek {
+    private var pressed = false
+    private var downAt = 0L
+    private var lastAt = 0L
+
+    /** [repeat] is the key event's repeat count: zero for a fresh press. */
+    fun step(repeat: Int, now: Long = System.currentTimeMillis()): Long {
+        if (repeat == 0 || !pressed) {
+            pressed = true
+            downAt = now
+            lastAt = now
+            return PRESS_STEP_MS
+        }
+        val elapsed = (now - lastAt).coerceIn(0L, MAX_GAP_MS)
+        lastAt = now
+        val speed = when (now - downAt) {
+            in 0L until 1_500L -> 30L
+            in 1_500L until 4_000L -> 90L
+            in 4_000L until 8_000L -> 240L
+            else -> 480L
+        }
+        return elapsed * speed
+    }
+
+    private companion object {
+        const val PRESS_STEP_MS = 10_000L
+        /** A repeat that took longer than this is not counted as time held. */
+        const val MAX_GAP_MS = 600L
+    }
+}

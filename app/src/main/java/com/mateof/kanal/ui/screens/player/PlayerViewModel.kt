@@ -11,6 +11,8 @@ import androidx.media3.common.TrackSelectionOverride
 import androidx.media3.common.Tracks
 import androidx.media3.common.VideoSize
 import androidx.media3.exoplayer.ExoPlayer
+import androidx.media3.datasource.HttpDataSource
+import com.mateof.kanal.core.formatDuration
 import com.mateof.kanal.R
 import com.mateof.kanal.core.SleepTimer
 import com.mateof.kanal.core.UiText
@@ -481,9 +483,14 @@ class PlayerViewModel @Inject constructor(
             exo.stop()
             exo.clearMediaItems()
             _state.value = _state.value.copy(switching = true)
-            exo.setMediaItem(playerFactory.mediaItem(playable.url, playable.title))
+            val item = playerFactory.mediaItem(playable.url, playable.title)
+            if (playable.startPositionMs > 0 && !playable.isLive) {
+                logger.i("Player", "Se reanuda en ${formatDuration(playable.startPositionMs)}")
+                exo.setMediaItem(item, playable.startPositionMs)
+            } else {
+                exo.setMediaItem(item)
+            }
             exo.prepare()
-            if (playable.startPositionMs > 0) exo.seekTo(playable.startPositionMs)
         }
         exo.playWhenReady = true
 
@@ -633,7 +640,13 @@ class PlayerViewModel @Inject constructor(
 
     private val listener = object : Player.Listener {
         override fun onPlayerError(error: PlaybackException) {
-            logger.w("Player", "Error de reproducción: ${error.errorCodeName}")
+            // The status and the position go in too: a refusal right after a
+            // seek reads very differently from one on the first request.
+            val status = (error.cause as? HttpDataSource.InvalidResponseCodeException)
+                ?.let { " · HTTP ${it.responseCode}" }.orEmpty()
+            val at = player?.currentPosition?.takeIf { it > 0 && _state.value.playable?.isLive == false }
+                ?.let { " · en ${formatDuration(it)}" }.orEmpty()
+            logger.w("Player", "Error de reproducción: ${error.errorCodeName}$status$at")
             // A stream that would not parse gets asked what it sent before
             // anything else is decided: the answer is often "the channel is
             // still shutting down, try again shortly", and walking through the
@@ -735,8 +748,7 @@ class PlayerViewModel @Inject constructor(
             )
             delay(NOT_READY_DELAY_MS)
             val exo = player ?: return
-            exo.setMediaItem(playerFactory.mediaItem(url, _state.value.playable?.title.orEmpty()))
-            exo.prepare()
+            reopen(exo, url)
             exo.playWhenReady = true
             return
         }
@@ -834,10 +846,29 @@ class PlayerViewModel @Inject constructor(
         }
 
         _state.value = _state.value.copy(error = null, buffering = true)
-        exo.setMediaItem(playerFactory.mediaItem(url, title))
-        exo.prepare()
+        reopen(exo, url)
         exo.playWhenReady = true
         return true
+    }
+
+    /**
+     * Points the player at [url] again, from where it was for anything but a
+     * live channel.
+     *
+     * A bare `setMediaItem` starts from zero. Every retry used to go through
+     * one, so a film whose first request after a seek failed — or one resumed
+     * from the middle, whose first request is a seek — came back from the
+     * beginning, and to the user it looked as if resuming never worked.
+     */
+    private fun reopen(exo: ExoPlayer, url: String) {
+        val item = playerFactory.mediaItem(url, _state.value.playable?.title.orEmpty())
+        val at = exo.currentPosition
+        if (_state.value.playable?.isLive == false && at > 0) {
+            exo.setMediaItem(item, at)
+        } else {
+            exo.setMediaItem(item)
+        }
+        exo.prepare()
     }
 
     private fun isWorthRetrying(error: PlaybackException): Boolean = when (error.errorCode) {
@@ -878,10 +909,8 @@ class PlayerViewModel @Inject constructor(
         reconnectJob = viewModelScope.launch {
             delay(delayMs)
             // Always come back on the candidate that was working.
-            candidates.getOrNull(candidateIndex)?.let { url ->
-                exo.setMediaItem(playerFactory.mediaItem(url, _state.value.playable?.title.orEmpty()))
-            }
-            exo.prepare()
+            val url = candidates.getOrNull(candidateIndex)
+            if (url != null) reopen(exo, url) else exo.prepare()
             exo.playWhenReady = true
         }
         return true
@@ -901,7 +930,12 @@ class PlayerViewModel @Inject constructor(
         // file the panel could not fetch look like an account out of
         // connections. Once something has played, the same code means the
         // stream dropped, and retrying is right.
-        PlaybackException.ERROR_CODE_IO_BAD_HTTP_STATUS -> everPlayed
+        //
+        // A film whose container has already been read is the exception: the
+        // server has the file, and a refusal on the next request — the one a
+        // seek or a resume makes — is the account's only connection not yet
+        // released after the request before it.
+        PlaybackException.ERROR_CODE_IO_BAD_HTTP_STATUS -> everPlayed || fileAlreadyRead()
 
         PlaybackException.ERROR_CODE_IO_NETWORK_CONNECTION_FAILED,
         PlaybackException.ERROR_CODE_IO_NETWORK_CONNECTION_TIMEOUT,
@@ -910,6 +944,9 @@ class PlayerViewModel @Inject constructor(
 
         else -> false
     }
+
+    private fun fileAlreadyRead(): Boolean =
+        _state.value.playable?.isLive == false && (player?.duration ?: C.TIME_UNSET) > 0
 
     private fun optionsFor(tracks: Tracks, type: Int): List<TrackOption> {
         val options = mutableListOf<TrackOption>()
@@ -1244,7 +1281,7 @@ class PlayerViewModel @Inject constructor(
     fun seekTo(positionMs: Long) {
         val exo = player ?: return
         if (_state.value.playable?.isLive == true) return
-        val duration = exo.duration.takeIf { it > 0 } ?: return
+        val duration = exo.duration.takeIf { it > 0 } ?: Long.MAX_VALUE
         exo.seekTo(positionMs.coerceIn(0L, duration))
         _state.value = _state.value.copy(positionMs = exo.currentPosition.coerceAtLeast(0))
         recordProgress()

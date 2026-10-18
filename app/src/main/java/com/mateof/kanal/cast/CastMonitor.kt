@@ -120,6 +120,10 @@ class CastMonitor @Inject constructor(
     /** How many screens are showing the panel; the television is only asked while someone looks. */
     private val viewers = AtomicInteger(0)
 
+    /** When the panel last moved or paused the television; see [controlled]. */
+    @Volatile
+    private var controlledAt = 0L
+
     init {
         scope.launch {
             relay.notices.collect { notice ->
@@ -127,6 +131,9 @@ class CastMonitor @Inject constructor(
                 if (notice.generation != current.generation) return@collect
                 when (notice.kind) {
                     RelayNotice.Kind.TV_RECONNECTED -> {
+                        // A seek through the relay is a new request from the
+                        // television, and not the comeback the count is about.
+                        if (System.currentTimeMillis() - controlledAt < CONTROL_ECHO_MS) return@collect
                         _session.update { it?.copy(tvComebacks = it.tvComebacks + 1) }
                         note(UiText(R.string.cast_event_tv_came_back))
                     }
@@ -248,6 +255,21 @@ class CastMonitor @Inject constructor(
         }
     }
 
+    /**
+     * The panel told the television to pause, carry on or move. What it says
+     * it is doing is taken now rather than at the next poll, so the buttons do
+     * not flip back for a second.
+     */
+    fun controlled(state: String? = null, positionMs: Long? = null) {
+        controlledAt = System.currentTimeMillis()
+        if (state != null) tvState(state)
+        if (positionMs != null) {
+            _session.update { current ->
+                current?.copy(position = CastPosition(msToUpnpTime(positionMs), current.position?.duration))
+            }
+        }
+    }
+
     fun tvSilent(misses: Int, of: Int, detail: String?) {
         note(UiText(R.string.cast_event_tv_silent, misses, of), detail, CastIncident.Level.WARN)
     }
@@ -268,7 +290,10 @@ class CastMonitor @Inject constructor(
                 if (current.phase != CastPhase.ACTIVE) continue
                 sample(current)
                 val now = System.currentTimeMillis()
-                if (viewers.get() > 0 && now - lastPoll >= POLL_MS) {
+                // A film's progress bar wants the position every second; a
+                // channel has none to show.
+                val every = if (current.request.live) POLL_MS else POSITION_POLL_MS
+                if (viewers.get() > 0 && now - lastPoll >= every) {
                     lastPoll = now
                     pollTv()
                 }
@@ -310,6 +335,8 @@ class CastMonitor @Inject constructor(
     private companion object {
         const val SAMPLE_MS = 1_000L
         const val POLL_MS = 5_000L
+        const val POSITION_POLL_MS = 1_000L
+        const val CONTROL_ECHO_MS = 10_000L
         const val MAX_INCIDENTS = 40
     }
 }

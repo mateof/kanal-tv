@@ -408,6 +408,14 @@
     <string name="cast_phase_ended">Stopped sending to %s</string>
     <string name="cast_section_speed">Speed</string>
     <string name="cast_section_tv">TV</string>
+    <string name="cast_section_playback">Playback</string>
+    <string name="cast_playback_pause">Pause</string>
+    <string name="cast_playback_resume">Resume</string>
+    <string name="cast_playback_back">−30 s</string>
+    <string name="cast_playback_forward">+30 s</string>
+    <string name="cast_playback_no_position">The TV does not say where it is, so there is no progress bar.</string>
+    <string name="cast_playback_tracks_note">Audio and subtitle language are picked with the TV\'s own remote: DLNA has no command for it.</string>
+    <string name="cast_event_control_refused">The TV refused the command</string>
     <string name="cast_section_connection">Connection</string>
     <string name="cast_section_events">Events</string>
     <string name="cast_stat_current">Now</string>

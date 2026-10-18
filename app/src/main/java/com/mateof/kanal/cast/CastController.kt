@@ -234,6 +234,38 @@ class CastController @Inject constructor(
         onRelayEnded(RelayEnded(session.device, problem, hint, session.generation))
     }
 
+    /** Pauses the television, or carries on after a pause. */
+    suspend fun togglePause(): Result<Unit> {
+        val session = monitor.session.value?.takeIf { it.phase == CastPhase.ACTIVE }
+            ?: return Result.failure(IllegalStateException("no hay ningún envío en marcha"))
+        val paused = session.tvState == "PAUSED_PLAYBACK"
+        val result = if (paused) upnp.resume(session.device) else upnp.pause(session.device)
+        return result
+            .onSuccess { monitor.controlled(state = if (paused) "PLAYING" else "PAUSED_PLAYBACK") }
+            .onFailure { failure ->
+                logger.w("Cast", "${session.device.name} no aceptó ${if (paused) "Play" else "Pause"}: ${failure.message}")
+                monitor.note(UiText(R.string.cast_event_control_refused), failure.message, CastIncident.Level.WARN)
+            }
+    }
+
+    /** Moves the television to [positionMs] into the film or episode. */
+    suspend fun seek(positionMs: Long): Result<Unit> {
+        val session = monitor.session.value?.takeIf { it.phase == CastPhase.ACTIVE && !it.request.live }
+            ?: return Result.failure(IllegalStateException("no hay ninguna película en marcha"))
+        // Before the request, so the television's new request to the relay is
+        // not counted as it coming back by itself.
+        monitor.controlled()
+        return upnp.seek(session.device, positionMs)
+            .onSuccess {
+                logger.i("Cast", "${session.device.name}: a ${msToUpnpTime(positionMs)}")
+                monitor.controlled(positionMs = positionMs)
+            }
+            .onFailure { failure ->
+                logger.w("Cast", "${session.device.name} no aceptó Seek: ${failure.message}")
+                monitor.note(UiText(R.string.cast_event_control_refused), failure.message, CastIncident.Level.WARN)
+            }
+    }
+
     /** Forgets a send that stopped by itself, once the user has seen it. */
     fun dismiss() {
         if (monitor.session.value?.phase == CastPhase.ENDED) monitor.clear()

@@ -34,7 +34,25 @@ data class CastDevice(
 }
 
 /** What a renderer reports about the item it holds; see [UpnpClient.position]. */
-data class CastPosition(val elapsed: String?, val duration: String?)
+data class CastPosition(val elapsed: String?, val duration: String?) {
+    val elapsedMs: Long? get() = elapsed?.let(::upnpTimeToMs)
+    val durationMs: Long? get() = duration?.let(::upnpTimeToMs)
+}
+
+/** "H:MM:SS", with or without a fraction of a second, as UPnP writes a time. */
+fun upnpTimeToMs(value: String): Long? {
+    val parts = value.trim().split(':')
+    if (parts.size != 3) return null
+    val hours = parts[0].toLongOrNull() ?: return null
+    val minutes = parts[1].toLongOrNull() ?: return null
+    val seconds = parts[2].toDoubleOrNull() ?: return null
+    return (hours * 3_600 + minutes * 60) * 1_000 + (seconds * 1_000).toLong()
+}
+
+fun msToUpnpTime(ms: Long): String {
+    val total = (ms / 1_000).coerceAtLeast(0)
+    return "%d:%02d:%02d".format(java.util.Locale.ROOT, total / 3_600, total / 60 % 60, total % 60)
+}
 
 /**
  * Sends a stream to a DLNA/UPnP renderer on the same network.
@@ -188,6 +206,40 @@ class UpnpClient @Inject constructor(
         runCatching { soap(device, "Stop", "<InstanceID>0</InstanceID>"); Unit }
     }
 
+    suspend fun pause(device: CastDevice): Result<Unit> = withContext(Dispatchers.IO) {
+        runCatching { soap(device, "Pause", "<InstanceID>0</InstanceID>"); Unit }
+    }
+
+    /** Play on what the renderer already holds: the way out of a pause. */
+    suspend fun resume(device: CastDevice): Result<Unit> = withContext(Dispatchers.IO) {
+        runCatching { soap(device, "Play", "<InstanceID>0</InstanceID><Speed>1</Speed>"); Unit }
+    }
+
+    /**
+     * Moves the renderer to [positionMs] into the item.
+     *
+     * REL_TIME is the unit the specification has every renderer support, but
+     * some only take ABS_TIME, and refuse the other with 710 (seek mode not
+     * supported): that refusal is answered with the other unit.
+     */
+    suspend fun seek(device: CastDevice, positionMs: Long): Result<Unit> = withContext(Dispatchers.IO) {
+        runCatching {
+            val target = msToUpnpTime(positionMs)
+            fun seekBy(unit: String) = soap(
+                device,
+                "Seek",
+                "<InstanceID>0</InstanceID><Unit>$unit</Unit><Target>$target</Target>"
+            )
+            try {
+                seekBy("REL_TIME")
+            } catch (refused: UpnpException) {
+                if (refused.upnpCode != SEEK_MODE_NOT_SUPPORTED) throw refused
+                seekBy("ABS_TIME")
+            }
+            Unit
+        }
+    }
+
     /**
      * What the renderer says it is doing — PLAYING, STOPPED, TRANSITIONING… —
      * or a failure when it no longer answers at all. The relay uses it to tell
@@ -291,6 +343,7 @@ class UpnpClient @Inject constructor(
         const val SSDP_HOST = "239.255.255.250"
         const val SSDP_PORT = 1900
         const val AV_TRANSPORT = "urn:schemas-upnp-org:service:AVTransport:1"
+        const val SEEK_MODE_NOT_SUPPORTED = 710
 
         /** Where renderers usually publish their description. */
         val COMMON_PATHS = listOf(
