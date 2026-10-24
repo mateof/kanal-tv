@@ -408,6 +408,10 @@ class RelayServer(
         "transferMode.dlna.org" to "Streaming",
         "contentFeatures.dlna.org" to current.features,
         "Cache-Control" to "no-cache",
+        // A Chromecast's receiver is a web page and fetches with CORS. Opening
+        // it to any origin costs nothing: only the television's address with
+        // the session's token is served at all.
+        "Access-Control-Allow-Origin" to "*",
         "Server" to SERVER_NAME
     )
 

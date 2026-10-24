@@ -364,7 +364,7 @@
     <string name="cast_title">Send to another device</string>
     <string name="cast_searching">Looking for devices on the network…</string>
     <string name="cast_none">No compatible device found.</string>
-    <string name="cast_none_hint">It has to be switched on, on the same network and support DLNA. Many televisions call it “media renderer” and it has to be enabled in their settings.</string>
+    <string name="cast_none_hint">It has to be switched on and on the same network. A DLNA television usually calls it “media renderer” and it has to be enabled in its settings; Settings → Playback picks which kinds of device are looked for.</string>
     <string name="cast_search_again">Search again</string>
     <string name="cast_playing_on">Playing on %s</string>
     <string name="cast_bring_back">Bring it back</string>
@@ -414,7 +414,7 @@
     <string name="cast_playback_back">−30 s</string>
     <string name="cast_playback_forward">+30 s</string>
     <string name="cast_playback_no_position">The TV does not say where it is, so there is no progress bar.</string>
-    <string name="cast_playback_tracks_note">Audio and subtitle language are picked with the TV\'s own remote: DLNA has no command for it.</string>
+    <string name="cast_playback_tracks_note">Audio and subtitle language are picked with the TV\'s own remote: sending to a television offers no way to choose them from here. Sent to another device with Kanal, it does.</string>
     <string name="cast_event_control_refused">The TV refused the command</string>
     <string name="cast_section_connection">Connection</string>
     <string name="cast_section_events">Events</string>
@@ -625,4 +625,15 @@
         <item quantity="one">Someone wants to send you a source</item>
         <item quantity="other">Someone wants to send you %d sources</item>
     </plurals>
+    <string name="cast_group_webos">LG webOS</string>
+    <string name="cast_group_google">Google Cast</string>
+    <string name="cast_webos_pairing">Accept Kanal on %1$s</string>
+    <string name="cast_webos_pairing_hint">The television is showing a prompt: press “Accept” with its remote. Only the first time.</string>
+    <string name="cast_hint_gcast_load">The Chromecast could not play it. Its player takes MP4, WebM and HLS, but not a live MPEG-TS stream: if your provider offers HLS, pick it in Settings → Playback → Stream format.</string>
+    <string name="settings_cast_protocols">Where to look for televisions</string>
+    <string name="settings_cast_protocols_desc">The ways of sending offered under “Send to…”. Switch off the ones you do not use and searching gets faster.</string>
+    <string name="settings_cast_kanal_desc">Other devices with Kanal open: Android TV, Fire TV, Google TV, phones and tablets. They play it themselves, with audio and subtitles to choose from.</string>
+    <string name="settings_cast_google_desc">Chromecast and televisions with Google Cast. Plays films and HLS; not a live MPEG-TS stream.</string>
+    <string name="settings_cast_webos_desc">LG webOS televisions, through their own remote control protocol. The first time Kanal has to be accepted on the television. For LG sets that refuse live streams over DLNA.</string>
+    <string name="settings_cast_dlna_desc">Televisions, consoles and receivers with DLNA, or “media renderer”.</string>
 </resources>

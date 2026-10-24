@@ -122,6 +122,7 @@ object CastRouting {
      */
     fun shouldFallBack(error: Throwable): Boolean {
         if (generateSequence(error) { it.cause }.any { it is InterruptedIOException }) return true
+        if (error is RendererRefused) return error.fetchFailed
         val refusal = error as? UpnpException ?: return false
         if (refusal.action !in FETCHING_ACTIONS) return false
         return refusal.upnpCode in FETCH_CODES || (refusal.upnpCode == null && refusal.httpCode == 500)

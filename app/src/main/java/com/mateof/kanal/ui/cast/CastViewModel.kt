@@ -9,7 +9,8 @@ import com.mateof.kanal.cast.CastController
 import com.mateof.kanal.cast.CastDevice
 import com.mateof.kanal.cast.CastHints
 import com.mateof.kanal.cast.CastRequest
-import com.mateof.kanal.cast.UpnpClient
+import com.mateof.kanal.cast.CastDiscovery
+import com.mateof.kanal.cast.webos.WebOsClient
 import com.mateof.kanal.core.UiText
 import com.mateof.kanal.core.log.FileLogger
 import com.mateof.kanal.data.prefs.AppPreferences
@@ -25,6 +26,8 @@ import kotlinx.coroutines.launch
 import com.mateof.kanal.link.KanalPeer
 import com.mateof.kanal.link.LinkClient
 import kotlinx.coroutines.async
+import kotlinx.coroutines.awaitAll
+import kotlinx.coroutines.coroutineScope
 import javax.inject.Inject
 
 /** What is being offered to the network, named rather than resolved up front. */
@@ -49,7 +52,9 @@ data class CastUiState(
     /** Directo failed in a way the relay gets past: offer it. */
     val canTryRelay: Boolean = false,
     /** Something is (or was, until it stopped by itself) on another device: the panel has it. */
-    val transmission: Boolean = false
+    val transmission: Boolean = false,
+    /** An LG television waiting for its owner to accept Kanal. */
+    val pairing: String? = null
 ) {
     val open: Boolean get() = target != null
 }
@@ -68,7 +73,8 @@ class CastViewModel @Inject constructor(
     private val prefs: AppPreferences,
     private val content: ContentRepository,
     private val playback: PlaybackRepository,
-    private val upnp: UpnpClient,
+    private val discovery: CastDiscovery,
+    webOs: WebOsClient,
     private val cast: CastController,
     private val link: LinkClient,
     private val logger: FileLogger
@@ -93,6 +99,9 @@ class CastViewModel @Inject constructor(
     private var sentPeer: KanalPeer? = null
 
     init {
+        viewModelScope.launch {
+            webOs.pairing.collect { _state.value = _state.value.copy(pairing = it) }
+        }
         viewModelScope.launch {
             cast.session.collect { session ->
                 _state.value = _state.value.copy(transmission = session != null)
@@ -141,7 +150,11 @@ class CastViewModel @Inject constructor(
     /** Re-reads the saved addresses, so a television added once stays. */
     private suspend fun loadRemembered() {
         if (manual.isNotEmpty()) return
-        val found = prefs.castAddresses.first().mapNotNull { upnp.describeManual(it) }
+        // All at once: each address is tried with every protocol, and one that
+        // no longer answers costs a connection timeout.
+        val found = coroutineScope {
+            prefs.castAddresses.first().map { async { discovery.describeManual(it) } }.awaitAll().flatten()
+        }
         if (found.isEmpty()) return
         manual = found
         _state.value = _state.value.copy(devices = merge(_state.value.devices))
@@ -162,9 +175,10 @@ class CastViewModel @Inject constructor(
             // Kanal answers in under two seconds, UPnP takes three: the
             // devices with Kanal show up first rather than waiting for the rest.
             val peers = async {
-                link.discover().also { _state.value = _state.value.copy(peers = it) }
+                val found = if (discovery.kanalEnabled()) link.discover() else emptyList()
+                found.also { _state.value = _state.value.copy(peers = it) }
             }
-            val found = upnp.discover()
+            val found = discovery.discover()
             peers.await()
             _state.value = _state.value.copy(devices = merge(found), searching = false)
         }
@@ -173,7 +187,7 @@ class CastViewModel @Inject constructor(
     fun addByAddress(address: String) {
         viewModelScope.launch {
             _state.value = _state.value.copy(searching = true, error = null, hint = null)
-            link.probe(address)?.let { peer ->
+            link.probe(address)?.takeIf { discovery.kanalEnabled() }?.let { peer ->
                 prefs.rememberLinkAddress(address.trim())
                 _state.value = _state.value.copy(
                     searching = false,
@@ -181,15 +195,15 @@ class CastViewModel @Inject constructor(
                 )
                 return@launch
             }
-            val device = upnp.describeManual(address)
-            if (device == null) {
+            val found = discovery.describeManual(address)
+            if (found.isEmpty()) {
                 _state.value = _state.value.copy(
                     searching = false,
                     error = address.trim(),
                     hint = UiText(R.string.cast_no_answer_at_address)
                 )
             } else {
-                manual = (manual + device).distinctBy { it.controlUrl }
+                manual = (manual + found).distinctBy { it.controlUrl }
                 prefs.rememberCastAddress(address.trim())
                 _state.value = _state.value.copy(
                     searching = false,

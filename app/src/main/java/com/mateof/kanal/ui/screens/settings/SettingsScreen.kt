@@ -331,6 +331,48 @@ fun SettingsScreen(
             }
         }
         item {
+            Column {
+                Text(
+                    stringResource(R.string.settings_cast_protocols),
+                    style = MaterialTheme.typography.titleSmall,
+                    color = KanalColors.OnBackground
+                )
+                Text(
+                    stringResource(R.string.settings_cast_protocols_desc),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = KanalColors.OnSurfaceFaint
+                )
+                Spacer(Modifier.height(10.dp))
+                SettingSwitchRow(
+                    title = stringResource(R.string.link_group_kanal),
+                    description = stringResource(R.string.settings_cast_kanal_desc),
+                    checked = settings.castKanal,
+                    onCheckedChange = vm::setCastKanal
+                )
+                Spacer(Modifier.height(6.dp))
+                SettingSwitchRow(
+                    title = stringResource(R.string.cast_group_google),
+                    description = stringResource(R.string.settings_cast_google_desc),
+                    checked = settings.castGoogle,
+                    onCheckedChange = vm::setCastGoogle
+                )
+                Spacer(Modifier.height(6.dp))
+                SettingSwitchRow(
+                    title = stringResource(R.string.cast_group_webos),
+                    description = stringResource(R.string.settings_cast_webos_desc),
+                    checked = settings.castWebOs,
+                    onCheckedChange = vm::setCastWebOs
+                )
+                Spacer(Modifier.height(6.dp))
+                SettingSwitchRow(
+                    title = stringResource(R.string.link_group_dlna),
+                    description = stringResource(R.string.settings_cast_dlna_desc),
+                    checked = settings.castDlna,
+                    onCheckedChange = vm::setCastDlna
+                )
+            }
+        }
+        item {
             OptionRow(
                 title = stringResource(R.string.settings_cast_mode),
                 description = stringResource(R.string.settings_cast_mode_desc),

@@ -27,7 +27,8 @@ data class CastDevice(
      * The device's own identity, which survives a new IP address or a different
      * description path. What the relay decision is remembered against.
      */
-    val udn: String = id
+    val udn: String = id,
+    val protocol: CastProtocol = CastProtocol.DLNA
 ) {
     /** Where the renderer lives, which is also where its requests to the relay come from. */
     val host: String get() = runCatching { URI(controlUrl).host }.getOrNull().orEmpty()
@@ -69,7 +70,7 @@ fun msToUpnpTime(ms: Long): String {
 class UpnpClient @Inject constructor(
     private val http: HttpProvider,
     private val logger: FileLogger
-) {
+) : Renderer {
     /**
      * Asks the network who can play video, and returns whoever answers.
      *
@@ -77,19 +78,34 @@ class UpnpClient @Inject constructor(
      * renderer replies directly to us. Some answer more than once, hence the
      * de-duplication by location.
      */
-    suspend fun discover(timeoutMs: Int = 3_000): List<CastDevice> = withContext(Dispatchers.IO) {
-        val locations = linkedSetOf<String>()
+    suspend fun discover(timeoutMs: Int = 3_000): List<CastDevice> {
+        val locations = search(SEARCH_TARGETS, timeoutMs).map { it.location }.distinct()
+        logger.i("Cast", "SSDP: ${locations.size} descripciones distintas")
+        // ssdp:all answers with everything on the network, printers included.
+        // The description is what decides: only those offering AVTransport stay.
+        return locations.mapNotNull { describe(it) }.distinctBy { it.controlUrl }
+    }
+
+    /** One SSDP answer: what was searched for, where the description is, and who answered. */
+    data class SsdpReply(val target: String, val location: String, val usn: String?)
+
+    /**
+     * Asks the network for [targets] and returns whoever answers.
+     *
+     * Discovery is by SSDP: a datagram to the multicast group, and every
+     * device replies directly to us. Some answer more than once, hence the
+     * de-duplication by location and target.
+     */
+    suspend fun search(targets: List<String>, timeoutMs: Int = 3_000): List<SsdpReply> = withContext(Dispatchers.IO) {
+        val replies = linkedSetOf<SsdpReply>()
         runCatching {
             DatagramSocket().use { socket ->
                 socket.soTimeout = 600
                 socket.broadcast = true
                 val group = InetAddress.getByName(SSDP_HOST)
-                // Asked for in several ways, and each one twice. Not every
-                // renderer answers the MediaRenderer device type — some only
-                // reply to the AVTransport service, others just to ssdp:all —
-                // and SSDP runs over UDP, where a lost datagram is routine.
+                // Each one twice: SSDP runs over UDP, where a lost datagram is routine.
                 repeat(2) {
-                    for (target in SEARCH_TARGETS) {
+                    for (target in targets) {
                         val payload = searchFor(target).toByteArray()
                         socket.send(DatagramPacket(payload, payload.size, group, SSDP_PORT))
                     }
@@ -105,15 +121,23 @@ class UpnpClient @Inject constructor(
                         continue
                     }
                     val reply = String(packet.data, 0, packet.length)
-                    headerOf(reply, "LOCATION")?.let(locations::add)
+                    val location = headerOf(reply, "LOCATION") ?: continue
+                    replies += SsdpReply(headerOf(reply, "ST").orEmpty(), location, headerOf(reply, "USN"))
                 }
             }
         }.onFailure { logger.w("Cast", "Fallo buscando aparatos", it) }
+        replies.toList()
+    }
 
-        logger.i("Cast", "SSDP: ${locations.size} descripciones distintas")
-        // ssdp:all answers with everything on the network, printers included.
-        // The description is what decides: only those offering AVTransport stay.
-        locations.mapNotNull { describe(it) }.distinctBy { it.controlUrl }
+    /** The friendly name and UDN a device description declares, whatever its services. */
+    suspend fun identity(location: String): Pair<String?, String?>? = withContext(Dispatchers.IO) {
+        runCatching {
+            val xml = http.client.newCall(Request.Builder().url(location).build()).execute().use { response ->
+                if (!response.isSuccessful) return@withContext null
+                response.body?.string().orEmpty()
+            }
+            tag(xml, "friendlyName") to tag(xml, "UDN")
+        }.getOrNull()
     }
 
     /**
@@ -171,7 +195,7 @@ class UpnpClient @Inject constructor(
     }
 
     /** Points the renderer at [source] and starts it. */
-    suspend fun play(device: CastDevice, source: CastSource, title: String): Result<Unit> =
+    override suspend fun play(device: CastDevice, source: CastSource, title: String, live: Boolean): Result<Unit> =
         withContext(Dispatchers.IO) {
             runCatching {
                 // Several televisions refuse a new URI while the transport still
@@ -202,16 +226,16 @@ class UpnpClient @Inject constructor(
             }
         }
 
-    suspend fun stop(device: CastDevice): Result<Unit> = withContext(Dispatchers.IO) {
+    override suspend fun stop(device: CastDevice): Result<Unit> = withContext(Dispatchers.IO) {
         runCatching { soap(device, "Stop", "<InstanceID>0</InstanceID>"); Unit }
     }
 
-    suspend fun pause(device: CastDevice): Result<Unit> = withContext(Dispatchers.IO) {
+    override suspend fun pause(device: CastDevice): Result<Unit> = withContext(Dispatchers.IO) {
         runCatching { soap(device, "Pause", "<InstanceID>0</InstanceID>"); Unit }
     }
 
     /** Play on what the renderer already holds: the way out of a pause. */
-    suspend fun resume(device: CastDevice): Result<Unit> = withContext(Dispatchers.IO) {
+    override suspend fun resume(device: CastDevice): Result<Unit> = withContext(Dispatchers.IO) {
         runCatching { soap(device, "Play", "<InstanceID>0</InstanceID><Speed>1</Speed>"); Unit }
     }
 
@@ -222,7 +246,7 @@ class UpnpClient @Inject constructor(
      * some only take ABS_TIME, and refuse the other with 710 (seek mode not
      * supported): that refusal is answered with the other unit.
      */
-    suspend fun seek(device: CastDevice, positionMs: Long): Result<Unit> = withContext(Dispatchers.IO) {
+    override suspend fun seek(device: CastDevice, positionMs: Long): Result<Unit> = withContext(Dispatchers.IO) {
         runCatching {
             val target = msToUpnpTime(positionMs)
             fun seekBy(unit: String) = soap(
@@ -245,7 +269,7 @@ class UpnpClient @Inject constructor(
      * or a failure when it no longer answers at all. The relay uses it to tell
      * a television that went away from one that is simply buffering.
      */
-    suspend fun transportState(device: CastDevice): Result<String?> = withContext(Dispatchers.IO) {
+    override suspend fun transportState(device: CastDevice): Result<String?> = withContext(Dispatchers.IO) {
         runCatching {
             tag(soap(device, "GetTransportInfo", "<InstanceID>0</InstanceID>"), "CurrentTransportState")
         }
@@ -256,7 +280,7 @@ class UpnpClient @Inject constructor(
      * it does not know. A live stream usually has no duration, and plenty of
      * renderers answer NOT_IMPLEMENTED or all zeroes.
      */
-    suspend fun position(device: CastDevice): Result<CastPosition> = withContext(Dispatchers.IO) {
+    override suspend fun position(device: CastDevice): Result<CastPosition> = withContext(Dispatchers.IO) {
         runCatching {
             val reply = soap(device, "GetPositionInfo", "<InstanceID>0</InstanceID>")
             CastPosition(

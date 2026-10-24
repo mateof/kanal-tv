@@ -115,6 +115,12 @@ data class Settings(
     val castRouteMode: CastRouteMode = CastRouteMode.AUTO,
     /** Port the cast relay listens on; 0 lets the system pick a free one. */
     val castRelayPort: Int = 0,
+    /** Which ways of sending to a television are offered; see [com.mateof.kanal.cast.CastProtocol]. */
+    val castDlna: Boolean = true,
+    val castWebOs: Boolean = true,
+    val castGoogle: Boolean = true,
+    /** Whether the send lists look for other devices with Kanal. */
+    val castKanal: Boolean = true,
     /** Whether other devices with Kanal can find this one and send it things. */
     val linkVisible: Boolean = true,
     /** The name other devices see; empty means the one the system has. */
@@ -150,6 +156,11 @@ class AppPreferences @Inject constructor(
         val DOWNLOAD_DELETE_WATCHED = booleanPreferencesKey("download_delete_watched")
         val CAST_ROUTE_MODE = stringPreferencesKey("cast_route_mode")
         val CAST_RELAY_PORT = intPreferencesKey("cast_relay_port")
+        val CAST_DLNA = booleanPreferencesKey("cast_dlna")
+        val CAST_WEBOS = booleanPreferencesKey("cast_webos")
+        val CAST_GOOGLE = booleanPreferencesKey("cast_google")
+        val CAST_KANAL = booleanPreferencesKey("cast_kanal")
+        val WEBOS_KEYS = stringPreferencesKey("webos_keys")
 
         val STREAM_FORMAT = stringPreferencesKey("stream_format")
         val PREVIEW_ENABLED = booleanPreferencesKey("preview_enabled")
@@ -336,6 +347,10 @@ class AppPreferences @Inject constructor(
                 CastRouteMode.entries.firstOrNull { it.name == name }
             } ?: CastRouteMode.AUTO,
             castRelayPort = prefs[Keys.CAST_RELAY_PORT] ?: 0,
+            castDlna = prefs[Keys.CAST_DLNA] ?: true,
+            castWebOs = prefs[Keys.CAST_WEBOS] ?: true,
+            castGoogle = prefs[Keys.CAST_GOOGLE] ?: true,
+            castKanal = prefs[Keys.CAST_KANAL] ?: true,
             linkVisible = prefs[Keys.LINK_VISIBLE] ?: true,
             linkDeviceName = prefs[Keys.LINK_DEVICE_NAME] ?: ""
         )
@@ -351,6 +366,10 @@ class AppPreferences @Inject constructor(
     suspend fun setCastRouteMode(value: CastRouteMode) = edit { it[Keys.CAST_ROUTE_MODE] = value.name }
     suspend fun setCastRelayPort(value: Int) = edit { it[Keys.CAST_RELAY_PORT] = value }
     suspend fun setLinkVisible(value: Boolean) = edit { it[Keys.LINK_VISIBLE] = value }
+    suspend fun setCastDlna(value: Boolean) = edit { it[Keys.CAST_DLNA] = value }
+    suspend fun setCastWebOs(value: Boolean) = edit { it[Keys.CAST_WEBOS] = value }
+    suspend fun setCastGoogle(value: Boolean) = edit { it[Keys.CAST_GOOGLE] = value }
+    suspend fun setCastKanal(value: Boolean) = edit { it[Keys.CAST_KANAL] = value }
     suspend fun setLinkDeviceName(value: String) = edit { it[Keys.LINK_DEVICE_NAME] = value.trim() }
     suspend fun setPreviewEnabled(value: Boolean) = edit { it[Keys.PREVIEW_ENABLED] = value }
     suspend fun setKeepLastChannel(value: Boolean) = edit { it[Keys.KEEP_LAST_CHANNEL] = value }
@@ -543,6 +562,21 @@ class AppPreferences @Inject constructor(
             prefs[Keys.LINK_DEVICE_ID] = id
         }
         return id
+    }
+
+    /**
+     * The key each LG television handed over when its owner accepted Kanal,
+     * by device. Without it the television asks again on every connection.
+     */
+    suspend fun webOsKey(device: String): String? =
+        decode<Map<String, String>>(context.dataStore.data.first()[Keys.WEBOS_KEYS], emptyMap())[device]
+
+    suspend fun setWebOsKey(device: String, key: String?) {
+        context.dataStore.edit { prefs ->
+            val all = decode<Map<String, String>>(prefs[Keys.WEBOS_KEYS], emptyMap()).toMutableMap()
+            if (key == null) all.remove(device) else all[device] = key
+            prefs[Keys.WEBOS_KEYS] = json.encodeToString(all)
+        }
     }
 
     /** Devices with Kanal added by address, for networks that drop broadcasts. */

@@ -1590,6 +1590,7 @@ private fun CastSheet(
             peers = state.castPeers,
             devices = state.castDevices,
             searching = state.castSearching,
+            pairing = state.castPairing,
             onPickPeer = onPickPeer,
             onPickDevice = onPick,
             modifier = Modifier.weight(1f)

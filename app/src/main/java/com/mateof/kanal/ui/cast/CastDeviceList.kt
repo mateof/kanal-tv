@@ -14,6 +14,7 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.Cast
+import androidx.compose.material.icons.outlined.CastConnected
 import androidx.compose.material.icons.outlined.PhoneAndroid
 import androidx.compose.material.icons.outlined.TabletAndroid
 import androidx.compose.material.icons.outlined.Tv
@@ -30,6 +31,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.mateof.kanal.R
 import com.mateof.kanal.cast.CastDevice
+import com.mateof.kanal.cast.CastProtocol
 import com.mateof.kanal.link.DeviceIdentity
 import com.mateof.kanal.link.KanalPeer
 import com.mateof.kanal.ui.components.FocusableSurface
@@ -37,7 +39,9 @@ import com.mateof.kanal.ui.theme.KanalColors
 
 /**
  * Everything a stream can be sent to: other devices with Kanal first, since
- * they play it themselves and need nothing switched on, then DLNA renderers.
+ * they play it themselves and need nothing switched on, then televisions by
+ * protocol. An LG set shows up twice, as webOS and as DLNA, on purpose: they
+ * are different players and one may take what the other refuses.
  */
 @Composable
 fun CastDeviceList(
@@ -46,8 +50,25 @@ fun CastDeviceList(
     searching: Boolean,
     onPickPeer: (KanalPeer) -> Unit,
     onPickDevice: (CastDevice) -> Unit,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    pairing: String? = null
 ) {
+    if (pairing != null) {
+        Column(modifier) {
+            Text(
+                stringResource(R.string.cast_webos_pairing, pairing),
+                style = MaterialTheme.typography.titleSmall,
+                color = KanalColors.Accent
+            )
+            Spacer(Modifier.height(6.dp))
+            Text(
+                stringResource(R.string.cast_webos_pairing_hint),
+                style = MaterialTheme.typography.bodySmall,
+                color = KanalColors.OnSurfaceMuted
+            )
+        }
+        return
+    }
     if (peers.isEmpty() && devices.isEmpty()) {
         Column(modifier) {
             Text(
@@ -87,15 +108,19 @@ fun CastDeviceList(
                 )
             }
         }
-        if (devices.isNotEmpty()) {
-            if (peers.isNotEmpty()) {
-                item(key = "dlna") { GroupLabel(stringResource(R.string.link_group_dlna)) }
+        val groups = devices.groupBy { it.protocol }
+        val labelled = peers.isNotEmpty() || groups.size > 1
+        for (protocol in CastProtocol.entries) {
+            val group = groups[protocol] ?: continue
+            if (labelled) {
+                item(key = "group:" + protocol.name) { GroupLabel(stringResource(protocolLabel(protocol))) }
             }
-            items(devices, key = { "dlna:" + it.id }) { device ->
+            items(group, key = { protocol.name + ":" + it.id }) { device ->
                 DeviceRow(
-                    icon = Icons.Outlined.Cast,
+                    icon = protocolIcon(protocol),
                     title = device.name,
-                    details = null,
+                    details = device.host.takeIf { it.isNotBlank() && it !in device.name }
+                        ?.let { "${stringResource(protocolLabel(protocol))} · $it" },
                     extra = null,
                     onClick = { onPickDevice(device) }
                 )
@@ -132,6 +157,18 @@ fun peerDetails(peer: KanalPeer): String {
     return listOf(kind, model, peer.host, "Kanal ${info.app}".takeIf { info.app.isNotBlank() })
         .filterNot { it.isNullOrBlank() }
         .joinToString(" · ")
+}
+
+fun protocolLabel(protocol: CastProtocol): Int = when (protocol) {
+    CastProtocol.DLNA -> R.string.link_group_dlna
+    CastProtocol.WEBOS -> R.string.cast_group_webos
+    CastProtocol.GOOGLE_CAST -> R.string.cast_group_google
+}
+
+fun protocolIcon(protocol: CastProtocol): ImageVector = when (protocol) {
+    CastProtocol.DLNA -> Icons.Outlined.Cast
+    CastProtocol.WEBOS -> Icons.Outlined.Tv
+    CastProtocol.GOOGLE_CAST -> Icons.Outlined.CastConnected
 }
 
 fun iconFor(formFactor: String): ImageVector = when (formFactor) {

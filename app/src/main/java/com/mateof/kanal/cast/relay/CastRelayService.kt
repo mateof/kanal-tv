@@ -27,7 +27,7 @@ import com.mateof.kanal.cast.CastController
 import com.mateof.kanal.cast.CastMonitor
 import com.mateof.kanal.cast.CastPhase
 import com.mateof.kanal.cast.CastSession
-import com.mateof.kanal.cast.UpnpClient
+import com.mateof.kanal.cast.Renderers
 import com.mateof.kanal.cast.tvStateRes
 import com.mateof.kanal.core.UiText
 import com.mateof.kanal.core.formatBitrate
@@ -65,7 +65,7 @@ import javax.inject.Inject
 class CastRelayService : Service() {
 
     @Inject lateinit var relay: CastRelay
-    @Inject lateinit var upnp: UpnpClient
+    @Inject lateinit var renderers: Renderers
     @Inject lateinit var monitor: CastMonitor
     @Inject lateinit var controller: CastController
     @Inject lateinit var logger: FileLogger
@@ -104,7 +104,7 @@ class CastRelayService : Service() {
                     if (monitor.session.value != null) {
                         controller.stopCurrent()
                     } else {
-                        (relay.status.value as? RelayStatus.Running)?.let { upnp.stop(it.device) }
+                        (relay.status.value as? RelayStatus.Running)?.let { renderers.stop(it.device) }
                         relay.end(null, byUser = true)
                     }
                     stopIfIdle(startId)
@@ -243,7 +243,7 @@ class CastRelayService : Service() {
             val now = System.currentTimeMillis()
             if (now - lastPoll < POLL_MS) continue
             lastPoll = now
-            upnp.transportState(device)
+            renderers.transportState(device)
                 .onSuccess { state ->
                     misses = 0
                     // Only changes: an evening of PLAYING every fifteen seconds

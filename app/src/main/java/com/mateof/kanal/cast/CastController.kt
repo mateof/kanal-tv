@@ -53,12 +53,24 @@ data class CastRequest(
     /** Where it sits in the catalogue, for the transmission panel. */
     val origin: CastOrigin? = null,
     /** Overrides the route in the settings: "try through the phone" after Directo failed. */
-    val route: CastRouteMode? = null
+    val route: CastRouteMode? = null,
+    /** The HLS variant, when the source offers one: all a Chromecast can play of a live channel. */
+    val hlsUrl: String? = null
 ) {
+    /**
+     * What a Chromecast is handed instead. Its receiver plays HLS but not a
+     * bare MPEG-TS stream, so a live channel goes as HLS where there is one,
+     * and directly: the relay passes on a single address, and the segments
+     * of a playlist would go to the server anyway.
+     */
+    fun forGoogleCast(): CastRequest =
+        if (live && hlsUrl != null) copy(directUrl = hlsUrl, relayUrl = hlsUrl, route = CastRouteMode.DIRECT) else this
+
     companion object {
         fun from(playable: Playable, directUrl: String = playable.url): CastRequest {
             val urls = listOf(playable.url) + playable.fallbackUrls
             val ts = playable.candidateIds.indexOf(StreamFormat.TS.extension)
+            val hls = playable.candidateIds.indexOf(StreamFormat.HLS.extension)
             val preferred = urls.getOrNull(ts)?.takeIf { ts >= 0 } ?: directUrl
             // A downloaded film plays from a content:// uri here, which the relay
             // cannot fetch; the provider's copy stays among the fallbacks.
@@ -71,7 +83,9 @@ data class CastRequest(
                 relayUrl,
                 playable.userAgent,
                 playable.isLive,
-                CastOrigin(playable.kind, playable.sourceId, playable.itemId, playable.epgChannelId, playable.subtitle)
+                CastOrigin(playable.kind, playable.sourceId, playable.itemId, playable.epgChannelId, playable.subtitle),
+                hlsUrl = urls.getOrNull(hls)?.takeIf { hls >= 0 }
+                    ?: directUrl.takeIf { Dlna.mimeOf(it) == Dlna.MIME_HLS }
             )
         }
     }
@@ -110,7 +124,7 @@ class RelayStopped(message: String, val hint: UiText?) : IOException(message)
 @Singleton
 class CastController @Inject constructor(
     @ApplicationContext private val context: Context,
-    private val upnp: UpnpClient,
+    private val renderers: Renderers,
     private val relay: CastRelay,
     private val network: NetworkInspector,
     private val prefs: AppPreferences,
@@ -195,7 +209,7 @@ class CastController @Inject constructor(
     suspend fun stop(device: CastDevice): Result<Unit> = withContext(Dispatchers.IO) {
         cancelAutomatic()
         monitor.clear()
-        val result = upnp.stop(device)
+        val result = renderers.stop(device)
         relay.close("envío detenido")
         result
     }
@@ -239,7 +253,7 @@ class CastController @Inject constructor(
         val session = monitor.session.value?.takeIf { it.phase == CastPhase.ACTIVE }
             ?: return Result.failure(IllegalStateException("no hay ningún envío en marcha"))
         val paused = session.tvState == "PAUSED_PLAYBACK"
-        val result = if (paused) upnp.resume(session.device) else upnp.pause(session.device)
+        val result = if (paused) renderers.resume(session.device) else renderers.pause(session.device)
         return result
             .onSuccess { monitor.controlled(state = if (paused) "PLAYING" else "PAUSED_PLAYBACK") }
             .onFailure { failure ->
@@ -255,7 +269,7 @@ class CastController @Inject constructor(
         // Before the request, so the television's new request to the relay is
         // not counted as it coming back by itself.
         monitor.controlled()
-        return upnp.seek(session.device, positionMs)
+        return renderers.seek(session.device, positionMs)
             .onSuccess {
                 logger.i("Cast", "${session.device.name}: a ${msToUpnpTime(positionMs)}")
                 monitor.controlled(positionMs = positionMs)
@@ -271,8 +285,9 @@ class CastController @Inject constructor(
         if (monitor.session.value?.phase == CastPhase.ENDED) monitor.clear()
     }
 
-    private suspend fun deliver(device: CastDevice, request: CastRequest, resumed: Boolean): Result<CastOutcome> =
+    private suspend fun deliver(device: CastDevice, asked: CastRequest, resumed: Boolean): Result<CastOutcome> =
         withContext(Dispatchers.IO) {
+            val request = if (device.protocol == CastProtocol.GOOGLE_CAST) asked.forGoogleCast() else asked
             sending.withLock {
                 if (!resumed) monitor.clear()
                 runCatching {
@@ -409,7 +424,7 @@ class CastController @Inject constructor(
     }
 
     private suspend fun direct(device: CastDevice, request: CastRequest): CastOutcome {
-        upnp.play(device, CastSource.direct(request.directUrl), request.title).getOrThrow()
+        renderers.play(device, CastSource.direct(request.directUrl), request.title, request.live).getOrThrow()
         return CastOutcome(CastSource.ROUTE_DIRECT)
     }
 
@@ -441,7 +456,7 @@ class CastController @Inject constructor(
         )
         val generation = relay.generation
         val source = CastSource(url, mime, features, route)
-        val play = scope.async { upnp.play(device, source, request.title) }
+        val play = scope.async { renderers.play(device, source, request.title, request.live) }
         // webOS holds Play open until its player settles, and on a live stream
         // answers 501 after thirty seconds while it is already showing it. What
         // the television does with the relay says more than what it answers.

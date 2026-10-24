@@ -371,7 +371,7 @@
     <string name="cast_title">Enviar a outro aparato</string>
     <string name="cast_searching">Buscando aparatos na rede…</string>
     <string name="cast_none">Non se atopou ningún aparato compatible.</string>
-    <string name="cast_none_hint">Ten que estar acendido, na mesma rede e admitir DLNA. Moitas teles chámanlle «renderizador multimedia» e hai que activalo nos seus axustes.</string>
+    <string name="cast_none_hint">Ten que estar acendido e na mesma rede. Unha tele con DLNA adoita chamarlle «renderizador multimedia» e hai que activalo nos seus axustes; en Axustes → Reprodución escolles que tipos de aparato se buscan.</string>
     <string name="cast_search_again">Buscar de novo</string>
     <string name="cast_playing_on">Reproducindo en %s</string>
     <string name="cast_bring_back">Traer de volta</string>
@@ -421,7 +421,7 @@
     <string name="cast_playback_back">−30 s</string>
     <string name="cast_playback_forward">+30 s</string>
     <string name="cast_playback_no_position">A tele non di por onde vai, así que non hai barra de progreso.</string>
-    <string name="cast_playback_tracks_note">O idioma do audio e dos subtítulos escóllese co mando da tele: DLNA non ten ningunha orde para iso.</string>
+    <string name="cast_playback_tracks_note">O idioma do audio e dos subtítulos escóllese co mando da tele: ao enviar a unha tele non hai forma de escollelo desde aquí. Enviado a outro aparato con Kanal, si.</string>
     <string name="cast_event_control_refused">A tele non aceptou a orde</string>
     <string name="cast_section_connection">Conexión</string>
     <string name="cast_section_events">Incidencias</string>
@@ -634,4 +634,15 @@
         <item quantity="one">Queren enviarche unha fonte</item>
         <item quantity="other">Queren enviarche %d fontes</item>
     </plurals>
+    <string name="cast_group_webos">LG webOS</string>
+    <string name="cast_group_google">Google Cast</string>
+    <string name="cast_webos_pairing">Acepta a Kanal en %1$s</string>
+    <string name="cast_webos_pairing_hint">A tele está a amosar un aviso: preme «Aceptar» co seu mando. Só fai falta a primeira vez.</string>
+    <string name="cast_hint_gcast_load">O Chromecast non puido reproducilo. O seu reprodutor admite MP4, WebM e HLS, pero non un directo en MPEG-TS: se o teu provedor ofrece HLS, escólleo en Axustes → Reprodución → Formato de emisión.</string>
+    <string name="settings_cast_protocols">Onde buscar teles</string>
+    <string name="settings_cast_protocols_desc">As formas de enviar que aparecen ao premer «Enviar a…». Desactiva as que non uses e a busca irá máis rápida.</string>
+    <string name="settings_cast_kanal_desc">Outros aparatos con Kanal aberto: Android TV, Fire TV, Google TV, móbiles e tabletas. Reprodúceno eles mesmos, con audio e subtítulos a escoller.</string>
+    <string name="settings_cast_google_desc">Chromecast e teles con Google Cast. Reproduce películas e HLS; un directo en MPEG-TS non.</string>
+    <string name="settings_cast_webos_desc">Teles LG con webOS, polo seu propio control remoto. A primeira vez hai que aceptar a Kanal na tele. Serve para as LG que rexeitan o directo por DLNA.</string>
+    <string name="settings_cast_dlna_desc">Teles, consolas e receptores con DLNA ou «renderizador multimedia».</string>
 </resources>

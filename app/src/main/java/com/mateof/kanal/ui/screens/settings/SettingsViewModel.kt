@@ -134,6 +134,10 @@ class SettingsViewModel @Inject constructor(
     fun setLanguage(value: AppLanguage) = viewModelScope.launch { prefs.setLanguage(value) }
     fun setStreamFormat(value: StreamFormat) = viewModelScope.launch { prefs.setStreamFormat(value) }
     fun setCastRouteMode(value: CastRouteMode) = viewModelScope.launch { prefs.setCastRouteMode(value) }
+    fun setCastDlna(value: Boolean) = viewModelScope.launch { prefs.setCastDlna(value) }
+    fun setCastWebOs(value: Boolean) = viewModelScope.launch { prefs.setCastWebOs(value) }
+    fun setCastGoogle(value: Boolean) = viewModelScope.launch { prefs.setCastGoogle(value) }
+    fun setCastKanal(value: Boolean) = viewModelScope.launch { prefs.setCastKanal(value) }
 
     /**
      * Blank means "any free port". Below 1024 needs root and above 65535 does

@@ -20,7 +20,8 @@ import com.mateof.kanal.cast.CastController
 import com.mateof.kanal.cast.CastDevice
 import com.mateof.kanal.cast.CastHints
 import com.mateof.kanal.cast.CastRequest
-import com.mateof.kanal.cast.UpnpClient
+import com.mateof.kanal.cast.CastDiscovery
+import com.mateof.kanal.cast.webos.WebOsClient
 import com.mateof.kanal.core.log.FileLogger
 import com.mateof.kanal.data.db.ChannelEntity
 import com.mateof.kanal.data.db.EpgEntity
@@ -174,6 +175,8 @@ data class PlayerUiState(
     /** Other devices with Kanal open on the network. */
     val castPeers: List<KanalPeer> = emptyList(),
     val castSearching: Boolean = false,
+    /** An LG television waiting for its owner to accept Kanal. */
+    val castPairing: String? = null,
     /** Name of the device the stream was handed to, if any. */
     val castingTo: String? = null,
     /** Whether the stream goes through this phone rather than straight from the server. */
@@ -215,7 +218,8 @@ class PlayerViewModel @Inject constructor(
     private val sleepTimer: SleepTimer,
     private val probe: StreamProbe,
     private val accounts: AccountRepository,
-    private val upnp: UpnpClient,
+    private val discovery: CastDiscovery,
+    webOs: WebOsClient,
     private val cast: CastController,
     private val inbox: LinkInbox,
     private val link: LinkClient,
@@ -290,6 +294,9 @@ class PlayerViewModel @Inject constructor(
     private var castPeer: KanalPeer? = null
 
     init {
+        viewModelScope.launch {
+            webOs.pairing.collect { _state.value = _state.value.copy(castPairing = it) }
+        }
         // The device that sent this here took it back: let go of the stream
         // completely, rather than parking it in the preview as leaving
         // normally would.
@@ -1043,8 +1050,8 @@ class PlayerViewModel @Inject constructor(
         if (_state.value.castSearching) return
         viewModelScope.launch {
             _state.value = _state.value.copy(castSearching = true)
-            val peers = async { link.discover() }
-            val found = upnp.discover()
+            val peers = async { if (discovery.kanalEnabled()) link.discover() else emptyList() }
+            val found = discovery.discover()
             _state.value = _state.value.copy(
                 castDevices = found,
                 castPeers = peers.await(),
@@ -1058,7 +1065,7 @@ class PlayerViewModel @Inject constructor(
         viewModelScope.launch {
             _state.value = _state.value.copy(castSearching = true, castError = null, castHint = null)
             // Another Kanal answers on its own port; a television on UPnP's.
-            link.probe(address)?.let { peer ->
+            link.probe(address)?.takeIf { discovery.kanalEnabled() }?.let { peer ->
                 prefs.rememberLinkAddress(address.trim())
                 _state.value = _state.value.copy(
                     castSearching = false,
@@ -1066,8 +1073,8 @@ class PlayerViewModel @Inject constructor(
                 )
                 return@launch
             }
-            val device = upnp.describeManual(address)
-            _state.value = if (device == null) {
+            val found = discovery.describeManual(address)
+            _state.value = if (found.isEmpty()) {
                 _state.value.copy(
                     castSearching = false,
                     castError = address.trim(),
@@ -1076,7 +1083,7 @@ class PlayerViewModel @Inject constructor(
             } else {
                 _state.value.copy(
                     castSearching = false,
-                    castDevices = (_state.value.castDevices + device).distinctBy { it.id }
+                    castDevices = (_state.value.castDevices + found).distinctBy { it.id }
                 )
             }
         }

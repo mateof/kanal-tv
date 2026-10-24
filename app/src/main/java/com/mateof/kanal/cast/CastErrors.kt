@@ -40,6 +40,7 @@ object CastHints {
     /** A UPnP code is exact but says nothing about what to do about it. */
     private fun forDetail(detail: String): UiText? = when {
         detail.contains("UPnP 716") -> UiText(R.string.cast_hint_716)
+        detail.contains("LOAD_FAILED") -> UiText(R.string.cast_hint_gcast_load)
         detail.contains("UPnP 714") -> UiText(R.string.cast_hint_714)
         detail.contains("UPnP 701") -> UiText(R.string.cast_hint_701)
         detail.contains("UPnP 402") -> UiText(R.string.cast_hint_402)

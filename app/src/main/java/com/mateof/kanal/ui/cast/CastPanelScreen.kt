@@ -359,17 +359,23 @@ private fun PlaybackCard(
             horizontalArrangement = Arrangement.spacedBy(10.dp),
             verticalArrangement = Arrangement.spacedBy(10.dp)
         ) {
-            KanalButton(stringResource(R.string.cast_playback_back), onClick = { onSeekBy(-SKIP_MS) }, icon = Icons.Outlined.Replay30)
+            // Skipping counts from where the television says it is: with no
+            // position (webOS never gives one) the buttons would do nothing.
+            if (elapsed != null) {
+                KanalButton(stringResource(R.string.cast_playback_back), onClick = { onSeekBy(-SKIP_MS) }, icon = Icons.Outlined.Replay30)
+            }
             KanalButton(
                 stringResource(if (paused) R.string.cast_playback_resume else R.string.cast_playback_pause),
                 onClick = onTogglePause,
                 icon = if (paused) Icons.Outlined.PlayArrow else Icons.Outlined.Pause,
                 tone = ButtonTone.Primary
             )
-            KanalButton(stringResource(R.string.cast_playback_forward), onClick = { onSeekBy(SKIP_MS) }, icon = Icons.Outlined.Forward30)
+            if (elapsed != null) {
+                KanalButton(stringResource(R.string.cast_playback_forward), onClick = { onSeekBy(SKIP_MS) }, icon = Icons.Outlined.Forward30)
+            }
         }
         Spacer(Modifier.height(10.dp))
-        // DLNA's transport has no command for picking a track, so the honest
+        // None of the protocols has a command for picking a track, so the honest
         // place to say it is next to the controls that do exist.
         Text(
             stringResource(R.string.cast_playback_tracks_note),

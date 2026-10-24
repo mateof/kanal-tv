@@ -101,7 +101,7 @@ data class CastSession(
 @Singleton
 class CastMonitor @Inject constructor(
     private val relay: CastRelay,
-    private val upnp: UpnpClient
+    private val renderers: Renderers
 ) {
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
 
@@ -326,8 +326,8 @@ class CastMonitor @Inject constructor(
 
     private suspend fun pollTv() {
         val device = _session.value?.takeIf { it.phase == CastPhase.ACTIVE }?.device ?: return
-        upnp.transportState(device).onSuccess { tvState(it) }
-        upnp.position(device).onSuccess { position ->
+        renderers.transportState(device).onSuccess { tvState(it) }
+        renderers.position(device).onSuccess { position ->
             _session.update { it?.takeIf { s -> s.device == device }?.copy(position = position) ?: it }
         }
     }
