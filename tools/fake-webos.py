@@ -7,7 +7,7 @@ Media: ssap://media.viewer/open (fetches the first bytes of the address),
 media.controls/play|pause|stop|seek, com.webos.media/getForegroundAppInfo,
 com.webos.applicationManager/getForegroundAppInfo and media.viewer/close.
 
-    python tools/fake-webos.py [--port 3000] [--accept-after 3] [--deny] [--no-seek]
+    python tools/fake-webos.py [--port 3000] [--accept-after 3] [--deny] [--no-seek] [--viewer-500]
 
 From an emulator, add the television by hand as 10.0.2.2.
 """
@@ -22,6 +22,8 @@ PORT = arg('--port', 3000)
 ACCEPT_AFTER = arg('--accept-after', 3.0)
 DENY = '--deny' in sys.argv
 NO_SEEK = '--no-seek' in sys.argv
+# Recent sets answer media.viewer/open like this without fetching anything.
+VIEWER_500 = '--viewer-500' in sys.argv
 KEY = 'fake-client-key-1234'
 MEDIA_APP = 'com.webos.app.mediadiscovery'
 state = {'play': None, 'base': 0.0, 'since': None, 'front': 'com.webos.app.home'}
@@ -95,7 +97,9 @@ def handle(conn, addr):
                     reply(mid, {'client-key': KEY}, 'registered')
                 continue
             log(uri.replace('ssap://', ''), payload or '')
-            if uri == 'ssap://media.viewer/open':
+            if uri == 'ssap://media.viewer/open' and VIEWER_500:
+                send_frame(conn, json.dumps({'type': 'error', 'id': mid, 'error': '500 Application error', 'payload': {}}), lock)
+            elif uri == 'ssap://media.viewer/open':
                 try:
                     status, n = fetch(payload['target'])
                     log('  fetched', status, n, 'bytes', payload.get('mimeType'))

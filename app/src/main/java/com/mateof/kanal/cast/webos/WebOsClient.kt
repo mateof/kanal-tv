@@ -17,6 +17,7 @@ import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
@@ -74,6 +75,9 @@ class WebOsClient @Inject constructor(
     /** The media viewer opened on each television, so it can be closed again. */
     private val opened = ConcurrentHashMap<String, Pair<String, String>>()
 
+    /** The set's own DLNA renderer, standing in for a media viewer that would not open. */
+    private val twins = ConcurrentHashMap<String, CastDevice>()
+
     private val _pairing = MutableStateFlow<String?>(null)
 
     /** The television waiting for its owner to accept Kanal, for the sheets to say so. */
@@ -110,10 +114,11 @@ class WebOsClient @Inject constructor(
         protocol = CastProtocol.WEBOS
     )
 
-    override suspend fun play(device: CastDevice, source: CastSource, title: String, live: Boolean): Result<Unit> =
-        call(device) { session ->
+    override suspend fun play(device: CastDevice, source: CastSource, title: String, live: Boolean): Result<Unit> {
+        twins.remove(device.id)
+        val viewer = call(device) { session ->
             val reply = session.request(
-                "ssap://media.viewer/open",
+                VIEWER_OPEN,
                 buildJsonObject {
                     put("target", source.url)
                     put("title", title)
@@ -128,8 +133,42 @@ class WebOsClient @Inject constructor(
             if (app != null && sessionId != null) opened[device.id] = app to sessionId
             logger.i("Cast", "Enviado '$title' a ${device.name} por webOS (${source.route}): ${redactUrl(source.url)}")
         }
+        val refusal = viewer.exceptionOrNull() as? ViewerRefused ?: return viewer
+        return withTwin(device, source, title, live, refusal)
+    }
 
-    override suspend fun stop(device: CastDevice): Result<Unit> = call(device) { session ->
+    /**
+     * Recent webOS answers media.viewer/open with "500 Application error"
+     * without fetching anything (NANO796PB, 2026). The same set's DLNA
+     * renderer plays it, so the send goes there and every later call follows.
+     */
+    private suspend fun withTwin(
+        device: CastDevice,
+        source: CastSource,
+        title: String,
+        live: Boolean,
+        refusal: ViewerRefused
+    ): Result<Unit> {
+        val twin = upnp.discover().firstOrNull { it.host == device.host }
+            // A set that does not answer SSDP may be among the addresses typed in by hand.
+            ?: prefs.castAddresses.first()
+                .filter { hostOf(if ("://" in it) it else "http://$it") == device.host }
+                .firstNotNullOfOrNull { upnp.describeManual(it) }
+        if (twin == null) {
+            logger.w("Cast", "${device.name} no abre su visor (${refusal.message}) y no se encontró su DLNA")
+            return Result.failure(refusal)
+        }
+        logger.i("Cast", "${device.name} no abre su visor (${refusal.message}); se envía por su DLNA")
+        twins[device.id] = twin
+        return upnp.play(twin, source, title, live)
+    }
+
+    override suspend fun stop(device: CastDevice): Result<Unit> {
+        twins.remove(device.id)?.let { return upnp.stop(it) }
+        return viewerStop(device)
+    }
+
+    private suspend fun viewerStop(device: CastDevice): Result<Unit> = call(device) { session ->
         val media = opened.remove(device.id)
         if (media != null) {
             session.request(
@@ -145,13 +184,16 @@ class WebOsClient @Inject constructor(
     }
 
     override suspend fun pause(device: CastDevice): Result<Unit> =
-        call(device) { it.request("ssap://media.controls/pause") }
+        twins[device.id]?.let { upnp.pause(it) } ?: call(device) { it.request("ssap://media.controls/pause") }
 
     override suspend fun resume(device: CastDevice): Result<Unit> =
-        call(device) { it.request("ssap://media.controls/play") }
+        twins[device.id]?.let { upnp.resume(it) } ?: call(device) { it.request("ssap://media.controls/play") }
 
     /** Not every webOS version has it; a refusal ends up among the panel's incidents. */
-    override suspend fun seek(device: CastDevice, positionMs: Long): Result<Unit> = call(device) {
+    override suspend fun seek(device: CastDevice, positionMs: Long): Result<Unit> =
+        twins[device.id]?.let { upnp.seek(it, positionMs) } ?: viewerSeek(device, positionMs)
+
+    private suspend fun viewerSeek(device: CastDevice, positionMs: Long): Result<Unit> = call(device) {
         it.request("ssap://media.controls/seek", buildJsonObject { put("position", positionMs) })
     }
 
@@ -160,7 +202,10 @@ class WebOsClient @Inject constructor(
      * Sets that do not offer it are asked which app is in front instead:
      * the media viewer still there counts as playing.
      */
-    override suspend fun transportState(device: CastDevice): Result<String?> = call(device) { session ->
+    override suspend fun transportState(device: CastDevice): Result<String?> =
+        twins[device.id]?.let { upnp.transportState(it) } ?: viewerState(device)
+
+    private suspend fun viewerState(device: CastDevice): Result<String?> = call(device) { session ->
         val media = runCatching { session.request("ssap://com.webos.media/getForegroundAppInfo") }.getOrNull()
         val playing = (media?.get("foregroundAppInfo") as? JsonArray)?.firstOrNull() as? JsonObject
         val state = playing?.let { (it["playState"] as? JsonPrimitive)?.contentOrNull }
@@ -176,7 +221,7 @@ class WebOsClient @Inject constructor(
 
     /** SSAP has no way to ask where the media viewer is. */
     override suspend fun position(device: CastDevice): Result<CastPosition> =
-        Result.failure(UnsupportedOperationException("webOS no informa de la posición"))
+        twins[device.id]?.let { upnp.position(it) } ?: Result.failure(UnsupportedOperationException("webOS no informa de la posición"))
 
     /** Runs [block] on a registered connection; a broken one is dropped and opened again next time. */
     private suspend fun <T> call(device: CastDevice, block: suspend (Session) -> T): Result<T> =
@@ -294,6 +339,7 @@ class WebOsClient @Inject constructor(
             }
             val body = reply["payload"] as? JsonObject ?: JsonObject(emptyMap())
             if (reply.string("type") == "error") {
+                if (uri == VIEWER_OPEN) throw ViewerRefused("${reply.string("error") ?: "error"}")
                 throw IOException("$uri: ${reply.string("error") ?: "error"}")
             }
             if ((body["returnValue"] as? JsonPrimitive)?.booleanOrNull == false) {
@@ -355,10 +401,14 @@ class WebOsClient @Inject constructor(
 
     private class SessionClosed(message: String) : IOException("conexión con la tele: $message")
 
+    /** The media viewer said no without trying the address. */
+    private class ViewerRefused(message: String) : IOException("$VIEWER_OPEN: $message")
+
     companion object {
         const val SEARCH_TARGET = "urn:lge-com:service:webos-second-screen:1"
         private const val PORT_TLS = 3001
         private const val PORT_PLAIN = 3000
+        private const val VIEWER_OPEN = "ssap://media.viewer/open"
         private const val CONNECT_TIMEOUT_MS = 4_000L
         private const val REQUEST_TIMEOUT_MS = 15_000L
 
