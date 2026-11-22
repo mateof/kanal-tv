@@ -55,6 +55,8 @@ import com.mateof.kanal.ui.screens.guide.GuideScreen
 import com.mateof.kanal.ui.screens.home.HomeScreen
 import com.mateof.kanal.ui.screens.live.LiveScreen
 import com.mateof.kanal.ui.screens.logs.LogsScreen
+import com.mateof.kanal.ui.screens.player.MiniPlayerOverlay
+import androidx.compose.ui.unit.dp
 import com.mateof.kanal.ui.screens.player.PlayerScreen
 import com.mateof.kanal.ui.screens.search.SearchScreen
 import com.mateof.kanal.ui.screens.settings.SettingsScreen
@@ -336,6 +338,13 @@ fun KanalNavHost() {
             )
         }
     }
+    // Over every screen but the player itself, which takes the picture back.
+    MiniPlayerOverlay(
+        hidden = currentRoute == null || currentRoute.startsWith("player/") ||
+            currentRoute == Routes.GATE || currentRoute.startsWith(Routes.SETUP),
+        onExpand = { kind, itemId, start -> nav.navigate(Routes.player(kind, itemId, start)) },
+        bottomInset = if (isCompact) 80.dp else 0.dp
+    )
     offer?.let { pending ->
         IncomingSourcesDialog(pending, onAnswer = { accept -> link.answer(pending, accept) })
     }

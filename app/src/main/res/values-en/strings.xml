@@ -131,6 +131,8 @@
     <string name="player_details">Details</string>
     <string name="player_play">Play</string>
     <string name="player_pause">Pause</string>
+    <string name="mini_close">Close the window</string>
+    <string name="mini_failed">Tap to open</string>
     <string name="player_zoom">Zoom</string>
     <string name="player_stretch">Stretch</string>
     <string name="player_next_label">NEXT</string>

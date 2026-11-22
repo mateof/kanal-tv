@@ -292,7 +292,9 @@ fun PlayerScreen(
     // A television has no orientation to change, a picture already lying on its
     // side has nothing to gain from being turned, and old Androids have no small
     // window: none of the three is hinted at where it cannot happen.
-    val canPip = android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.O
+    // On a phone or tablet the small window is the app's own corner, which any
+    // Android can draw; on a television it is still the system's.
+    val canPip = !onTelevision || android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.O
 
     var forcedLandscape by remember { mutableStateOf(false) }
     // Bumped every time landscape is asked for, to re-arm the release below.
@@ -372,6 +374,20 @@ fun PlayerScreen(
     val isLive = state.playable?.isLive == true
     // Something sent from another device is not in the list here, so there is nothing to hand back.
     fun liveChannelId(): String? = state.playable?.takeIf { it.isLive && it.sourceId.isNotBlank() }?.itemId
+
+    /**
+     * Away from a television the small window stays inside the app, so the rest
+     * of it can still be used: the system's own shrinks the whole activity and
+     * leaves nothing to browse. Leaving the app still uses the system's.
+     */
+    fun shrink() {
+        if (!onTelevision && vm.minimize()) {
+            mode = Mode.Watching
+            onBack(null)
+        } else if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.O) {
+            vm.enterPip()
+        }
+    }
 
     fun poke() {
         osdVisible = true
@@ -626,7 +642,7 @@ fun PlayerScreen(
                             when (fired) {
                                 PlayerGesture.Back -> onBack(liveChannelId())
                                 PlayerGesture.Fullscreen -> goFullscreenLandscape()
-                                PlayerGesture.Pip -> vm.enterPip()
+                                PlayerGesture.Pip -> shrink()
                                 PlayerGesture.Cast -> {
                                     mode = Mode.Cast
                                     vm.searchCastDevices()
@@ -1111,12 +1127,12 @@ fun PlayerScreen(
                             active = sleepLeft != null
                         ) { mode = Mode.Sleep }
                     )
-                    if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.O) {
+                    if (canPip) {
                         add(
                             MenuAction(
                                 stringResource(R.string.player_pip),
                                 Icons.Outlined.PictureInPictureAlt
-                            ) { vm.enterPip() }
+                            ) { shrink() }
                         )
                     }
                 }

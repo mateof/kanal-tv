@@ -41,6 +41,7 @@ import com.mateof.kanal.data.repo.Playable
 import com.mateof.kanal.data.repo.PlaybackRepository
 import com.mateof.kanal.player.PlayerFactory
 import com.mateof.kanal.player.StreamProbe
+import com.mateof.kanal.player.MiniPlayer
 import com.mateof.kanal.player.PipController
 import com.mateof.kanal.player.PlayerHandover
 import dagger.hilt.android.lifecycle.HiltViewModel
@@ -214,6 +215,7 @@ class PlayerViewModel @Inject constructor(
     private val epg: EpgRepository,
     private val playerFactory: PlayerFactory,
     private val handover: PlayerHandover,
+    private val mini: MiniPlayer,
     private val pip: PipController,
     private val sleepTimer: SleepTimer,
     private val probe: StreamProbe,
@@ -236,6 +238,12 @@ class PlayerViewModel @Inject constructor(
     private var channelIds: List<String> = emptyList()
     private var ticker: Job? = null
     private var loadedKey = ""
+    private var loadedKind = ""
+    private var loadedItemId = ""
+    private var loadedStart = 0L
+
+    /** Set just before the screen closes to leave the picture in a corner of the app. */
+    private var minimizing = false
 
     /** Urls still to try for the current item, in order. */
     private var candidates: List<String> = emptyList()
@@ -360,6 +368,9 @@ class PlayerViewModel @Inject constructor(
         val key = "$kind/$itemId/$startMillis"
         if (loadedKey == key) return
         loadedKey = key
+        loadedKind = kind
+        loadedItemId = itemId
+        loadedStart = startMillis
 
         viewModelScope.launch {
             // Sent from another device as a bare url: there may be no source
@@ -451,12 +462,16 @@ class PlayerViewModel @Inject constructor(
         // player over keeps the connection and the buffer, so opening a channel
         // from the list is instant instead of reconnecting from scratch.
         var adoptedFromPreview = false
-        val adopted = player ?: handover.adopt(streamKey, signature)?.also {
+        // Or the corner of the app, when it is the same thing coming back full size.
+        val adopted = player ?: (handover.adopt(streamKey, signature) ?: mini.adopt(streamKey, signature))?.also {
             it.addListener(listener)
             player = it
             adoptedFromPreview = true
         }
         val fresh = adopted == null
+        // Something else is in the corner: one stream at a time, so it goes
+        // before this one asks the provider for another connection.
+        if (fresh) mini.close()
         val exo = adopted ?: playerFactory.create(
             playable.userAgent,
             settings.bufferProfile,
@@ -1187,6 +1202,20 @@ class PlayerViewModel @Inject constructor(
     /** Asks the activity to shrink into a floating window. */
     fun enterPip() = pip.request()
 
+    /**
+     * Leaves the picture playing in a corner of the app once this screen closes.
+     *
+     * @return false when there is nothing here to leave there: no picture yet,
+     *   or the stream is on another device.
+     */
+    fun minimize(): Boolean {
+        val exo = player ?: return false
+        if (_state.value.playable == null || _state.value.castingTo != null) return false
+        if (exo.playbackState == Player.STATE_IDLE) return false
+        minimizing = true
+        return true
+    }
+
     // --- Sleep timer ---------------------------------------------------------
     //
     // The same singleton the settings screen arms, so the two cannot disagree
@@ -1249,6 +1278,9 @@ class PlayerViewModel @Inject constructor(
      */
     fun onStandby() {
         if (standing) return
+        // Leaving for the corner of the app also stops this screen's lifecycle,
+        // but the picture is going on, not off.
+        if (minimizing) return
         val playable = _state.value.playable ?: return
         val exo = player ?: return
         standing = true
@@ -1601,10 +1633,27 @@ class PlayerViewModel @Inject constructor(
         reconnectJob?.cancel()
         ticker?.cancel()
         val exo = player
+        val playable = _state.value.playable
         // A live channel is handed to the preview instead of being torn down;
         // anything else has nowhere to go and is released.
         val keep = keepChannelOnExit && !inbox.stoppedRecently()
-        if (exo != null && _state.value.playable?.isLive == true && keep) {
+        if (exo != null && playable != null && minimizing) {
+            exo.removeListener(listener)
+            // Zapping moves away from the route the screen was opened with, so
+            // the way back is built from what is playing now. Something sent
+            // from another device has no catalogue entry and keeps its own route.
+            // Only live zaps, and an episode's item id is not its route's.
+            val sameItem = playable.sourceId.isBlank() || !playable.isLive || playable.itemId == loadedItemId
+            mini.show(
+                exo,
+                playable,
+                kind = if (sameItem) loadedKind else "LIVE",
+                itemId = if (sameItem) loadedItemId else playable.itemId,
+                startMillis = if (sameItem) loadedStart else 0L,
+                streamKey = streamKey,
+                signature = signature
+            )
+        } else if (exo != null && playable?.isLive == true && keep) {
             handover.park(exo, streamKey, signature, listener)
         } else {
             exo?.release()

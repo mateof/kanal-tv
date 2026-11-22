@@ -23,6 +23,7 @@ import com.mateof.kanal.data.repo.EpgRepository
 import com.mateof.kanal.data.repo.PlaybackRepository
 import com.mateof.kanal.data.repo.WatchedNow
 import com.mateof.kanal.data.repo.WatchingRepository
+import com.mateof.kanal.player.MiniPlayer
 import com.mateof.kanal.player.PlayerFactory
 import com.mateof.kanal.player.PlayerHandover
 import dagger.hilt.android.lifecycle.HiltViewModel
@@ -56,6 +57,7 @@ class LiveViewModel @Inject constructor(
     private val playback: PlaybackRepository,
     private val playerFactory: PlayerFactory,
     private val handover: PlayerHandover,
+    private val mini: MiniPlayer,
     private val watching: WatchingRepository,
     private val logger: FileLogger
 ) : ViewModel() {
@@ -236,6 +238,9 @@ class LiveViewModel @Inject constructor(
         previewJob = viewModelScope.launch {
             val config = prefs.settings.first()
             if (!config.previewEnabled) return@launch
+            // The corner of the app is already playing something: a preview
+            // would ask the provider for a second connection behind it.
+            if (mini.showing.value != null) return@launch
             if (!immediate) delay(config.previewDelayMs.toLong())
             val current = activeSource.first() ?: return@launch
             if (_focused.value?.streamId != channel.streamId) return@launch

@@ -138,6 +138,8 @@
     <string name="player_details">Ficha</string>
     <string name="player_play">Reproducir</string>
     <string name="player_pause">Pausa</string>
+    <string name="mini_close">Pechar a ventá</string>
+    <string name="mini_failed">Toca para abrir</string>
     <string name="player_zoom">Zoom</string>
     <string name="player_stretch">Estirar</string>
     <string name="player_next_label">DESPOIS</string>

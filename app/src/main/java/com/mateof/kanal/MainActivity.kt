@@ -15,6 +15,7 @@ import androidx.lifecycle.lifecycleScope
 import com.mateof.kanal.core.InactivityWatcher
 import com.mateof.kanal.core.SleepTimer
 import com.mateof.kanal.data.prefs.AppPreferences
+import com.mateof.kanal.player.MiniPlayer
 import com.mateof.kanal.player.PipController
 import com.mateof.kanal.player.PlayerHandover
 import com.mateof.kanal.ui.AppShell
@@ -40,6 +41,7 @@ class MainActivity : ComponentActivity() {
     @Inject lateinit var handover: PlayerHandover
 
     @Inject lateinit var pip: PipController
+    @Inject lateinit var mini: MiniPlayer
 
     override fun onCreate(savedInstanceState: Bundle?) {
         installSplashScreen()
@@ -164,6 +166,9 @@ class MainActivity : ComponentActivity() {
         // A player parked mid-handover would otherwise keep pulling the stream
         // with nothing on screen to hand it to.
         handover.discard()
+        // Same for the corner of the app: the system's small window keeps the
+        // activity started, so reaching here means nothing is showing it.
+        mini.close()
     }
 
     /** Every touch and every key press on the remote passes through here. */
