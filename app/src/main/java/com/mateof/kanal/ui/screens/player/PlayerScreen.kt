@@ -7,7 +7,8 @@ import android.content.pm.ActivityInfo
 import android.provider.Settings
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.Spring
-import androidx.compose.foundation.gestures.detectDragGestures
+import androidx.compose.foundation.gestures.awaitEachGesture
+import androidx.compose.foundation.gestures.awaitFirstDown
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.platform.LocalConfiguration
@@ -103,6 +104,7 @@ import androidx.compose.ui.input.key.onKeyEvent
 import androidx.compose.ui.input.key.onPreviewKeyEvent
 import androidx.compose.ui.input.key.type
 import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.input.pointer.positionChange
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
@@ -148,6 +150,7 @@ import com.mateof.kanal.ui.isCompact
 import com.mateof.kanal.ui.isTelevision
 import com.mateof.kanal.ui.theme.KanalColors
 import kotlinx.coroutines.delay
+import kotlin.math.abs
 import kotlinx.coroutines.launch
 
 private const val OSD_TIMEOUT_MS = 6_000L
@@ -168,6 +171,52 @@ private enum class Mode { Watching, Menu, Channels, Tracks, Guide, Cast, Sleep }
  * accelerometer is given the screen back.
  */
 private const val ORIENTATION_HOLD_MS = 6_000L
+
+/** How long the brightness or volume column stays after the finger lifts. */
+private const val LEVEL_LINGER_MS = 900L
+
+/**
+ * The window's own brightness, or the system's while the window has not set
+ * one. Read from the setting as a share of 255, which on newer phones is not
+ * quite what the slider shows, but only decides where the dial starts.
+ */
+private fun currentBrightness(activity: Activity?): Float {
+    val own = activity?.window?.attributes?.screenBrightness ?: -1f
+    if (own >= 0f) return own
+    val system = runCatching {
+        android.provider.Settings.System.getInt(
+            activity?.contentResolver,
+            android.provider.Settings.System.SCREEN_BRIGHTNESS
+        )
+    }.getOrNull() ?: return 0.5f
+    return (system / 255f).coerceIn(0f, 1f)
+}
+
+/**
+ * Only this window, never the system setting: no permission is needed and the
+ * phone is back to its own brightness as soon as the player goes. Never quite
+ * zero, which some screens take as off.
+ */
+private fun applyBrightness(activity: Activity?, value: Float) {
+    val window = activity?.window ?: return
+    window.attributes = window.attributes.apply { screenBrightness = value.coerceIn(0.01f, 1f) }
+}
+
+private fun currentVolume(audio: android.media.AudioManager): Float {
+    val max = audio.getStreamMaxVolume(android.media.AudioManager.STREAM_MUSIC)
+    if (max <= 0) return 0f
+    return audio.getStreamVolume(android.media.AudioManager.STREAM_MUSIC) / max.toFloat()
+}
+
+/** Without the system's panel: the app draws its own column over the picture. */
+private fun applyVolume(audio: android.media.AudioManager, value: Float): Float {
+    val max = audio.getStreamMaxVolume(android.media.AudioManager.STREAM_MUSIC)
+    if (max <= 0) return 0f
+    val step = kotlin.math.round(value * max).toInt().coerceIn(0, max)
+    // Do-not-disturb can refuse it; the dial then just shows where it stayed.
+    runCatching { audio.setStreamVolume(android.media.AudioManager.STREAM_MUSIC, step, 0) }
+    return step / max.toFloat()
+}
 
 private val TILE_WIDTH = 104.dp
 private val TILE_GAP = 12.dp
@@ -222,7 +271,24 @@ fun PlayerScreen(
     // picture back. Kept apart so the drag itself writes a plain state and does
     // not have to start a coroutine for every one of the moves a finger makes.
     var dragTravel by remember { mutableStateOf(Offset.Zero) }
+    // Fingers down at the widest point of the current drag: three is a cast.
+    var dragFingers by remember { mutableIntStateOf(1) }
+    // Set while a drag owns the touch. With more than one finger down the tap
+    // detector does not see the drag consume the moves, and three fingers held
+    // still at the top of a swipe opened the menu as a long press.
+    val dragOwnsTouch = remember { booleanArrayOf(false) }
     val settle = remember { Animatable(1f) }
+    // The side dial being turned, kept on screen a moment after the finger lifts.
+    var levelReading by remember { mutableStateOf<LevelReading?>(null) }
+    var levelReleasedAt by remember { mutableLongStateOf(0L) }
+    // Its side outlives the reading, or the column would jump across as it fades.
+    var levelSide by remember { mutableStateOf(PlayerLevel.Volume) }
+    LaunchedEffect(levelReleasedAt) {
+        if (levelReleasedAt == 0L) return@LaunchedEffect
+        delay(LEVEL_LINGER_MS)
+        levelReading = null
+    }
+    val audio = remember(context) { context.getSystemService(android.content.Context.AUDIO_SERVICE) as android.media.AudioManager }
     // A television has no orientation to change, a picture already lying on its
     // side has nothing to gain from being turned, and old Androids have no small
     // window: none of the three is hinted at where it cannot happen.
@@ -295,6 +361,9 @@ fun PlayerScreen(
         onDispose {
             val window = activity?.window ?: return@onDispose
             activity.requestedOrientation = ActivityInfo.SCREEN_ORIENTATION_UNSPECIFIED
+            window.attributes = window.attributes.apply {
+                screenBrightness = android.view.WindowManager.LayoutParams.BRIGHTNESS_OVERRIDE_NONE
+            }
             WindowInsetsControllerCompat(window, window.decorView)
                 .show(WindowInsetsCompat.Type.systemBars())
         }
@@ -412,14 +481,23 @@ fun PlayerScreen(
         derivedStateOf {
             (dragTravel * settle.value)
                 .takeIf { it.getDistance() > hintThreshold }
-                ?.let { PlayerGestures.pending(it, canGoFullscreen, canPip) }
+                ?.let { PlayerGestures.pending(it, canGoFullscreen, canPip, dragFingers) }
         }
     }
     val gestureArmed by remember(canGoFullscreen, canPip, swipeThreshold) {
         derivedStateOf {
             val travelled = dragTravel * settle.value
-            val gesture = PlayerGestures.pending(travelled, canGoFullscreen, canPip)
+            val gesture = PlayerGestures.pending(travelled, canGoFullscreen, canPip, dragFingers)
             PlayerGestures.progress(travelled, gesture, swipeThreshold) >= 1f
+        }
+    }
+
+    fun springBack(stiffness: Float = Spring.StiffnessMediumLow) {
+        scope.launch {
+            settle.animateTo(0f, spring(stiffness = stiffness))
+            dragTravel = Offset.Zero
+            dragFingers = 1
+            settle.snapTo(1f)
         }
     }
 
@@ -432,7 +510,7 @@ fun PlayerScreen(
             // and a tap while something is showing puts it away.
             .pointerInput(Unit) {
                 detectTapGestures(
-                    onLongPress = { openMenu() },
+                    onLongPress = { if (!dragOwnsTouch[0]) openMenu() },
                     onTap = {
                         // Anything showing goes away, including the title band:
                         // switching mode alone left it up until its timer ran
@@ -450,45 +528,113 @@ fun PlayerScreen(
             // Gestures for the hand, mirroring what the remote does with keys.
             // Only while watching: with a panel open the drag belongs to the
             // panel, and firing a gesture from under it would be a surprise.
-            .pointerInput(swipeThreshold, gesturesEnabled) {
+            .pointerInput(swipeThreshold, gesturesEnabled, canGoFullscreen, canPip) {
                 if (!gesturesEnabled) return@pointerInput
-                detectDragGestures(
-                    onDragStart = {
-                        dragTravel = Offset.Zero
-                        scope.launch { settle.snapTo(1f) }
-                    },
-                    onDragEnd = {
-                        val travelled = dragTravel
-                        val fired = PlayerGestures
-                            .pending(travelled, canGoFullscreen, canPip)
-                            ?.takeIf {
-                                PlayerGestures.progress(travelled, it, swipeThreshold) >= 1f
+                awaitEachGesture {
+                    val down = awaitFirstDown(requireUnconsumed = false)
+                    val zone = PlayerGestures.zoneOf(down.position.x, size.width)
+                    val slop = viewConfiguration.touchSlop
+                    var travel = Offset.Zero
+                    var fingers = 1
+                    // Past the slop the drag is ours: the tap detector then sees it consumed.
+                    var committed = false
+                    var dial: PlayerLevel? = null
+                    var dialStart = 0f
+                    // Once a dial has been turned the drag was that and nothing else:
+                    // letting go must not also read it as a swipe up or down.
+                    var turnedDial = false
+                    var lifted = false
+
+                    fun dropDial() {
+                        if (dial != null) levelReleasedAt = android.os.SystemClock.uptimeMillis()
+                        dial = null
+                    }
+
+                    try {
+                        while (true) {
+                            val event = awaitPointerEvent()
+                            val pressed = event.changes.count { it.pressed }
+                            if (pressed == 0) {
+                                lifted = true
+                                break
                             }
-                        // Sprung back whatever happens: when the gesture does
-                        // not take — a small window the system refuses, say —
-                        // the picture has to return rather than stay askew.
-                        scope.launch {
-                            settle.animateTo(0f, spring(stiffness = Spring.StiffnessMediumLow))
-                            dragTravel = Offset.Zero
-                            settle.snapTo(1f)
+                            if (pressed > fingers) {
+                                fingers = pressed
+                                // A dial is a one-finger thing, and a cast counts
+                                // from the moment the third finger lands.
+                                dropDial()
+                                if (fingers >= 3) {
+                                    travel = Offset.Zero
+                                    turnedDial = false
+                                }
+                            }
+                            val moving = event.changes.filter { it.pressed && it.previousPressed }
+                            if (moving.isEmpty()) continue
+                            val delta = moving.fold(Offset.Zero) { acc, c -> acc + c.positionChange() } /
+                                moving.size.toFloat()
+                            travel += delta
+                            if (!committed) {
+                                if (travel.getDistance() < slop) continue
+                                committed = true
+                                dragOwnsTouch[0] = true
+                                // The sides turn a dial only when the drag starts
+                                // upright: sideways from there is still "back".
+                                if (fingers == 1 && abs(travel.y) > abs(travel.x)) {
+                                    dial = when (zone) {
+                                        TouchZone.Left -> PlayerLevel.Brightness
+                                        TouchZone.Right -> PlayerLevel.Volume.takeIf { !audio.isVolumeFixed }
+                                        TouchZone.Centre -> null
+                                    }
+                                    dialStart = when (dial) {
+                                        PlayerLevel.Brightness -> currentBrightness(activity)
+                                        PlayerLevel.Volume -> currentVolume(audio)
+                                        null -> 0f
+                                    }
+                                }
+                            }
+                            val turning = dial
+                            if (turning != null) {
+                                val target = PlayerGestures.level(dialStart, travel.y, size.height)
+                                val reached = when (turning) {
+                                    PlayerLevel.Brightness -> target.also { applyBrightness(activity, it) }
+                                    PlayerLevel.Volume -> applyVolume(audio, target)
+                                }
+                                levelReading = LevelReading(turning, reached)
+                                levelSide = turning
+                                turnedDial = true
+                                levelReleasedAt = 0L
+                            } else {
+                                dragFingers = fingers
+                                dragTravel = travel
+                            }
+                            event.changes.forEach { if (it.pressed) it.consume() }
                         }
-                        when (fired) {
-                            PlayerGesture.Back -> onBack(liveChannelId())
-                            PlayerGesture.Fullscreen -> goFullscreenLandscape()
-                            PlayerGesture.Pip -> vm.enterPip()
-                            null -> Unit
-                        }
-                    },
-                    onDragCancel = {
-                        scope.launch {
-                            settle.animateTo(0f, spring())
-                            dragTravel = Offset.Zero
-                            settle.snapTo(1f)
+                    } finally {
+                        dragOwnsTouch[0] = false
+                        dropDial()
+                        if (!lifted) {
+                            // Cancelled: a panel opened, say. Nothing fires.
+                            springBack(Spring.StiffnessMedium)
+                        } else if (committed && !turnedDial) {
+                            val fired = PlayerGestures
+                                .pending(travel, canGoFullscreen, canPip, fingers)
+                                ?.takeIf { PlayerGestures.progress(travel, it, swipeThreshold) >= 1f }
+                            // Sprung back whatever happens: when the gesture does
+                            // not take — a small window the system refuses, say —
+                            // the picture has to return rather than stay askew.
+                            springBack()
+                            when (fired) {
+                                PlayerGesture.Back -> onBack(liveChannelId())
+                                PlayerGesture.Fullscreen -> goFullscreenLandscape()
+                                PlayerGesture.Pip -> vm.enterPip()
+                                PlayerGesture.Cast -> {
+                                    mode = Mode.Cast
+                                    vm.searchCastDevices()
+                                }
+                                null -> Unit
+                            }
                         }
                     }
-                ) { change, drag ->
-                    dragTravel += drag
-                    change.consume()
                 }
             }
             // Preview, not onKeyEvent: a key event reaches the focused child
@@ -636,7 +782,7 @@ fun PlayerScreen(
                         val travelled = dragTravel * settle.value
                         val transform = gestureTransform(
                             travelled,
-                            PlayerGestures.pending(travelled, canGoFullscreen, canPip),
+                            PlayerGestures.pending(travelled, canGoFullscreen, canPip, dragFingers),
                             swipeThreshold
                         )
                         translationX = transform.translationX
@@ -655,6 +801,19 @@ fun PlayerScreen(
                 gesture = pendingGesture,
                 armed = gestureArmed,
                 modifier = Modifier.align(Alignment.Center)
+            )
+        }
+
+        // Brightness on the left, volume on the right: each next to its own thumb.
+        if (!inPip) {
+            LevelIndicator(
+                reading = levelReading,
+                modifier = Modifier
+                    .align(
+                        if (levelSide == PlayerLevel.Brightness) Alignment.CenterStart
+                        else Alignment.CenterEnd
+                    )
+                    .padding(horizontal = 32.dp)
             )
         }
 
